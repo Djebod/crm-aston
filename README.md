@@ -17,6 +17,8 @@ Multi-user (Bang Syam sebagai super admin + tim marketing), dengan upload dokume
 - Cari & filter status, tombol WhatsApp langsung dari nomor prospek
 - **Manajemen user (admin):** tambah, edit (nama/role), aktif-nonaktifkan, dan **reset password**
 - **Lupa password (self-service):** user minta tautan reset -> dikirim ke email -> buat password baru
+- **Profil Saya (semua user):** ubah nama & ganti password sendiri (wajib password lama benar)
+- **Lihat password:** semua kolom password punya tombol mata untuk menampilkan/menyembunyikan isian
 
 ---
 
@@ -137,6 +139,7 @@ git push
 ## Cara pakai fitur user
 
 - **Tambah/edit/reset (admin):** login sebagai admin -> tombol **Kelola Tim** -> tambah anggota, atau klik **Kelola** pada anggota untuk ubah nama/role, aktif-nonaktif, dan reset password.
+- **Profil Saya (semua user):** klik nama Anda di kanan atas -> ubah nama, atau ganti password (isi password lama + password baru). Klik ikon mata untuk melihat isian password.
 - **Lupa password (semua user tim):** di halaman masuk -> **Lupa password?** -> isi email -> tautan reset dikirim ke email -> buka tautan -> buat password baru (berlaku 1 jam).
 - **Super admin lupa password:** buat hash baru (langkah 4), ganti `ADMIN_PASSWORD_HASH` di Vercel, lalu Redeploy. (Super admin tidak lewat email karena datanya di Environment Variable, bukan di Sheet.)
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function ResetPassword() {
   const [email, setEmail] = useState("");
@@ -79,23 +80,25 @@ export default function ResetPassword() {
               )}
 
               <label className="block text-sm font-medium mb-1">Password baru</label>
-              <input
-                type="password"
-                value={pw1}
-                onChange={(e) => setPw1(e.target.value)}
-                placeholder="minimal 6 karakter"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2.5 mb-4 outline-none focus:ring-2 focus:ring-[#c8962c]"
-              />
+              <div className="mb-4">
+                <PasswordInput
+                  value={pw1}
+                  onChange={(e) => setPw1(e.target.value)}
+                  placeholder="minimal 6 karakter"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#c8962c]"
+                />
+              </div>
 
               <label className="block text-sm font-medium mb-1">Ulangi password</label>
-              <input
-                type="password"
-                value={pw2}
-                onChange={(e) => setPw2(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && simpan()}
-                placeholder="ketik ulang"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2.5 mb-4 outline-none focus:ring-2 focus:ring-[#c8962c]"
-              />
+              <div className="mb-4">
+                <PasswordInput
+                  value={pw2}
+                  onChange={(e) => setPw2(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && simpan()}
+                  placeholder="ketik ulang"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#c8962c]"
+                />
+              </div>
 
               {error && (
                 <div className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 mb-4">

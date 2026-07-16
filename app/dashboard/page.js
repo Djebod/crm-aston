@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import PasswordInput from "@/components/PasswordInput";
 
 const STATUS = ["Baru", "Follow Up", "Penawaran", "Negosiasi", "Deal", "Batal"];
 const STATUS_STYLE = {
@@ -61,6 +62,7 @@ export default function Dashboard() {
   const [form, setForm] = useState(FORM_KOSONG);
   const [menyimpan, setMenyimpan] = useState(false);
   const [modalUser, setModalUser] = useState(false);
+  const [modalProfil, setModalProfil] = useState(false);
 
   // Cek login
   useEffect(() => {
@@ -227,10 +229,14 @@ export default function Dashboard() {
                 Kelola Tim
               </button>
             )}
-            <div className="text-right leading-tight hidden sm:block">
+            <button
+              onClick={() => setModalProfil(true)}
+              className="text-right leading-tight bg-white/10 hover:bg-white/20 rounded-lg px-3 py-1.5 transition"
+              title="Profil saya"
+            >
               <div className="text-sm font-semibold">{user.nama}</div>
               <div className="text-xs text-slate-300 capitalize">{user.role}</div>
-            </div>
+            </button>
             <button
               onClick={logout}
               className="text-sm bg-[#c8962c] hover:brightness-95 text-[#12263a] font-semibold rounded-lg px-3 py-1.5 transition"
@@ -375,6 +381,19 @@ export default function Dashboard() {
 
       {/* Modal Kelola Tim */}
       {modalUser && <KelolaTim user={user} onClose={() => setModalUser(false)} />}
+
+      {/* Modal Profil Saya */}
+      {modalProfil && (
+        <ProfilSaya
+          user={user}
+          onClose={() => setModalProfil(false)}
+          onProfileUpdate={(nama) => {
+            const baru = { ...user, nama };
+            setUser(baru);
+            localStorage.setItem("crm_user", JSON.stringify(baru));
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -531,7 +550,9 @@ function KelolaTim({ user, onClose }) {
       <div className="grid sm:grid-cols-2 gap-3">
         <Field label="Nama"><input className={inp} value={nama} onChange={(e) => setNama(e.target.value)} /></Field>
         <Field label="Email"><input className={inp} value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-        <Field label="Password awal"><input type="password" className={inp} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+        <Field label="Password awal">
+          <PasswordInput className={inp} value={password} onChange={(e) => setPassword(e.target.value)} />
+        </Field>
         <Field label="Role">
           <select className={inp} value={role} onChange={(e) => setRole(e.target.value)}>
             <option value="marketing">marketing</option>
@@ -647,8 +668,7 @@ function BarisUser({ u, requester, expanded, onToggle, onSaved }) {
           <div className="mt-4 pt-3 border-t border-slate-200">
             <div className="text-sm font-medium text-slate-700 mb-1">Reset password</div>
             <div className="flex flex-col sm:flex-row gap-2">
-              <input
-                type="password"
+              <PasswordInput
                 className={inp}
                 value={pwBaru}
                 onChange={(e) => setPwBaru(e.target.value)}
@@ -672,5 +692,117 @@ function BarisUser({ u, requester, expanded, onToggle, onSaved }) {
         </div>
       )}
     </div>
+  );
+}
+
+function ProfilSaya({ user, onClose, onProfileUpdate }) {
+  const [nama, setNama] = useState(user.nama || "");
+  const [busyProfil, setBusyProfil] = useState(false);
+  const [pesanProfil, setPesanProfil] = useState("");
+
+  const [pwLama, setPwLama] = useState("");
+  const [pwBaru, setPwBaru] = useState("");
+  const [pwBaru2, setPwBaru2] = useState("");
+  const [busyPw, setBusyPw] = useState(false);
+  const [pesanPw, setPesanPw] = useState("");
+
+  async function simpanProfil() {
+    setPesanProfil("");
+    if (!nama.trim()) {
+      setPesanProfil("Nama tidak boleh kosong.");
+      return;
+    }
+    setBusyProfil(true);
+    try {
+      const res = await fetch("/api/account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateProfile", email: user.email, nama: nama.trim() }),
+      });
+      const data = await res.json();
+      if (data.status === "ok") {
+        onProfileUpdate(nama.trim());
+        setPesanProfil("✓ Profil diperbarui.");
+      } else {
+        setPesanProfil(data.message || "Gagal memperbarui profil.");
+      }
+    } catch (e) {
+      setPesanProfil("Tidak bisa terhubung ke server.");
+    } finally {
+      setBusyProfil(false);
+    }
+  }
+
+  async function gantiPassword() {
+    setPesanPw("");
+    if (!pwLama) { setPesanPw("Isi password lama."); return; }
+    if (pwBaru.length < 6) { setPesanPw("Password baru minimal 6 karakter."); return; }
+    if (pwBaru !== pwBaru2) { setPesanPw("Konfirmasi password baru tidak sama."); return; }
+    setBusyPw(true);
+    try {
+      const res = await fetch("/api/account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "changePassword",
+          email: user.email,
+          currentPassword: pwLama,
+          newPassword: pwBaru,
+        }),
+      });
+      const data = await res.json();
+      if (data.status === "ok") {
+        setPesanPw("✓ Password berhasil diganti.");
+        setPwLama(""); setPwBaru(""); setPwBaru2("");
+      } else {
+        setPesanPw(data.message || "Gagal mengganti password.");
+      }
+    } catch (e) {
+      setPesanPw("Tidak bisa terhubung ke server.");
+    } finally {
+      setBusyPw(false);
+    }
+  }
+
+  return (
+    <Modal title="Profil Saya" onClose={onClose}>
+      {/* Ubah profil */}
+      <h3 className="font-semibold text-sm text-slate-700 mb-2">Data profil</h3>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <Field label="Nama"><input className={inp} value={nama} onChange={(e) => setNama(e.target.value)} /></Field>
+        <Field label="Email (tidak bisa diubah)">
+          <input className={inp + " bg-slate-100 text-slate-500"} value={user.email} readOnly />
+        </Field>
+      </div>
+      {pesanProfil && <p className="text-sm mt-3">{pesanProfil}</p>}
+      <button onClick={simpanProfil} disabled={busyProfil} className="mt-3 bg-[#12263a] hover:bg-[#0e1f33] text-white text-sm font-semibold rounded-lg py-2 px-4 disabled:opacity-60">
+        {busyProfil ? "Menyimpan..." : "Simpan profil"}
+      </button>
+
+      {/* Ganti password */}
+      <div className="mt-6 pt-5 border-t border-slate-200">
+        <h3 className="font-semibold text-sm text-slate-700 mb-2">Ganti password</h3>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label="Password lama">
+            <PasswordInput className={inp} value={pwLama} onChange={(e) => setPwLama(e.target.value)} placeholder="password sekarang" />
+          </Field>
+          <div className="hidden sm:block" />
+          <Field label="Password baru">
+            <PasswordInput className={inp} value={pwBaru} onChange={(e) => setPwBaru(e.target.value)} placeholder="min. 6 karakter" />
+          </Field>
+          <Field label="Ulangi password baru">
+            <PasswordInput className={inp} value={pwBaru2} onChange={(e) => setPwBaru2(e.target.value)} placeholder="ketik ulang" />
+          </Field>
+        </div>
+        {pesanPw && <p className="text-sm mt-3">{pesanPw}</p>}
+        <button onClick={gantiPassword} disabled={busyPw} className="mt-3 bg-[#c8962c] hover:brightness-95 text-[#12263a] text-sm font-semibold rounded-lg py-2 px-4 disabled:opacity-60">
+          {busyPw ? "Menyimpan..." : "Ganti password"}
+        </button>
+      </div>
+
+      <p className="text-xs text-slate-400 mt-5">
+        Catatan: akun super admin dikelola lewat Environment Variable, jadi ubah profil/password di sini hanya untuk akun tim.
+      </p>
+    </Modal>
   );
 }
