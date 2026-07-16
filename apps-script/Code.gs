@@ -15,7 +15,7 @@ const SHEET_LEADS = "Leads";
 const SHEET_USERS = "Users";
 const SHEET_AKT = "Aktivitas";
 const SHEET_COMP = "Companies";
-const FOLDER_ID = "PASTE_ID_FOLDER_DRIVE_DISINI"; // folder Google Drive untuk dokumen
+const FOLDER_ID = "1v_vC83UUEKpw9HkK3VKNrFYpurQ2pHxO"; // folder Google Drive untuk dokumen
 const APP_URL = "https://crm-aston.vercel.app"; // ganti dengan URL aplikasi Anda (untuk link reset password)
 
 /*** BACA DATA (GET) ***/
