@@ -2,20 +2,19 @@
  * ASTON CRM — Apps Script Web App (jembatan ke Sheets & Drive)
  * Tempel kode ini di: Sheet -> Extensions -> Apps Script
  *
- * SIAPKAN 2 TAB DI GOOGLE SHEET:
- *
- * Tab "Leads" (baris pertama = judul kolom, urutan HARUS sama):
+ * TAB "Leads" (baris pertama = judul kolom, urutan HARUS sama):
  * ID | Tanggal | Nama | Instansi | NoHP | Email | JenisEvent |
  * TanggalEvent | JumlahPax | EstimasiNilai | Sumber | Status |
  * PIC | Catatan | LinkDokumen | UpdatedAt
  *
- * Tab "Users" (baris pertama = judul kolom):
- * Email | Nama | PasswordHash | Role | Aktif
+ * TAB "Users" (baris pertama = judul kolom):
+ * Email | Nama | PasswordHash | Role | Aktif | ResetToken | ResetExpiry
  *************************************************************/
 
 const SHEET_LEADS = "Leads";
 const SHEET_USERS = "Users";
 const FOLDER_ID = "PASTE_ID_FOLDER_DRIVE_DISINI"; // folder Google Drive untuk dokumen
+const APP_URL = "https://crm-aston.vercel.app"; // ganti dengan URL aplikasi Anda (untuk link reset password)
 
 /*** BACA DATA (GET) ***/
 function doGet(e) {
@@ -33,6 +32,9 @@ function doPost(e) {
     if (action === "auth") return json({ status: "ok", user: cariUserByEmail(body.email) });
     if (action === "listUsers") return json({ status: "ok", data: bacaUsers() });
     if (action === "addUser") { tambahUser(body); return json({ status: "ok" }); }
+    if (action === "updateUser") return json(updateUser(body));
+    if (action === "requestReset") return json(requestReset(body));
+    if (action === "doReset") return json(doReset(body));
     if (action === "addLead") return json(tambahLead(body));
     if (action === "updateLead") return json(updateLead(body));
 
@@ -100,7 +102,7 @@ function bacaUsers() {
   const values = sheet(SHEET_USERS).getDataRange().getValues();
   values.shift();
   return values.map(function (r) {
-    return { Email: r[0], Nama: r[1], Role: r[3], Aktif: r[4] }; // tanpa PasswordHash
+    return { Email: r[0], Nama: r[1], Role: r[3], Aktif: r[4] }; // tanpa hash & token
   });
 }
 
@@ -110,16 +112,91 @@ function cariUserByEmail(email) {
   const target = String(email).toLowerCase().trim();
   for (var i = 0; i < values.length; i++) {
     if (String(values[i][0]).toLowerCase().trim() === target) {
-      return { Email: values[i][0], Nama: values[i][1], PasswordHash: values[i][2], Role: values[i][3], Aktif: values[i][4] };
+      return {
+        Email: values[i][0], Nama: values[i][1], PasswordHash: values[i][2],
+        Role: values[i][3], Aktif: values[i][4]
+      };
     }
   }
   return null;
 }
 
 function tambahUser(b) {
-  sheet(SHEET_USERS).appendRow([
-    String(b.email).toLowerCase().trim(), b.nama || "", b.passwordHash || "", b.role || "marketing", true
-  ]);
+  const email = String(b.email).toLowerCase().trim();
+  if (cariUserByEmail(email)) return; // hindari duplikat
+  sheet(SHEET_USERS).appendRow([ email, b.nama || "", b.passwordHash || "", b.role || "marketing", true, "", "" ]);
+}
+
+// Edit user: nama / role / aktif / (opsional) passwordHash baru
+function updateUser(b) {
+  const sh = sheet(SHEET_USERS);
+  const values = sh.getDataRange().getValues();
+  const target = String(b.email).toLowerCase().trim();
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][0]).toLowerCase().trim() === target) {
+      const row = i + 1;
+      if (b.nama !== undefined) sh.getRange(row, 2).setValue(b.nama);
+      if (b.passwordHash) sh.getRange(row, 3).setValue(b.passwordHash);
+      if (b.role !== undefined) sh.getRange(row, 4).setValue(b.role);
+      if (b.aktif !== undefined) sh.getRange(row, 5).setValue(b.aktif);
+      return { status: "ok" };
+    }
+  }
+  return { status: "error", message: "User tidak ditemukan" };
+}
+
+/*** ===== LUPA PASSWORD ===== ***/
+function requestReset(b) {
+  const sh = sheet(SHEET_USERS);
+  const values = sh.getDataRange().getValues();
+  const target = String(b.email).toLowerCase().trim();
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][0]).toLowerCase().trim() === target) {
+      if (String(values[i][4]).toLowerCase() === "false") break; // non-aktif: diam saja
+      const row = i + 1;
+      const token = Utilities.getUuid().replace(/-/g, "");
+      const expiry = Date.now() + 60 * 60 * 1000; // berlaku 1 jam
+      sh.getRange(row, 6).setValue(token);
+      sh.getRange(row, 7).setValue(expiry);
+      kirimEmailReset(values[i][0], values[i][1], token);
+      break;
+    }
+  }
+  // Demi keamanan, selalu balas ok (tidak membocorkan email terdaftar / tidak)
+  return { status: "ok" };
+}
+
+function doReset(b) {
+  const sh = sheet(SHEET_USERS);
+  const values = sh.getDataRange().getValues();
+  const target = String(b.email).toLowerCase().trim();
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][0]).toLowerCase().trim() === target) {
+      const row = i + 1;
+      const token = String(values[i][5] || "");
+      const expiry = Number(values[i][6] || 0);
+      if (!token || token !== String(b.token)) return { status: "error", message: "Link reset tidak valid." };
+      if (Date.now() > expiry) return { status: "error", message: "Link reset sudah kedaluwarsa. Minta ulang." };
+      sh.getRange(row, 3).setValue(b.passwordHash); // set hash baru
+      sh.getRange(row, 6).setValue("");             // hapus token
+      sh.getRange(row, 7).setValue("");
+      return { status: "ok" };
+    }
+  }
+  return { status: "error", message: "Akun tidak ditemukan." };
+}
+
+function kirimEmailReset(email, nama, token) {
+  const link = APP_URL + "/reset?email=" + encodeURIComponent(email) + "&token=" + token;
+  const subjek = "Reset Password — Aston CRM";
+  const isi =
+    "Halo " + (nama || "") + ",\n\n" +
+    "Kami menerima permintaan reset password untuk akun Aston CRM Anda.\n" +
+    "Klik tautan di bawah untuk membuat password baru (berlaku 1 jam):\n\n" +
+    link + "\n\n" +
+    "Jika Anda tidak meminta ini, abaikan email ini.\n\n" +
+    "— Aston CRM, Aston Cirebon";
+  MailApp.sendEmail(email, subjek, isi);
 }
 
 /*** ===== DRIVE (UPLOAD DOKUMEN) ===== ***/

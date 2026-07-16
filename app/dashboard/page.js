@@ -211,9 +211,12 @@ export default function Dashboard() {
       {/* Header */}
       <header className="bg-[#12263a] text-white sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-extrabold tracking-wide">
-            <span className="w-8 h-8 rounded-lg bg-[#c8962c] text-[#12263a] grid place-items-center">A</span>
-            <span className="hidden sm:inline">ASTON CRM</span>
+          <div className="flex items-center gap-2">
+            <span className="bg-white rounded-lg px-2 py-1 flex items-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/aston-logo.png" alt="Aston Cirebon" className="h-7 w-auto object-contain" />
+            </span>
+            <span className="font-extrabold tracking-wide text-[#c8962c] hidden sm:inline">SALES CRM</span>
           </div>
           <div className="flex items-center gap-3">
             {user.role === "admin" && (
@@ -479,6 +482,7 @@ function KelolaTim({ user, onClose }) {
   const [role, setRole] = useState("marketing");
   const [loading, setLoading] = useState(false);
   const [pesan, setPesan] = useState("");
+  const [editing, setEditing] = useState(null); // email user yang sedang diedit
 
   const muat = useCallback(async () => {
     try {
@@ -503,7 +507,7 @@ function KelolaTim({ user, onClose }) {
       const res = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterEmail: user.email, nama, email, password, role }),
+        body: JSON.stringify({ action: "addUser", requesterEmail: user.email, nama, email, password, role }),
       });
       const data = await res.json();
       if (data.status === "ok") {
@@ -521,11 +525,13 @@ function KelolaTim({ user, onClose }) {
   }
 
   return (
-    <Modal title="Kelola Tim Marketing" onClose={onClose}>
+    <Modal title="Kelola Tim" onClose={onClose}>
+      {/* Tambah user baru */}
+      <h3 className="font-semibold text-sm text-slate-700 mb-2">Tambah anggota</h3>
       <div className="grid sm:grid-cols-2 gap-3">
         <Field label="Nama"><input className={inp} value={nama} onChange={(e) => setNama(e.target.value)} /></Field>
         <Field label="Email"><input className={inp} value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-        <Field label="Password"><input type="password" className={inp} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+        <Field label="Password awal"><input type="password" className={inp} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
         <Field label="Role">
           <select className={inp} value={role} onChange={(e) => setRole(e.target.value)}>
             <option value="marketing">marketing</option>
@@ -535,24 +541,136 @@ function KelolaTim({ user, onClose }) {
       </div>
       {pesan && <p className="text-sm mt-3">{pesan}</p>}
       <button onClick={tambah} disabled={loading} className="mt-4 bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg py-2.5 px-4 disabled:opacity-60">
-        {loading ? "Menyimpan…" : "Tambah User"}
+        {loading ? "Menyimpan..." : "Tambah User"}
       </button>
 
+      {/* Daftar anggota + aksi */}
       <div className="mt-6">
-        <h3 className="font-semibold text-sm text-slate-700 mb-2">Anggota Tim</h3>
-        <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg">
-          {daftar.length === 0 && <div className="p-3 text-sm text-slate-500">Belum ada anggota tim.</div>}
-          {daftar.map((u, i) => (
-            <div key={i} className="p-3 flex items-center justify-between text-sm">
-              <div>
-                <div className="font-medium">{u.Nama || u.Email}</div>
-                <div className="text-xs text-slate-500">{u.Email}</div>
-              </div>
-              <span className="text-xs bg-slate-100 rounded-full px-2 py-0.5 capitalize">{u.Role}</span>
-            </div>
+        <h3 className="font-semibold text-sm text-slate-700 mb-2">Anggota tim</h3>
+        <div className="space-y-2">
+          {daftar.length === 0 && (
+            <div className="p-3 text-sm text-slate-500 border border-slate-200 rounded-lg">Belum ada anggota tim.</div>
+          )}
+          {daftar.map((u) => (
+            <BarisUser
+              key={u.Email}
+              u={u}
+              requester={user.email}
+              expanded={editing === u.Email}
+              onToggle={() => setEditing(editing === u.Email ? null : u.Email)}
+              onSaved={muat}
+            />
           ))}
         </div>
+        <p className="text-xs text-slate-400 mt-3">
+          Catatan: super admin (env) tidak muncul di daftar ini dan tidak diedit dari sini.
+        </p>
       </div>
     </Modal>
+  );
+}
+
+function BarisUser({ u, requester, expanded, onToggle, onSaved }) {
+  const [nama, setNama] = useState(u.Nama || "");
+  const [role, setRole] = useState(u.Role || "marketing");
+  const [aktif, setAktif] = useState(String(u.Aktif).toLowerCase() !== "false");
+  const [pwBaru, setPwBaru] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [pesan, setPesan] = useState("");
+
+  async function kirim(payloadTambahan, pesanSukses) {
+    setBusy(true);
+    setPesan("");
+    try {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateUser", requesterEmail: requester, email: u.Email, ...payloadTambahan }),
+      });
+      const data = await res.json();
+      if (data.status === "ok") {
+        setPesan(pesanSukses);
+        setPwBaru("");
+        await onSaved();
+      } else {
+        setPesan("Gagal: " + (data.message || "coba lagi"));
+      }
+    } catch (e) {
+      setPesan("Tidak bisa terhubung ke server.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const nonaktif = String(u.Aktif).toLowerCase() === "false";
+
+  return (
+    <div className="border border-slate-200 rounded-lg overflow-hidden">
+      <div className="p-3 flex items-center justify-between text-sm">
+        <div className="min-w-0">
+          <div className="font-medium truncate">
+            {u.Nama || u.Email} {nonaktif && <span className="text-rose-600 text-xs">(non-aktif)</span>}
+          </div>
+          <div className="text-xs text-slate-500 truncate">{u.Email}</div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs bg-slate-100 rounded-full px-2 py-0.5 capitalize">{u.Role}</span>
+          <button onClick={onToggle} className="text-xs font-semibold text-[#12263a] border border-slate-300 rounded-md px-2.5 py-1 hover:bg-slate-50">
+            {expanded ? "Tutup" : "Kelola"}
+          </button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="border-t border-slate-100 p-3 bg-slate-50/60">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <Field label="Nama"><input className={inp} value={nama} onChange={(e) => setNama(e.target.value)} /></Field>
+            <Field label="Role">
+              <select className={inp} value={role} onChange={(e) => setRole(e.target.value)}>
+                <option value="marketing">marketing</option>
+                <option value="admin">admin</option>
+              </select>
+            </Field>
+          </div>
+          <div className="flex items-center gap-2 mt-3">
+            <input id={"aktif-" + u.Email} type="checkbox" checked={aktif} onChange={(e) => setAktif(e.target.checked)} />
+            <label htmlFor={"aktif-" + u.Email} className="text-sm text-slate-700">Akun aktif (boleh login)</label>
+          </div>
+          <button
+            onClick={() => kirim({ nama, role, aktif }, "✓ Perubahan disimpan.")}
+            disabled={busy}
+            className="mt-3 bg-[#12263a] hover:bg-[#0e1f33] text-white text-sm font-semibold rounded-lg py-2 px-4 disabled:opacity-60"
+          >
+            {busy ? "Menyimpan..." : "Simpan perubahan"}
+          </button>
+
+          <div className="mt-4 pt-3 border-t border-slate-200">
+            <div className="text-sm font-medium text-slate-700 mb-1">Reset password</div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="password"
+                className={inp}
+                value={pwBaru}
+                onChange={(e) => setPwBaru(e.target.value)}
+                placeholder="Password baru (min. 6 karakter)"
+              />
+              <button
+                onClick={() => {
+                  if (pwBaru.length < 6) { setPesan("Password minimal 6 karakter."); return; }
+                  kirim({ password: pwBaru }, "✓ Password direset.");
+                }}
+                disabled={busy}
+                className="bg-[#c8962c] hover:brightness-95 text-[#12263a] text-sm font-semibold rounded-lg py-2 px-4 whitespace-nowrap disabled:opacity-60"
+              >
+                Reset
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">Beritahu password baru ini ke anggota, atau minta mereka pakai fitur "Lupa password".</p>
+          </div>
+
+          {pesan && <p className="text-sm mt-3">{pesan}</p>}
+        </div>
+      )}
+    </div>
   );
 }

@@ -14,8 +14,12 @@ export async function POST(req) {
 
     // 1) Super admin — data dari Environment Variable (paling aman)
     const adminEmail = String(process.env.ADMIN_EMAIL || "").toLowerCase().trim();
-    if (em === adminEmail) {
-      const cocok = bcrypt.compareSync(password, process.env.ADMIN_PASSWORD_HASH || "");
+    if (adminEmail && em === adminEmail) {
+      const hash = process.env.ADMIN_PASSWORD_HASH || "";
+      if (!hash) {
+        return NextResponse.json({ ok: false, message: "ADMIN_PASSWORD_HASH belum di-set di Environment Variable." });
+      }
+      const cocok = bcrypt.compareSync(password, hash);
       if (cocok) {
         return NextResponse.json({
           ok: true,
@@ -40,6 +44,7 @@ export async function POST(req) {
       user: { email: u.Email, nama: u.Nama, role: u.Role || "marketing" },
     });
   } catch (e) {
-    return NextResponse.json({ ok: false, message: "Terjadi kesalahan server. Coba lagi." });
+    // Tampilkan penyebab asli supaya mudah diperbaiki saat setup
+    return NextResponse.json({ ok: false, message: "Server error: " + (e?.message || String(e)) });
   }
 }

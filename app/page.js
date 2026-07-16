@@ -10,7 +10,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Kalau sudah login, langsung ke dashboard
   useEffect(() => {
     if (typeof window !== "undefined" && localStorage.getItem("crm_user")) {
       router.replace("/dashboard");
@@ -47,17 +46,16 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen flex items-center justify-center px-4 py-10 bg-gradient-to-b from-[#0e1f33] to-[#12263a]">
       <div className="w-full max-w-sm">
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 text-[#c8962c] font-extrabold tracking-wide text-lg">
-            <span className="w-8 h-8 rounded-lg bg-[#c8962c] text-[#12263a] grid place-items-center">A</span>
-            ASTON CRM
-          </div>
-          <p className="text-slate-300 text-sm mt-2">Leads Event &amp; Booking · Cirebon</p>
-        </div>
+        <p className="text-center text-[#c8962c] font-bold tracking-[0.3em] text-xs mb-6">SALES CRM</p>
 
         <div className="bg-white rounded-2xl shadow-xl p-6">
+          <div className="flex justify-center mb-5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/aston-logo.png" alt="Aston Cirebon" className="h-20 w-auto object-contain" />
+          </div>
+
           <h1 className="text-lg font-bold mb-1">Masuk</h1>
-          <p className="text-slate-500 text-sm mb-5">Gunakan akun yang terdaftar.</p>
+          <p className="text-slate-500 text-sm mb-5">Leads Event &amp; Booking &middot; Cirebon</p>
 
           <label className="block text-sm font-medium mb-1">Email</label>
           <input
@@ -75,9 +73,15 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && masuk()}
-            placeholder="••••••••"
-            className="w-full border border-slate-300 rounded-lg px-3 py-2.5 mb-4 outline-none focus:ring-2 focus:ring-[#c8962c]"
+            placeholder="********"
+            className="w-full border border-slate-300 rounded-lg px-3 py-2.5 mb-2 outline-none focus:ring-2 focus:ring-[#c8962c]"
           />
+
+          <div className="text-right mb-4">
+            <a href="/lupa-password" className="text-sm text-[#12263a] hover:text-[#c8962c] font-medium">
+              Lupa password?
+            </a>
+          </div>
 
           {error && (
             <div className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 mb-4">
@@ -90,12 +94,12 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg py-2.5 transition disabled:opacity-60"
           >
-            {loading ? "Memeriksa…" : "Masuk"}
+            {loading ? "Memeriksa..." : "Masuk"}
           </button>
         </div>
 
         <p className="text-center text-slate-400 text-xs mt-6">
-          Aston Cirebon · Internal Sales Tool
+          Aston Cirebon &middot; Hotel &amp; Convention Center
         </p>
       </div>
     </main>
