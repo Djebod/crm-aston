@@ -1,0 +1,15 @@
+# dependency
+node_modules
+
+# next.js
+.next
+out
+
+# rahasia (JANGAN di-push)
+.env
+.env.local
+service-account.json
+
+# lain-lain
+.DS_Store
+*.log
