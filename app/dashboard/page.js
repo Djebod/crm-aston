@@ -213,12 +213,15 @@ export default function Dashboard() {
       {/* Header */}
       <header className="bg-[#12263a] text-white sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="bg-white rounded-lg px-2 py-1 flex items-center">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="bg-white rounded-lg px-2 py-1 flex items-center shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/aston-logo.png" alt="Aston Cirebon" className="h-7 w-auto object-contain" />
             </span>
-            <span className="font-extrabold tracking-wide text-[#c8962c] hidden sm:inline">SALES CRM</span>
+            <nav className="flex items-center gap-1 text-sm">
+              <a href="/dashboard" className="px-3 py-1.5 rounded-lg bg-white/15 font-semibold">Leads</a>
+              <a href="/aktivitas" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition">Activity</a>
+            </nav>
           </div>
           <div className="flex items-center gap-3">
             {user.role === "admin" && (

@@ -13,6 +13,8 @@
 
 const SHEET_LEADS = "Leads";
 const SHEET_USERS = "Users";
+const SHEET_AKT = "Aktivitas";
+const SHEET_COMP = "Companies";
 const FOLDER_ID = "PASTE_ID_FOLDER_DRIVE_DISINI"; // folder Google Drive untuk dokumen
 const APP_URL = "https://crm-aston.vercel.app"; // ganti dengan URL aplikasi Anda (untuk link reset password)
 
@@ -20,6 +22,8 @@ const APP_URL = "https://crm-aston.vercel.app"; // ganti dengan URL aplikasi And
 function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) || "leads";
   if (action === "leads") return json({ status: "ok", data: bacaLeads() });
+  if (action === "aktivitas") return json({ status: "ok", data: bacaAktivitas() });
+  if (action === "companies") return json({ status: "ok", data: bacaCompanies() });
   return json({ status: "error", message: "action tidak dikenal" });
 }
 
@@ -37,6 +41,8 @@ function doPost(e) {
     if (action === "doReset") return json(doReset(body));
     if (action === "addLead") return json(tambahLead(body));
     if (action === "updateLead") return json(updateLead(body));
+    if (action === "addActivity") return json(tambahAktivitas(body));
+    if (action === "listCompanies") return json({ status: "ok", data: bacaCompanies() });
 
     return json({ status: "error", message: "action tidak dikenal" });
   } catch (err) {
@@ -94,6 +100,49 @@ function bacaLeads() {
     const o = {};
     header.forEach(function (h, i) { o[h] = r[i]; });
     return o;
+  });
+}
+
+/*** ===== SALES ACTIVITY ===== ***/
+function tambahAktivitas(b) {
+  const id = "A" + Date.now();
+  const comp = String(b.companyName || "").trim();
+  if (comp) pastikanCompany(comp, b.segmentation || "");
+  let foto = "";
+  if (b.fotoBase64) foto = simpanDokumen(b.fotoBase64, id + "_" + (b.fotoNama || "foto"));
+  sheet(SHEET_AKT).appendRow([
+    id, b.date || "", b.time || "", b.salesName || "", comp, b.segmentation || "",
+    b.picName || "", b.position || "", b.phone || "", b.description || "", b.activity || "", foto
+  ]);
+  return { status: "ok", id: id, photo: foto };
+}
+
+function bacaAktivitas() {
+  const values = sheet(SHEET_AKT).getDataRange().getValues();
+  const header = values.shift();
+  return values.map(function (r) {
+    const o = {};
+    header.forEach(function (h, i) { o[h] = r[i]; });
+    return o;
+  });
+}
+
+// Company name harus unik (tidak boleh dobel persis). PIC & Position bebas per aktivitas.
+function pastikanCompany(nama, seg) {
+  const sh = sheet(SHEET_COMP);
+  const values = sh.getDataRange().getValues();
+  const target = nama.trim().toLowerCase();
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][0]).trim().toLowerCase() === target) return; // sudah ada -> jangan tambah lagi
+  }
+  sh.appendRow([nama, seg]);
+}
+
+function bacaCompanies() {
+  const values = sheet(SHEET_COMP).getDataRange().getValues();
+  values.shift();
+  return values.filter(function (r) { return r[0]; }).map(function (r) {
+    return { CompanyName: r[0], Segmentation: r[1] };
   });
 }
 

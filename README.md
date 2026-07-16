@@ -19,6 +19,7 @@ Multi-user (Bang Syam sebagai super admin + tim marketing), dengan upload dokume
 - **Lupa password (self-service):** user minta tautan reset -> dikirim ke email -> buat password baru
 - **Profil Saya (semua user):** ubah nama & ganti password sendiri (wajib password lama benar)
 - **Lihat password:** semua kolom password punya tombol mata untuk menampilkan/menyembunyikan isian
+- **Sales Activity:** catat kunjungan/aktivitas sales (Activity & Segmentation berupa pilihan, upload foto). Nama Company unik (tidak boleh dobel persis); PIC Name & Position bebas berubah tiap aktivitas.
 
 ---
 
@@ -36,6 +37,15 @@ Multi-user (Bang Syam sebagai super admin + tim marketing), dengan upload dokume
    Email | Nama | PasswordHash | Role | Aktif | ResetToken | ResetExpiry
    ```
    (Kolom `ResetToken` & `ResetExpiry` biarkan kosong; dipakai otomatis saat fitur lupa password.)
+4. **Tab ketiga** beri nama `Aktivitas`. Baris pertama (12 kolom, urutan persis):
+   ```
+   ID | Date | Time | SalesName | CompanyName | Segmentation | PICName | Position | PhoneNumber | Description | Activity | Photo
+   ```
+5. **Tab keempat** beri nama `Companies`. Baris pertama (2 kolom):
+   ```
+   CompanyName | Segmentation
+   ```
+   (Terisi otomatis saat menambah aktivitas; nama company dijaga unik.)
 
 ### 2) Siapkan folder Google Drive (untuk dokumen)
 
