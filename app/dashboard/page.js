@@ -41,15 +41,6 @@ function rupiah(n) {
   return "Rp " + angka.toLocaleString("id-ID");
 }
 
-function fileKeBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 export default function Dashboard() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -127,11 +118,6 @@ export default function Dashboard() {
       .reverse(); // terbaru di atas
   }, [leads, cari, filterStatus]);
 
-  function bukaTambah() {
-    setForm({ ...FORM_KOSONG, pic: user?.nama || "" });
-    setModalForm(true);
-  }
-
   function bukaEdit(l) {
     setForm({
       id: l.ID,
@@ -152,13 +138,6 @@ export default function Dashboard() {
       LinkDokumen: l.LinkDokumen || "",
     });
     setModalForm(true);
-  }
-
-  async function pilihFile(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const base64 = await fileKeBase64(file);
-    setForm((f) => ({ ...f, dokumenBase64: base64, dokumenNama: file.name }));
   }
 
   async function simpan() {
@@ -277,12 +256,6 @@ export default function Dashboard() {
               <option key={s}>{s}</option>
             ))}
           </select>
-          <button
-            onClick={bukaTambah}
-            className="bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg px-4 py-2.5 transition whitespace-nowrap"
-          >
-            + Tambah Prospek
-          </button>
         </div>
 
         {/* Daftar leads */}
@@ -290,7 +263,7 @@ export default function Dashboard() {
           <div className="text-center text-slate-500 py-16">Memuat data…</div>
         ) : leadsTampil.length === 0 ? (
           <div className="text-center text-slate-500 py-16 border-2 border-dashed border-slate-200 rounded-2xl">
-            Belum ada prospek. Klik <span className="font-semibold">“+ Tambah Prospek”</span> untuk mulai.
+            Belum ada lead yang disubmit. Lead dibuat dari menu <span className="font-semibold">Activity</span> saat ada potensi lead.
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -354,15 +327,6 @@ export default function Dashboard() {
             </Field>
             <Field label="PIC (penanggung jawab)">
               <input className={inp} value={form.pic} onChange={(e) => setForm({ ...form, pic: e.target.value })} />
-            </Field>
-            <Field label="Dokumen (KTP / foto / file)">
-              <input type="file" accept="image/*,application/pdf" onChange={pilihFile} className="text-sm w-full" />
-              {form.dokumenNama && <p className="text-xs text-emerald-700 mt-1">Siap unggah: {form.dokumenNama}</p>}
-              {!form.dokumenNama && form.LinkDokumen && (
-                <a href={form.LinkDokumen} target="_blank" rel="noreferrer" className="text-xs text-blue-700 underline mt-1 inline-block">
-                  Lihat dokumen tersimpan
-                </a>
-              )}
             </Field>
             <div className="sm:col-span-2">
               <Field label="Catatan">

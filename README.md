@@ -19,7 +19,10 @@ Multi-user (Bang Syam sebagai super admin + tim marketing), dengan upload dokume
 - **Lupa password (self-service):** user minta tautan reset -> dikirim ke email -> buat password baru
 - **Profil Saya (semua user):** ubah nama & ganti password sendiri (wajib password lama benar)
 - **Lihat password:** semua kolom password punya tombol mata untuk menampilkan/menyembunyikan isian
-- **Sales Activity:** catat kunjungan/aktivitas sales (Activity & Segmentation berupa pilihan, upload foto). Nama Company unik (tidak boleh dobel persis); PIC Name & Position bebas berubah tiap aktivitas.
+- **Sales Activity:** catat kunjungan/aktivitas sales. Activity (Sales Visit, Sales Call, Site Inspection, Telemarketing) & Market Segment berupa pilihan, upload foto kegiatan. Nama Company unik (tidak boleh dobel persis); PIC Name & Position bebas tiap aktivitas. Filter pull-down: Activity, Market Segment, By Sales.
+- **Import Database Company:** tombol "Database Company" -> unduh template CSV -> isi -> upload massal (duplikat otomatis dilewati).
+- **Potensi lead:** di form aktivitas ada tombol "Apakah ada potensi lead?". Jika "Ya", muncul Form Leads di bawahnya (tanpa upload foto) dan lead langsung tersimpan ke menu Leads.
+- **Menu Leads:** hanya menampilkan lead yang sudah disubmit (dibuat dari Activity). Status/detail masih bisa diedit di sini.
 
 ---
 

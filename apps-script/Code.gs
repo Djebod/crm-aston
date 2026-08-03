@@ -43,6 +43,7 @@ function doPost(e) {
     if (action === "updateLead") return json(updateLead(body));
     if (action === "addActivity") return json(tambahAktivitas(body));
     if (action === "listCompanies") return json({ status: "ok", data: bacaCompanies() });
+    if (action === "importCompanies") return json(importCompanies(body));
 
     return json({ status: "error", message: "action tidak dikenal" });
   } catch (err) {
@@ -144,6 +145,28 @@ function bacaCompanies() {
   return values.filter(function (r) { return r[0]; }).map(function (r) {
     return { CompanyName: r[0], Segmentation: r[1] };
   });
+}
+
+// Import massal dari file (CSV). Nama company tetap dijaga unik (tidak dobel).
+function importCompanies(b) {
+  const sh = sheet(SHEET_COMP);
+  const values = sh.getDataRange().getValues();
+  const ada = {};
+  for (var i = 1; i < values.length; i++) ada[String(values[i][0]).trim().toLowerCase()] = true;
+  const rows = b.rows || [];
+  const toAppend = [];
+  for (var j = 0; j < rows.length; j++) {
+    const nama = String(rows[j].companyName || "").trim();
+    if (!nama) continue;
+    const key = nama.toLowerCase();
+    if (ada[key]) continue;
+    ada[key] = true;
+    toAppend.push([nama, rows[j].segmentation || ""]);
+  }
+  if (toAppend.length) {
+    sh.getRange(sh.getLastRow() + 1, 1, toAppend.length, 2).setValues(toAppend);
+  }
+  return { status: "ok", ditambah: toAppend.length };
 }
 
 /*** ===== USERS ===== ***/

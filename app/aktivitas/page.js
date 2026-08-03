@@ -5,47 +5,40 @@ import { useRouter } from "next/navigation";
 import { Modal, Field, inp } from "@/components/Modal";
 import ProfilSaya from "@/components/ProfilSaya";
 
-const ACTIVITIES = [
-  "Sales Call", "Presentation", "Site Inspection", "Client Gathering",
-  "Contract Discussion", "Complaint Handling", "Entertainment",
-];
+const ACTIVITIES = ["Sales Visit", "Sales Call", "Site Inspection", "Telemarketing"];
 const SEGMENTS = [
   "Online Travel Agent", "Company", "Government", "Tour & Travel",
   "University / School", "Event Organizer", "Wedding Organizer", "Social Event", "Personal",
 ];
 
+// pilihan untuk form leads
+const JENIS_EVENT = ["Wedding", "Meeting / Rapat", "Gathering", "Ulang Tahun", "Menginap / Kamar", "Lainnya"];
+const SUMBER = ["Sales Visit", "Sales Call", "Telemarketing", "Referral", "Walk-in", "Lainnya"];
+const STATUS = ["Baru", "Follow Up", "Penawaran", "Negosiasi", "Deal", "Batal"];
+
 const SEG_STYLE = "bg-slate-100 text-slate-700";
 const ACT_STYLE = {
+  "Sales Visit": "bg-emerald-100 text-emerald-800",
   "Sales Call": "bg-blue-100 text-blue-800",
-  Presentation: "bg-violet-100 text-violet-800",
   "Site Inspection": "bg-amber-100 text-amber-800",
-  "Client Gathering": "bg-emerald-100 text-emerald-800",
-  "Contract Discussion": "bg-indigo-100 text-indigo-800",
-  "Complaint Handling": "bg-rose-100 text-rose-700",
-  Entertainment: "bg-pink-100 text-pink-800",
+  Telemarketing: "bg-violet-100 text-violet-800",
 };
 
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
+function today() { return new Date().toISOString().slice(0, 10); }
 function nowTime() {
   const d = new Date();
   return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
 }
 
 const FORM_KOSONG = {
-  date: today(),
-  time: nowTime(),
-  salesName: "",
-  companyName: "",
-  segmentation: "",
-  picName: "",
-  position: "",
-  phone: "",
-  description: "",
-  activity: "",
-  fotoBase64: "",
-  fotoNama: "",
+  date: today(), time: nowTime(), salesName: "", companyName: "", segmentation: "",
+  picName: "", position: "", phone: "", description: "", activity: "",
+  fotoBase64: "", fotoNama: "", potensiLead: "Tidak",
+};
+
+const LEAD_KOSONG = {
+  nama: "", instansi: "", nohp: "", email: "", jenisEvent: "Wedding", tanggalEvent: "",
+  jumlahPax: "", estimasiNilai: "", sumber: "Sales Visit", status: "Baru", pic: "", catatan: "",
 };
 
 function fileKeBase64(file) {
@@ -57,6 +50,36 @@ function fileKeBase64(file) {
   });
 }
 
+// ---- CSV helper untuk import company ----
+function splitCsvLine(line) {
+  const out = []; let cur = ""; let q = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (q) {
+      if (c === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+      else cur += c;
+    } else {
+      if (c === '"') q = true;
+      else if (c === ",") { out.push(cur); cur = ""; }
+      else cur += c;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+function parseCSV(text) {
+  const lines = text.replace(/\r/g, "").split("\n").filter((l) => l.trim() !== "");
+  const rows = [];
+  for (let i = 0; i < lines.length; i++) {
+    const cols = splitCsvLine(lines[i]);
+    if (i === 0 && /company/i.test(cols[0] || "")) continue; // lewati header
+    const companyName = (cols[0] || "").trim();
+    const segmentation = (cols[1] || "").trim();
+    if (companyName) rows.push({ companyName, segmentation });
+  }
+  return rows;
+}
+
 export default function AktivitasPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -65,20 +88,20 @@ export default function AktivitasPage() {
   const [loading, setLoading] = useState(true);
 
   const [cari, setCari] = useState("");
-  const [fActivity, setFActivity] = useState("Semua");
-  const [fSeg, setFSeg] = useState("Semua");
+  const [fActivity, setFActivity] = useState("");
+  const [fSeg, setFSeg] = useState("");
+  const [fSales, setFSales] = useState("");
 
   const [modalForm, setModalForm] = useState(false);
   const [form, setForm] = useState(FORM_KOSONG);
+  const [lead, setLead] = useState(LEAD_KOSONG);
   const [menyimpan, setMenyimpan] = useState(false);
   const [modalProfil, setModalProfil] = useState(false);
+  const [modalCompany, setModalCompany] = useState(false);
 
   useEffect(() => {
     const raw = typeof window !== "undefined" ? localStorage.getItem("crm_user") : null;
-    if (!raw) {
-      router.replace("/");
-      return;
-    }
+    if (!raw) { router.replace("/"); return; }
     setUser(JSON.parse(raw));
   }, [router]);
 
@@ -91,31 +114,36 @@ export default function AktivitasPage() {
       ]);
       if (a.status === "ok") setList(a.data || []);
       if (c.status === "ok") setCompanies(c.data || []);
-    } catch (e) {
-      // biarkan
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) {} finally { setLoading(false); }
   }, []);
 
-  useEffect(() => {
-    if (user) ambil();
-  }, [user, ambil]);
+  useEffect(() => { if (user) ambil(); }, [user, ambil]);
 
-  function logout() {
-    localStorage.removeItem("crm_user");
-    router.replace("/");
-  }
+  function logout() { localStorage.removeItem("crm_user"); router.replace("/"); }
 
   function bukaTambah() {
     setForm({ ...FORM_KOSONG, date: today(), time: nowTime(), salesName: user?.nama || "" });
+    setLead(LEAD_KOSONG);
     setModalForm(true);
   }
 
-  // Prefill segmentation kalau company sudah ada di master
   function isiCompany(nilai) {
     const ada = companies.find((c) => String(c.CompanyName).trim().toLowerCase() === nilai.trim().toLowerCase());
     setForm((f) => ({ ...f, companyName: nilai, segmentation: ada ? ada.Segmentation || f.segmentation : f.segmentation }));
+  }
+
+  function togglePotensi(val) {
+    setForm((f) => ({ ...f, potensiLead: val }));
+    if (val === "Ya") {
+      // prefill dari data aktivitas
+      setLead((l) => ({
+        ...l,
+        nama: l.nama || form.picName || "",
+        instansi: l.instansi || form.companyName || "",
+        nohp: l.nohp || form.phone || "",
+        pic: l.pic || form.salesName || user?.nama || "",
+      }));
+    }
   }
 
   async function pilihFoto(e) {
@@ -128,20 +156,36 @@ export default function AktivitasPage() {
   async function simpan() {
     if (!form.companyName.trim()) { alert("Company Name wajib diisi."); return; }
     if (!form.activity) { alert("Pilih jenis Activity."); return; }
+    if (form.potensiLead === "Ya" && (!lead.nama.trim() || !lead.nohp.trim())) {
+      alert("Karena ada potensi lead, isi minimal Nama Prospek dan No. HP pada form Leads.");
+      return;
+    }
     setMenyimpan(true);
     try {
-      const res = await fetch("/api/aktivitas", {
+      const resA = await fetch("/api/aktivitas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "addActivity", ...form }),
       });
-      const data = await res.json();
-      if (data.status === "ok") {
-        setModalForm(false);
-        await ambil();
-      } else {
-        alert("Gagal menyimpan: " + (data.message || "coba lagi"));
+      const dataA = await resA.json();
+      if (dataA.status !== "ok") { alert("Gagal menyimpan aktivitas: " + (dataA.message || "coba lagi")); setMenyimpan(false); return; }
+
+      if (form.potensiLead === "Ya") {
+        const resL = await fetch("/api/leads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "addLead",
+            ...lead,
+            estimasiNilai: Number(String(lead.estimasiNilai).replace(/[^\d]/g, "")) || 0,
+          }),
+        });
+        const dataL = await resL.json();
+        if (dataL.status !== "ok") { alert("Aktivitas tersimpan, tapi lead gagal: " + (dataL.message || "coba lagi")); }
       }
+
+      setModalForm(false);
+      await ambil();
     } catch (e) {
       alert("Tidak bisa terhubung ke server.");
     } finally {
@@ -149,18 +193,24 @@ export default function AktivitasPage() {
     }
   }
 
+  const salesOptions = useMemo(() => {
+    const set = new Set();
+    list.forEach((x) => { if (x.SalesName) set.add(x.SalesName); });
+    return Array.from(set);
+  }, [list]);
+
   const tampil = useMemo(() => {
     const q = cari.toLowerCase().trim();
     return list
-      .filter((x) => (fActivity === "Semua" ? true : x.Activity === fActivity))
-      .filter((x) => (fSeg === "Semua" ? true : x.Segmentation === fSeg))
+      .filter((x) => (!fActivity ? true : x.Activity === fActivity))
+      .filter((x) => (!fSeg ? true : x.Segmentation === fSeg))
+      .filter((x) => (!fSales ? true : x.SalesName === fSales))
       .filter((x) => {
         if (!q) return true;
-        return [x.CompanyName, x.PICName, x.SalesName, x.PhoneNumber, x.Position]
-          .join(" ").toLowerCase().includes(q);
+        return [x.CompanyName, x.PICName, x.SalesName, x.PhoneNumber, x.Position].join(" ").toLowerCase().includes(q);
       })
       .reverse();
-  }, [list, cari, fActivity, fSeg]);
+  }, [list, cari, fActivity, fSeg, fSales]);
 
   if (!user) return null;
 
@@ -179,51 +229,46 @@ export default function AktivitasPage() {
             </nav>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setModalProfil(true)}
-              className="text-right leading-tight bg-white/10 hover:bg-white/20 rounded-lg px-3 py-1.5 transition hidden sm:block"
-              title="Profil saya"
-            >
+            <button onClick={() => setModalProfil(true)} className="text-right leading-tight bg-white/10 hover:bg-white/20 rounded-lg px-3 py-1.5 transition hidden sm:block" title="Profil saya">
               <div className="text-sm font-semibold">{user.nama}</div>
               <div className="text-xs text-slate-300 capitalize">{user.role}</div>
             </button>
             <button onClick={() => setModalProfil(true)} className="sm:hidden bg-white/10 rounded-lg px-3 py-1.5 text-sm">Profil</button>
-            <button onClick={logout} className="text-sm bg-[#c8962c] hover:brightness-95 text-[#12263a] font-semibold rounded-lg px-3 py-1.5 transition">
-              Keluar
-            </button>
+            <button onClick={logout} className="text-sm bg-[#c8962c] hover:brightness-95 text-[#12263a] font-semibold rounded-lg px-3 py-1.5 transition">Keluar</button>
           </div>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 gap-2">
           <div>
             <h1 className="text-xl font-extrabold text-[#12263a]">Sales Activity</h1>
-            <p className="text-sm text-slate-500">Catatan kunjungan & aktivitas sales.</p>
+            <p className="text-sm text-slate-500">Catatan kunjungan &amp; aktivitas sales.</p>
           </div>
-          <button
-            onClick={bukaTambah}
-            className="bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg px-4 py-2.5 transition whitespace-nowrap"
-          >
-            + Tambah Aktivitas
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setModalCompany(true)} className="border border-slate-300 text-[#12263a] font-semibold rounded-lg px-3 py-2.5 hover:bg-slate-50 whitespace-nowrap">
+              Database Company
+            </button>
+            <button onClick={bukaTambah} className="bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg px-4 py-2.5 transition whitespace-nowrap">
+              + Tambah Aktivitas
+            </button>
+          </div>
         </div>
 
-        {/* Filter */}
-        <div className="flex flex-col sm:flex-row gap-2 mb-4">
-          <input
-            value={cari}
-            onChange={(e) => setCari(e.target.value)}
-            placeholder="Cari company, PIC, sales, no HP…"
-            className="flex-1 border border-slate-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#c8962c]"
-          />
+        {/* Filter pull-down */}
+        <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 mb-4">
+          <input value={cari} onChange={(e) => setCari(e.target.value)} placeholder="Cari…" className="col-span-2 sm:flex-1 border border-slate-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#c8962c]" />
           <select value={fActivity} onChange={(e) => setFActivity(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
-            <option>Semua</option>
-            {ACTIVITIES.map((a) => <option key={a}>{a}</option>)}
+            <option value="">Activity</option>
+            {ACTIVITIES.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
           <select value={fSeg} onChange={(e) => setFSeg(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
-            <option>Semua</option>
-            {SEGMENTS.map((s) => <option key={s}>{s}</option>)}
+            <option value="">Market Segment</option>
+            {SEGMENTS.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select value={fSales} onChange={(e) => setFSales(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
+            <option value="">By Sales</option>
+            {salesOptions.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
 
@@ -240,77 +285,99 @@ export default function AktivitasPage() {
         )}
       </main>
 
-      {/* Modal Form */}
+      {/* Modal Form Aktivitas */}
       {modalForm && (
         <Modal title="Tambah Aktivitas" onClose={() => setModalForm(false)}>
           <div className="grid sm:grid-cols-2 gap-3">
-            <Field label="Tanggal">
-              <input type="date" className={inp} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-            </Field>
-            <Field label="Jam">
-              <input type="time" className={inp} value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} />
-            </Field>
-            <Field label="Sales Name">
-              <input className={inp} value={form.salesName} onChange={(e) => setForm({ ...form, salesName: e.target.value })} />
-            </Field>
+            <Field label="Tanggal"><input type="date" className={inp} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></Field>
+            <Field label="Jam"><input type="time" className={inp} value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} /></Field>
+            <Field label="Sales Name"><input className={inp} value={form.salesName} onChange={(e) => setForm({ ...form, salesName: e.target.value })} /></Field>
             <Field label="Company Name *">
-              <input
-                className={inp}
-                list="daftar-company"
-                value={form.companyName}
-                onChange={(e) => isiCompany(e.target.value)}
-                placeholder="ketik / pilih perusahaan"
-              />
+              <input className={inp} list="daftar-company" value={form.companyName} onChange={(e) => isiCompany(e.target.value)} placeholder="ketik / pilih perusahaan" />
               <datalist id="daftar-company">
                 {companies.map((c) => <option key={c.CompanyName} value={c.CompanyName} />)}
               </datalist>
-              <p className="text-xs text-slate-400 mt-1">Nama company unik. Kalau sudah ada, pilih dari daftar (tidak dobel).</p>
+              <p className="text-xs text-slate-400 mt-1">Nama company unik. Kalau sudah ada, pilih dari daftar.</p>
             </Field>
           </div>
 
           <div className="mt-3">
-            <span className="block text-sm font-medium mb-1 text-slate-700">Segmentation</span>
+            <span className="block text-sm font-medium mb-1 text-slate-700">Market Segment</span>
             <div className="flex flex-wrap gap-2">
-              {SEGMENTS.map((s) => (
-                <Chip key={s} active={form.segmentation === s} onClick={() => setForm({ ...form, segmentation: s })}>{s}</Chip>
-              ))}
+              {SEGMENTS.map((s) => <Chip key={s} active={form.segmentation === s} onClick={() => setForm({ ...form, segmentation: s })}>{s}</Chip>)}
             </div>
           </div>
 
           <div className="mt-3">
             <span className="block text-sm font-medium mb-1 text-slate-700">Activity *</span>
             <div className="flex flex-wrap gap-2">
-              {ACTIVITIES.map((a) => (
-                <Chip key={a} active={form.activity === a} onClick={() => setForm({ ...form, activity: a })}>{a}</Chip>
-              ))}
+              {ACTIVITIES.map((a) => <Chip key={a} active={form.activity === a} onClick={() => setForm({ ...form, activity: a })}>{a}</Chip>)}
             </div>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-3 mt-3">
-            <Field label="PIC Name">
-              <input className={inp} value={form.picName} onChange={(e) => setForm({ ...form, picName: e.target.value })} />
-            </Field>
-            <Field label="Position">
-              <input className={inp} value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} />
-            </Field>
-            <Field label="Phone Number">
-              <input className={inp} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} inputMode="tel" />
-            </Field>
+            <Field label="PIC Name"><input className={inp} value={form.picName} onChange={(e) => setForm({ ...form, picName: e.target.value })} /></Field>
+            <Field label="Position"><input className={inp} value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} /></Field>
+            <Field label="Phone Number"><input className={inp} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} inputMode="tel" /></Field>
             <Field label="Foto kegiatan">
               <input type="file" accept="image/*" onChange={pilihFoto} className="text-sm w-full" />
               {form.fotoNama && <p className="text-xs text-emerald-700 mt-1">Siap unggah: {form.fotoNama}</p>}
             </Field>
             <div className="sm:col-span-2">
-              <Field label="Description">
-                <textarea className={inp + " h-20 resize-none"} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-              </Field>
+              <Field label="Description"><textarea className={inp + " h-20 resize-none"} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
             </div>
           </div>
 
+          {/* Potensi lead */}
+          <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <span className="block text-sm font-semibold mb-2 text-slate-700">Apakah ada potensi lead?</span>
+            <div className="flex gap-2">
+              <Chip active={form.potensiLead === "Ya"} onClick={() => togglePotensi("Ya")}>Ya</Chip>
+              <Chip active={form.potensiLead === "Tidak"} onClick={() => togglePotensi("Tidak")}>Tidak</Chip>
+            </div>
+          </div>
+
+          {/* Form lead lanjutan (tanpa upload foto) */}
+          {form.potensiLead === "Ya" && (
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <h3 className="font-semibold text-[#12263a] mb-3">Form Leads</h3>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <Field label="Nama Prospek *"><input className={inp} value={lead.nama} onChange={(e) => setLead({ ...lead, nama: e.target.value })} /></Field>
+                <Field label="Instansi / Perusahaan"><input className={inp} value={lead.instansi} onChange={(e) => setLead({ ...lead, instansi: e.target.value })} /></Field>
+                <Field label="No. HP / WA *"><input className={inp} value={lead.nohp} onChange={(e) => setLead({ ...lead, nohp: e.target.value })} /></Field>
+                <Field label="Email"><input className={inp} value={lead.email} onChange={(e) => setLead({ ...lead, email: e.target.value })} /></Field>
+                <Field label="Jenis Event">
+                  <select className={inp} value={lead.jenisEvent} onChange={(e) => setLead({ ...lead, jenisEvent: e.target.value })}>
+                    {JENIS_EVENT.map((x) => <option key={x}>{x}</option>)}
+                  </select>
+                </Field>
+                <Field label="Tanggal Event"><input type="date" className={inp} value={lead.tanggalEvent} onChange={(e) => setLead({ ...lead, tanggalEvent: e.target.value })} /></Field>
+                <Field label="Jumlah Tamu / Kamar"><input className={inp} value={lead.jumlahPax} onChange={(e) => setLead({ ...lead, jumlahPax: e.target.value })} /></Field>
+                <Field label="Estimasi Nilai (Rp)">
+                  <input className={inp} inputMode="numeric"
+                    value={lead.estimasiNilai ? Number(String(lead.estimasiNilai).replace(/[^\d]/g, "")).toLocaleString("id-ID") : ""}
+                    onChange={(e) => setLead({ ...lead, estimasiNilai: e.target.value.replace(/[^\d]/g, "") })} placeholder="mis. 25.000.000" />
+                </Field>
+                <Field label="Sumber">
+                  <select className={inp} value={lead.sumber} onChange={(e) => setLead({ ...lead, sumber: e.target.value })}>
+                    {SUMBER.map((x) => <option key={x}>{x}</option>)}
+                  </select>
+                </Field>
+                <Field label="Status">
+                  <select className={inp} value={lead.status} onChange={(e) => setLead({ ...lead, status: e.target.value })}>
+                    {STATUS.map((x) => <option key={x}>{x}</option>)}
+                  </select>
+                </Field>
+                <Field label="PIC (penanggung jawab)"><input className={inp} value={lead.pic} onChange={(e) => setLead({ ...lead, pic: e.target.value })} /></Field>
+                <div className="sm:col-span-2">
+                  <Field label="Catatan"><textarea className={inp + " h-16 resize-none"} value={lead.catatan} onChange={(e) => setLead({ ...lead, catatan: e.target.value })} /></Field>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-2 mt-5">
-            <button onClick={() => setModalForm(false)} className="flex-1 border border-slate-300 rounded-lg py-2.5 font-medium hover:bg-slate-50">
-              Batal
-            </button>
+            <button onClick={() => setModalForm(false)} className="flex-1 border border-slate-300 rounded-lg py-2.5 font-medium hover:bg-slate-50">Batal</button>
             <button onClick={simpan} disabled={menyimpan} className="flex-1 bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg py-2.5 disabled:opacity-60">
               {menyimpan ? "Menyimpan…" : "Simpan"}
             </button>
@@ -318,16 +385,13 @@ export default function AktivitasPage() {
         </Modal>
       )}
 
+      {/* Modal Database Company */}
+      {modalCompany && <DatabaseCompany companies={companies} onClose={() => setModalCompany(false)} onImported={ambil} />}
+
+      {/* Modal Profil */}
       {modalProfil && (
-        <ProfilSaya
-          user={user}
-          onClose={() => setModalProfil(false)}
-          onProfileUpdate={(nama) => {
-            const baru = { ...user, nama };
-            setUser(baru);
-            localStorage.setItem("crm_user", JSON.stringify(baru));
-          }}
-        />
+        <ProfilSaya user={user} onClose={() => setModalProfil(false)}
+          onProfileUpdate={(nama) => { const baru = { ...user, nama }; setUser(baru); localStorage.setItem("crm_user", JSON.stringify(baru)); }} />
       )}
     </div>
   );
@@ -335,16 +399,8 @@ export default function AktivitasPage() {
 
 function Chip({ active, onClick, children }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        "text-sm rounded-lg px-3 py-2 border transition " +
-        (active
-          ? "bg-[#12263a] text-white border-[#12263a]"
-          : "bg-white text-slate-700 border-slate-300 hover:border-[#c8962c]")
-      }
-    >
+    <button type="button" onClick={onClick}
+      className={"text-sm rounded-lg px-3 py-2 border transition " + (active ? "bg-[#12263a] text-white border-[#12263a]" : "bg-white text-slate-700 border-slate-300 hover:border-[#c8962c]")}>
       {children}
     </button>
   );
@@ -358,38 +414,105 @@ function ActivityCard({ x }) {
           <div className="font-bold text-[#12263a] truncate">{x.CompanyName}</div>
           <div className="text-xs text-slate-500">{x.Date} · {x.Time} · {x.SalesName}</div>
         </div>
-        {x.Activity && (
-          <span className={"text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap " + (ACT_STYLE[x.Activity] || "bg-slate-100 text-slate-700")}>
-            {x.Activity}
-          </span>
-        )}
+        {x.Activity && <span className={"text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap " + (ACT_STYLE[x.Activity] || "bg-slate-100 text-slate-700")}>{x.Activity}</span>}
       </div>
-
-      {x.Segmentation && (
-        <span className={"self-start text-xs font-medium px-2 py-0.5 rounded-full " + SEG_STYLE}>{x.Segmentation}</span>
-      )}
-
+      {x.Segmentation && <span className={"self-start text-xs font-medium px-2 py-0.5 rounded-full " + SEG_STYLE}>{x.Segmentation}</span>}
       <div className="text-sm text-slate-600">
-        {(x.PICName || x.Position) && (
-          <div>👤 {x.PICName}{x.Position ? " — " + x.Position : ""}</div>
-        )}
+        {(x.PICName || x.Position) && <div>👤 {x.PICName}{x.Position ? " — " + x.Position : ""}</div>}
       </div>
-
       {x.Description && <p className="text-sm text-slate-600">{x.Description}</p>}
-
       <div className="flex flex-wrap items-center gap-3 text-xs mt-1">
         {x.PhoneNumber && (
-          <a
-            href={"https://wa.me/" + String(x.PhoneNumber).replace(/[^\d]/g, "").replace(/^0/, "62")}
-            target="_blank" rel="noreferrer" className="text-emerald-700 font-medium"
-          >
-            💬 {x.PhoneNumber}
-          </a>
+          <a href={"https://wa.me/" + String(x.PhoneNumber).replace(/[^\d]/g, "").replace(/^0/, "62")} target="_blank" rel="noreferrer" className="text-emerald-700 font-medium">💬 {x.PhoneNumber}</a>
         )}
-        {x.Photo && (
-          <a href={x.Photo} target="_blank" rel="noreferrer" className="text-blue-700 font-medium">📷 Foto</a>
-        )}
+        {x.Photo && <a href={x.Photo} target="_blank" rel="noreferrer" className="text-blue-700 font-medium">📷 Foto</a>}
       </div>
     </div>
+  );
+}
+
+function DatabaseCompany({ companies, onClose, onImported }) {
+  const [rows, setRows] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [pesan, setPesan] = useState("");
+
+  function unduhTemplate() {
+    const isi = "CompanyName,Segmentation\nPT Contoh Sejahtera,Company\nDinas Pariwisata Kota,Government\nUniversitas Contoh,University / School\n";
+    const blob = new Blob([isi], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "template-company.csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  async function pilihFile(e) {
+    setPesan("");
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const parsed = parseCSV(text);
+    if (parsed.length === 0) { setPesan("File kosong / format tidak sesuai template."); setRows(null); return; }
+    setRows(parsed);
+    setPesan(parsed.length + " baris terbaca dari file. Klik Import untuk menyimpan.");
+  }
+
+  async function importData() {
+    if (!rows || rows.length === 0) return;
+    setBusy(true); setPesan("");
+    try {
+      const res = await fetch("/api/companies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "importCompanies", rows }),
+      });
+      const data = await res.json();
+      if (data.status === "ok") {
+        setPesan("✓ " + (data.ditambah || 0) + " company baru ditambahkan (duplikat dilewati).");
+        setRows(null);
+        await onImported();
+      } else {
+        setPesan("Gagal: " + (data.message || "coba lagi"));
+      }
+    } catch (e) {
+      setPesan("Tidak bisa terhubung ke server.");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <Modal title="Database Company" onClose={onClose}>
+      <p className="text-sm text-slate-600 mb-3">
+        Upload banyak company sekaligus. <b>Unduh template</b> dulu, isi kolom <code>CompanyName</code> dan <code>Segmentation</code>, lalu upload. Nama yang sudah ada otomatis dilewati (tidak dobel).
+      </p>
+
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <button onClick={unduhTemplate} className="border border-slate-300 text-[#12263a] font-semibold rounded-lg py-2.5 px-4 hover:bg-slate-50">
+          ⬇ Unduh Template (CSV)
+        </button>
+        <label className="flex-1">
+          <span className="block text-sm font-medium mb-1 text-slate-700">Upload file CSV terisi</span>
+          <input type="file" accept=".csv,text/csv" onChange={pilihFile} className="text-sm w-full" />
+        </label>
+      </div>
+
+      {pesan && <p className="text-sm mb-3">{pesan}</p>}
+
+      <button onClick={importData} disabled={busy || !rows} className="bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg py-2.5 px-4 disabled:opacity-60">
+        {busy ? "Mengimport…" : "Import"}
+      </button>
+
+      <div className="mt-5">
+        <div className="text-sm font-semibold text-slate-700 mb-1">Company tersimpan: {companies.length}</div>
+        <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+          {companies.length === 0 && <div className="p-2 text-sm text-slate-500">Belum ada.</div>}
+          {companies.map((c) => (
+            <div key={c.CompanyName} className="p-2 text-sm flex items-center justify-between">
+              <span className="truncate">{c.CompanyName}</span>
+              <span className="text-xs text-slate-400 ml-2 shrink-0">{c.Segmentation}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Modal>
   );
 }
