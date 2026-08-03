@@ -4,14 +4,11 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import PasswordInput from "@/components/PasswordInput";
 
-const STATUS = ["Baru", "Follow Up", "Penawaran", "Negosiasi", "Deal", "Batal"];
+const STATUS = ["Tentative", "Definite", "Cancel"];
 const STATUS_STYLE = {
-  Baru: "bg-slate-100 text-slate-700",
-  "Follow Up": "bg-amber-100 text-amber-800",
-  Penawaran: "bg-blue-100 text-blue-800",
-  Negosiasi: "bg-violet-100 text-violet-800",
-  Deal: "bg-emerald-100 text-emerald-800",
-  Batal: "bg-rose-100 text-rose-700",
+  Tentative: "bg-amber-100 text-amber-800",
+  Definite: "bg-emerald-100 text-emerald-800",
+  Cancel: "bg-rose-100 text-rose-700",
 };
 const JENIS_EVENT = ["Wedding", "Meeting / Rapat", "Gathering", "Ulang Tahun", "Menginap / Kamar", "Lainnya"];
 const SUMBER = ["Walk-in", "WhatsApp", "Instagram", "Telepon", "Referral", "OTA", "Lainnya"];
@@ -27,9 +24,10 @@ const FORM_KOSONG = {
   jumlahPax: "",
   estimasiNilai: "",
   sumber: "Walk-in",
-  status: "Baru",
+  status: "Tentative",
   pic: "",
   catatan: "",
+  alasanCancel: "",
   dokumenBase64: "",
   dokumenNama: "",
   LinkDokumen: "",
@@ -92,22 +90,22 @@ export default function Dashboard() {
     const perStatus = {};
     STATUS.forEach((s) => (perStatus[s] = 0));
     let nilaiPipeline = 0;
-    let nilaiDeal = 0;
+    let nilaiDefinite = 0;
     leads.forEach((l) => {
-      const s = l.Status || "Baru";
+      const s = l.Status || "Tentative";
       if (perStatus[s] !== undefined) perStatus[s]++;
       const nilai = Number(String(l.EstimasiNilai).replace(/[^\d]/g, "")) || 0;
-      if (s === "Deal") nilaiDeal += nilai;
-      else if (s !== "Batal") nilaiPipeline += nilai;
+      if (s === "Definite") nilaiDefinite += nilai;
+      else if (s !== "Cancel") nilaiPipeline += nilai;
     });
-    return { perStatus, nilaiPipeline, nilaiDeal, total: leads.length };
+    return { perStatus, nilaiPipeline, nilaiDefinite, total: leads.length };
   }, [leads]);
 
   // Filter + cari
   const leadsTampil = useMemo(() => {
     const q = cari.toLowerCase().trim();
     return leads
-      .filter((l) => (filterStatus === "Semua" ? true : (l.Status || "Baru") === filterStatus))
+      .filter((l) => (filterStatus === "Semua" ? true : (l.Status || "Tentative") === filterStatus))
       .filter((l) => {
         if (!q) return true;
         return [l.Nama, l.Instansi, l.NoHP, l.Email, l.PIC, l.JenisEvent]
@@ -130,9 +128,10 @@ export default function Dashboard() {
       jumlahPax: l.JumlahPax || "",
       estimasiNilai: String(l.EstimasiNilai || "").replace(/[^\d]/g, ""),
       sumber: l.Sumber || "Walk-in",
-      status: l.Status || "Baru",
+      status: l.Status || "Tentative",
       pic: l.PIC || "",
       catatan: l.Catatan || "",
+      alasanCancel: l.AlasanCancel || "",
       dokumenBase64: "",
       dokumenNama: "",
       LinkDokumen: l.LinkDokumen || "",
@@ -145,12 +144,18 @@ export default function Dashboard() {
       alert("Nama prospek dan No. HP wajib diisi.");
       return;
     }
+    if (form.status === "Cancel" && !form.alasanCancel.trim()) {
+      alert("Status Cancel wajib disertai Alasan Cancel.");
+      return;
+    }
     setMenyimpan(true);
     try {
       const payload = {
         action: form.id ? "updateLead" : "addLead",
         ...form,
         estimasiNilai: Number(String(form.estimasiNilai).replace(/[^\d]/g, "")) || 0,
+        alasanCancel: form.status === "Cancel" ? form.alasanCancel.trim() : "",
+        oleh: user?.nama || user?.email || "",
       };
       const res = await fetch("/api/leads", {
         method: "POST",
@@ -173,11 +178,23 @@ export default function Dashboard() {
 
   // Ubah status cepat dari kartu
   async function ubahStatusCepat(l, status) {
+    let alasanCancel = "";
+    if (status === "Cancel") {
+      alasanCancel = (window.prompt("Alasan Cancel (wajib diisi):", "") || "").trim();
+      if (!alasanCancel) return; // batal kalau alasan kosong
+    }
     try {
       await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "updateLead", id: l.ID, status }),
+        body: JSON.stringify({
+          action: "updateLead",
+          id: l.ID,
+          nama: l.Nama || "",
+          status,
+          alasanCancel,
+          oleh: user?.nama || user?.email || "",
+        }),
       });
       await ambilLeads();
     } catch (e) {
@@ -233,9 +250,9 @@ export default function Dashboard() {
         {/* Ringkasan */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
           <Kartu label="Total Prospek" nilai={ringkasan.total} />
-          <Kartu label="Sedang Proses" nilai={ringkasan.total - (ringkasan.perStatus["Deal"] + ringkasan.perStatus["Batal"])} />
+          <Kartu label="Sedang Proses" nilai={ringkasan.perStatus["Tentative"]} />
           <Kartu label="Nilai Pipeline" nilai={rupiah(ringkasan.nilaiPipeline)} kecil />
-          <Kartu label="Nilai Deal" nilai={rupiah(ringkasan.nilaiDeal)} kecil emas />
+          <Kartu label="Nilai Definite" nilai={rupiah(ringkasan.nilaiDefinite)} kecil emas />
         </div>
 
         {/* Baris aksi */}
@@ -328,6 +345,18 @@ export default function Dashboard() {
             <Field label="PIC (penanggung jawab)">
               <input className={inp} value={form.pic} onChange={(e) => setForm({ ...form, pic: e.target.value })} />
             </Field>
+            {form.status === "Cancel" && (
+              <div className="sm:col-span-2">
+                <Field label="Alasan Cancel *">
+                  <textarea
+                    className={inp + " h-16 resize-none border-rose-300"}
+                    value={form.alasanCancel}
+                    onChange={(e) => setForm({ ...form, alasanCancel: e.target.value })}
+                    placeholder="Wajib diisi jika status Cancel"
+                  />
+                </Field>
+              </div>
+            )}
             <div className="sm:col-span-2">
               <Field label="Catatan">
                 <textarea className={inp + " h-20 resize-none"} value={form.catatan} onChange={(e) => setForm({ ...form, catatan: e.target.value })} />
@@ -396,8 +425,8 @@ function LeadCard({ lead, onEdit, onStatus }) {
           <div className="font-bold text-[#12263a]">{lead.Nama}</div>
           {lead.Instansi && <div className="text-xs text-slate-500">{lead.Instansi}</div>}
         </div>
-        <span className={"text-xs font-semibold px-2 py-1 rounded-full " + (STATUS_STYLE[lead.Status] || STATUS_STYLE.Baru)}>
-          {lead.Status || "Baru"}
+        <span className={"text-xs font-semibold px-2 py-1 rounded-full " + (STATUS_STYLE[lead.Status] || STATUS_STYLE.Tentative)}>
+          {lead.Status || "Tentative"}
         </span>
       </div>
 
@@ -408,6 +437,12 @@ function LeadCard({ lead, onEdit, onStatus }) {
       </div>
 
       {nilai > 0 && <div className="text-sm font-semibold text-[#a9781f]">Rp {nilai.toLocaleString("id-ID")}</div>}
+
+      {lead.Status === "Cancel" && lead.AlasanCancel && (
+        <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-md px-2 py-1">
+          Alasan cancel: {lead.AlasanCancel}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
         {lead.NoHP && (
@@ -428,9 +463,15 @@ function LeadCard({ lead, onEdit, onStatus }) {
         {lead.PIC && <span>PIC: {lead.PIC}</span>}
       </div>
 
+      {(lead.UpdatedAt || lead.UpdatedBy) && (
+        <div className="text-[11px] text-slate-400">
+          Update: {lead.UpdatedAt || "-"}{lead.UpdatedBy ? " · oleh " + lead.UpdatedBy : ""}
+        </div>
+      )}
+
       <div className="flex items-center gap-2 mt-1 pt-2 border-t border-slate-100">
         <select
-          value={lead.Status || "Baru"}
+          value={lead.Status || "Tentative"}
           onChange={(e) => onStatus(e.target.value)}
           className="text-xs border border-slate-300 rounded-md px-2 py-1.5 bg-white flex-1"
         >

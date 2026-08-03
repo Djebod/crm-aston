@@ -15,7 +15,7 @@ const SHEET_LEADS = "Leads";
 const SHEET_USERS = "Users";
 const SHEET_AKT = "Aktivitas";
 const SHEET_COMP = "Companies";
-const FOLDER_ID = "1v_vC83UUEKpw9HkK3VKNrFYpurQ2pHxO"; // folder Google Drive untuk dokumen
+const FOLDER_ID = "PASTE_ID_FOLDER_DRIVE_DISINI"; // folder Google Drive untuk dokumen
 const APP_URL = "https://crm-aston.vercel.app"; // ganti dengan URL aplikasi Anda (untuk link reset password)
 
 /*** BACA DATA (GET) ***/
@@ -57,11 +57,14 @@ function tambahLead(b) {
   const now = formatTgl(new Date());
   let linkDok = "";
   if (b.dokumenBase64) linkDok = simpanDokumen(b.dokumenBase64, id + "_" + (b.dokumenNama || "dokumen"));
+  const status = b.status || "Tentative";
   sheet(SHEET_LEADS).appendRow([
     id, now, b.nama || "", b.instansi || "", b.nohp || "", b.email || "",
     b.jenisEvent || "", b.tanggalEvent || "", b.jumlahPax || "", b.estimasiNilai || "",
-    b.sumber || "", b.status || "Baru", b.pic || "", b.catatan || "", linkDok, now
+    b.sumber || "", status, b.pic || "", b.catatan || "", linkDok, now,
+    b.alasanCancel || "", b.oleh || ""
   ]);
+  logStatus(id, b.nama || "", "-", status, b.alasanCancel || "", b.oleh || "");
   return { status: "ok", id: id, linkDokumen: linkDok };
 }
 
@@ -69,14 +72,16 @@ function updateLead(b) {
   const sh = sheet(SHEET_LEADS);
   const values = sh.getDataRange().getValues();
   const header = values[0];
+  const idxStatus = header.indexOf("Status");
   for (var i = 1; i < values.length; i++) {
     if (String(values[i][0]) === String(b.id)) {
       const row = i + 1;
+      const statusLama = idxStatus >= 0 ? String(values[i][idxStatus]) : "";
       const map = {
         Nama: b.nama, Instansi: b.instansi, NoHP: b.nohp, Email: b.email,
         JenisEvent: b.jenisEvent, TanggalEvent: b.tanggalEvent, JumlahPax: b.jumlahPax,
         EstimasiNilai: b.estimasiNilai, Sumber: b.sumber, Status: b.status,
-        PIC: b.pic, Catatan: b.catatan
+        PIC: b.pic, Catatan: b.catatan, AlasanCancel: b.alasanCancel
       };
       header.forEach(function (h, idx) {
         if (map[h] !== undefined) sh.getRange(row, idx + 1).setValue(map[h]);
@@ -88,10 +93,28 @@ function updateLead(b) {
       }
       const colUpd = header.indexOf("UpdatedAt") + 1;
       if (colUpd > 0) sh.getRange(row, colUpd).setValue(formatTgl(new Date()));
+      const colBy = header.indexOf("UpdatedBy") + 1;
+      if (colBy > 0 && b.oleh !== undefined) sh.getRange(row, colBy).setValue(b.oleh || "");
+
+      // Catat perubahan status (kalau berubah)
+      if (b.status !== undefined && String(b.status) !== statusLama) {
+        logStatus(b.id, b.nama || values[i][header.indexOf("Nama")] || "", statusLama, b.status, b.alasanCancel || "", b.oleh || "");
+      }
       return { status: "ok" };
     }
   }
   return { status: "error", message: "ID tidak ditemukan" };
+}
+
+// Catat riwayat perubahan status ke tab Log_Status (dibuat otomatis kalau belum ada)
+function logStatus(id, nama, lama, baru, alasan, oleh) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName("Log_Status");
+  if (!sh) {
+    sh = ss.insertSheet("Log_Status");
+    sh.appendRow(["Waktu", "LeadID", "Nama", "StatusLama", "StatusBaru", "AlasanCancel", "Oleh"]);
+  }
+  sh.appendRow([formatTgl(new Date()), id, nama, lama, baru, alasan || "", oleh || ""]);
 }
 
 function bacaLeads() {
@@ -149,11 +172,14 @@ function bacaCompanies() {
 
 // Import massal dari file (CSV). Nama company tetap dijaga unik (tidak dobel).
 function importCompanies(b) {
+  const rows = (b && b.rows) || [];
+  if (rows.length === 0) {
+    return { status: "error", message: "Tidak ada data. Fungsi ini dijalankan dari aplikasi (upload CSV), bukan tombol Run editor." };
+  }
   const sh = sheet(SHEET_COMP);
   const values = sh.getDataRange().getValues();
   const ada = {};
   for (var i = 1; i < values.length; i++) ada[String(values[i][0]).trim().toLowerCase()] = true;
-  const rows = b.rows || [];
   const toAppend = [];
   for (var j = 0; j < rows.length; j++) {
     const nama = String(rows[j].companyName || "").trim();

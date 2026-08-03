@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Modal, Field, inp } from "@/components/Modal";
 import ProfilSaya from "@/components/ProfilSaya";
 
-const ACTIVITIES = ["Sales Visit", "Sales Call", "Site Inspection", "Telemarketing"];
+const ACTIVITIES = ["Sales Call", "Site Inspection", "Telemarketing"];
 const SEGMENTS = [
   "Online Travel Agent", "Company", "Government", "Tour & Travel",
   "University / School", "Event Organizer", "Wedding Organizer", "Social Event", "Personal",
@@ -13,12 +13,11 @@ const SEGMENTS = [
 
 // pilihan untuk form leads
 const JENIS_EVENT = ["Wedding", "Meeting / Rapat", "Gathering", "Ulang Tahun", "Menginap / Kamar", "Lainnya"];
-const SUMBER = ["Sales Visit", "Sales Call", "Telemarketing", "Referral", "Walk-in", "Lainnya"];
-const STATUS = ["Baru", "Follow Up", "Penawaran", "Negosiasi", "Deal", "Batal"];
+const SUMBER = ["Sales Call", "Site Inspection", "Telemarketing", "Referral", "Walk-in", "Lainnya"];
+const STATUS = ["Tentative", "Definite", "Cancel"];
 
 const SEG_STYLE = "bg-slate-100 text-slate-700";
 const ACT_STYLE = {
-  "Sales Visit": "bg-emerald-100 text-emerald-800",
   "Sales Call": "bg-blue-100 text-blue-800",
   "Site Inspection": "bg-amber-100 text-amber-800",
   Telemarketing: "bg-violet-100 text-violet-800",
@@ -38,7 +37,8 @@ const FORM_KOSONG = {
 
 const LEAD_KOSONG = {
   nama: "", instansi: "", nohp: "", email: "", jenisEvent: "Wedding", tanggalEvent: "",
-  jumlahPax: "", estimasiNilai: "", sumber: "Sales Visit", status: "Baru", pic: "", catatan: "",
+  jumlahPax: "", estimasiNilai: "", sumber: "Sales Call", status: "Tentative", pic: "", catatan: "",
+  alasanCancel: "",
 };
 
 function fileKeBase64(file) {
@@ -160,6 +160,10 @@ export default function AktivitasPage() {
       alert("Karena ada potensi lead, isi minimal Nama Prospek dan No. HP pada form Leads.");
       return;
     }
+    if (form.potensiLead === "Ya" && lead.status === "Cancel" && !lead.alasanCancel.trim()) {
+      alert("Status Cancel wajib disertai Alasan Cancel.");
+      return;
+    }
     setMenyimpan(true);
     try {
       const resA = await fetch("/api/aktivitas", {
@@ -178,6 +182,8 @@ export default function AktivitasPage() {
             action: "addLead",
             ...lead,
             estimasiNilai: Number(String(lead.estimasiNilai).replace(/[^\d]/g, "")) || 0,
+            alasanCancel: lead.status === "Cancel" ? lead.alasanCancel.trim() : "",
+            oleh: form.salesName || user?.nama || user?.email || "",
           }),
         });
         const dataL = await resL.json();
@@ -369,6 +375,14 @@ export default function AktivitasPage() {
                   </select>
                 </Field>
                 <Field label="PIC (penanggung jawab)"><input className={inp} value={lead.pic} onChange={(e) => setLead({ ...lead, pic: e.target.value })} /></Field>
+                {lead.status === "Cancel" && (
+                  <div className="sm:col-span-2">
+                    <Field label="Alasan Cancel *">
+                      <textarea className={inp + " h-16 resize-none border-rose-300"} value={lead.alasanCancel}
+                        onChange={(e) => setLead({ ...lead, alasanCancel: e.target.value })} placeholder="Wajib diisi jika status Cancel" />
+                    </Field>
+                  </div>
+                )}
                 <div className="sm:col-span-2">
                   <Field label="Catatan"><textarea className={inp + " h-16 resize-none"} value={lead.catatan} onChange={(e) => setLead({ ...lead, catatan: e.target.value })} /></Field>
                 </div>

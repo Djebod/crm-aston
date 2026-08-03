@@ -10,7 +10,7 @@ Multi-user (Bang Syam sebagai super admin + tim marketing), dengan upload dokume
 ## Fitur
 
 - Login aman (password di-hash bcrypt, tidak pernah disimpan polos) + branding logo Aston
-- Pipeline: **Baru -> Follow Up -> Penawaran -> Negosiasi -> Deal -> Batal**
+- Pipeline status: **Tentative -> Definite -> Cancel** (status Cancel wajib mengisi Alasan Cancel). Semua perubahan status tercatat otomatis di tab `Log_Status` (waktu, status lama/baru, alasan, oleh siapa).
 - Tambah / edit prospek, ubah status cepat dari kartu
 - Upload dokumen prospek ke Google Drive (link otomatis masuk ke Sheet)
 - Ringkasan: total prospek, sedang proses, nilai pipeline, nilai deal
@@ -33,8 +33,9 @@ Multi-user (Bang Syam sebagai super admin + tim marketing), dengan upload dokume
 1. Buka https://sheets.google.com -> **Blank**.
 2. **Tab pertama** beri nama `Leads`. Baris pertama isi judul kolom ini (urutan persis):
    ```
-   ID | Tanggal | Nama | Instansi | NoHP | Email | JenisEvent | TanggalEvent | JumlahPax | EstimasiNilai | Sumber | Status | PIC | Catatan | LinkDokumen | UpdatedAt
+   ID | Tanggal | Nama | Instansi | NoHP | Email | JenisEvent | TanggalEvent | JumlahPax | EstimasiNilai | Sumber | Status | PIC | Catatan | LinkDokumen | UpdatedAt | AlasanCancel | UpdatedBy
    ```
+   (2 kolom terakhir `AlasanCancel` & `UpdatedBy` untuk fitur status Cancel dan pencatatan siapa yang terakhir mengubah. Tab `Log_Status` tidak perlu dibuat manual — dibuat otomatis saat ada perubahan status.)
 3. **Tab kedua** beri nama `Users`. Baris pertama (7 kolom):
    ```
    Email | Nama | PasswordHash | Role | Aktif | ResetToken | ResetExpiry
