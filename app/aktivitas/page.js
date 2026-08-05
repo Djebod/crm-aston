@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Modal, Field, inp } from "@/components/Modal";
 import ProfilSaya from "@/components/ProfilSaya";
+import { Donut, BarList, ChartCard, hitungPer, beriWarna } from "@/components/Charts";
 
 const ACTIVITIES = ["Sales Call", "Site Inspection", "Telemarketing"];
 const SEGMENTS = [
@@ -205,6 +206,10 @@ export default function AktivitasPage() {
     return Array.from(set);
   }, [list]);
 
+  const chartActivity = useMemo(() => beriWarna(hitungPer(list, (x) => x.Activity || "(kosong)")), [list]);
+  const chartSegmen = useMemo(() => beriWarna(hitungPer(list, (x) => x.Segmentation || "(kosong)")), [list]);
+  const chartSales = useMemo(() => beriWarna(hitungPer(list, (x) => x.SalesName || "(kosong)")), [list]);
+
   const tampil = useMemo(() => {
     const q = cari.toLowerCase().trim();
     return list
@@ -232,6 +237,7 @@ export default function AktivitasPage() {
             <nav className="flex items-center gap-1 text-sm">
               <a href="/dashboard" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition">Leads</a>
               <a href="/aktivitas" className="px-3 py-1.5 rounded-lg bg-white/15 font-semibold">Activity</a>
+              <a href="/company" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition">Company</a>
             </nav>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -277,6 +283,21 @@ export default function AktivitasPage() {
             {salesOptions.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
+
+        {/* Chart */}
+        {!loading && list.length > 0 && (
+          <div className="grid md:grid-cols-2 gap-3 mb-5">
+            <ChartCard title="Aktivitas per Jenis">
+              <Donut data={chartActivity} />
+            </ChartCard>
+            <ChartCard title="Aktivitas per Market Segment">
+              <BarList data={chartSegmen} />
+            </ChartCard>
+            <ChartCard title="Aktivitas per Sales">
+              <BarList data={chartSales} />
+            </ChartCard>
+          </div>
+        )}
 
         {loading ? (
           <div className="text-center text-slate-500 py-16">Memuat data…</div>

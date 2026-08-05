@@ -3,6 +3,9 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import PasswordInput from "@/components/PasswordInput";
+import { Donut, BarList, ChartCard, hitungPer, beriWarna } from "@/components/Charts";
+
+const STATUS_HEX = { Tentative: "#f59e0b", Definite: "#10b981", Cancel: "#f43f5e" };
 
 const STATUS = ["Tentative", "Definite", "Cancel"];
 const STATUS_STYLE = {
@@ -100,6 +103,16 @@ export default function Dashboard() {
     });
     return { perStatus, nilaiPipeline, nilaiDefinite, total: leads.length };
   }, [leads]);
+
+  // Data chart
+  const chartStatus = useMemo(
+    () => beriWarna(hitungPer(leads, (l) => l.Status || "Tentative"), STATUS_HEX),
+    [leads]
+  );
+  const chartSumber = useMemo(
+    () => beriWarna(hitungPer(leads, (l) => l.Sumber || "(kosong)")),
+    [leads]
+  );
 
   // Filter + cari
   const leadsTampil = useMemo(() => {
@@ -217,6 +230,7 @@ export default function Dashboard() {
             <nav className="flex items-center gap-1 text-sm">
               <a href="/dashboard" className="px-3 py-1.5 rounded-lg bg-white/15 font-semibold">Leads</a>
               <a href="/aktivitas" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition">Activity</a>
+              <a href="/company" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition">Company</a>
             </nav>
           </div>
           <div className="flex items-center gap-3">
@@ -254,6 +268,18 @@ export default function Dashboard() {
           <Kartu label="Nilai Pipeline" nilai={rupiah(ringkasan.nilaiPipeline)} kecil />
           <Kartu label="Nilai Definite" nilai={rupiah(ringkasan.nilaiDefinite)} kecil emas />
         </div>
+
+        {/* Chart */}
+        {!loading && leads.length > 0 && (
+          <div className="grid md:grid-cols-2 gap-3 mb-5">
+            <ChartCard title="Lead per Status">
+              <Donut data={chartStatus} />
+            </ChartCard>
+            <ChartCard title="Lead per Sumber">
+              <BarList data={chartSumber} />
+            </ChartCard>
+          </div>
+        )}
 
         {/* Baris aksi */}
         <div className="flex flex-col sm:flex-row gap-2 mb-4">
