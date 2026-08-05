@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Modal, Field, inp } from "@/components/Modal";
 import ProfilSaya from "@/components/ProfilSaya";
 import { Donut, BarList, ChartCard, hitungPer, beriWarna } from "@/components/Charts";
+import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
 
 const ACTIVITIES = ["Sales Call", "Site Inspection", "Telemarketing"];
 const SEGMENTS = [
@@ -124,8 +125,11 @@ export default function AktivitasPage() {
   }
 
   async function simpan() {
-    if (!form.companyName.trim()) { alert("Company Name wajib diisi."); return; }
     if (!form.activity) { alert("Pilih jenis Activity."); return; }
+    if (!form.segmentation) { alert("Pilih Market Segment."); return; }
+    if (!form.picName.trim()) { alert("PIC Name wajib diisi."); return; }
+    if (!form.phone.trim()) { alert("Phone Number wajib diisi."); return; }
+    if (!form.fotoBase64) { alert("Foto kegiatan wajib diunggah."); return; }
     if (form.potensiLead === "Ya" && (!lead.nama.trim() || !lead.nohp.trim())) {
       alert("Karena ada potensi lead, isi minimal Nama Prospek dan No. HP pada form Leads.");
       return;
@@ -136,10 +140,12 @@ export default function AktivitasPage() {
     }
     setMenyimpan(true);
     try {
+      const compMatch = companies.find((c) => String(c.CompanyName).trim().toLowerCase() === form.companyName.trim().toLowerCase());
+      const alamat = form.companyName.trim() && compMatch ? (compMatch.Alamat || "") : "";
       const resA = await fetch("/api/aktivitas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "addActivity", ...form }),
+        body: JSON.stringify({ action: "addActivity", ...form, alamat }),
       });
       const dataA = await resA.json();
       if (dataA.status !== "ok") { alert("Gagal menyimpan aktivitas: " + (dataA.message || "coba lagi")); setMenyimpan(false); return; }
@@ -192,6 +198,21 @@ export default function AktivitasPage() {
       .reverse();
   }, [list, cari, fActivity, fSeg, fSales]);
 
+  const companyMatch = companies.find(
+    (c) => String(c.CompanyName).trim().toLowerCase() === form.companyName.trim().toLowerCase()
+  );
+  const companyTerpilih = !!(form.companyName.trim() && companyMatch);
+  const alamatCompany = companyTerpilih ? (companyMatch.Alamat || "") : "";
+
+  function exportCSV() {
+    const header = ["Tanggal", "Jam", "Sales", "Company", "Alamat", "Market Segment", "PIC Name", "Position", "Phone Number", "Activity", "Hasil Meeting", "Foto"];
+    const rows = tampil.map((x) => [
+      x.Date, x.Time, x.SalesName, x.CompanyName, x.Alamat || "", x.Segmentation,
+      x.PICName, x.Position, x.PhoneNumber, x.Activity, x.Description, x.Photo,
+    ]);
+    unduhCSV(namaFileTanggal("aktivitas"), [header, ...rows]);
+  }
+
   if (!user) return null;
 
   return (
@@ -227,6 +248,9 @@ export default function AktivitasPage() {
             <p className="text-sm text-slate-500">Catatan kunjungan &amp; aktivitas sales.</p>
           </div>
           <div className="flex gap-2">
+            <button onClick={exportCSV} disabled={tampil.length === 0} className="border border-slate-300 text-[#12263a] font-semibold rounded-lg px-3 py-2.5 hover:bg-slate-50 whitespace-nowrap disabled:opacity-50">
+              ⬇ Export
+            </button>
             <button onClick={bukaTambah} className="bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg px-4 py-2.5 transition whitespace-nowrap">
               + Tambah Aktivitas
             </button>
@@ -285,17 +309,28 @@ export default function AktivitasPage() {
             <Field label="Tanggal"><input type="date" className={inp} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></Field>
             <Field label="Jam"><input type="time" className={inp} value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} /></Field>
             <Field label="Sales Name"><input className={inp} value={form.salesName} onChange={(e) => setForm({ ...form, salesName: e.target.value })} /></Field>
-            <Field label="Company Name *">
-              <input className={inp} list="daftar-company" value={form.companyName} onChange={(e) => isiCompany(e.target.value)} placeholder="ketik / pilih perusahaan" />
+            <Field label="Company Name">
+              <input className={inp} list="daftar-company" value={form.companyName} onChange={(e) => isiCompany(e.target.value)} placeholder="opsional — kosongkan jika perorangan" />
               <datalist id="daftar-company">
                 {companies.map((c) => <option key={c.CompanyName} value={c.CompanyName} />)}
               </datalist>
-              <p className="text-xs text-slate-400 mt-1">Nama company unik. Kalau sudah ada, pilih dari daftar.</p>
+              <p className="text-xs text-slate-400 mt-1">Boleh dikosongkan (kunjungan perorangan). Kalau sudah ada, pilih dari daftar.</p>
             </Field>
+            {companyTerpilih && (
+              <div className="sm:col-span-2">
+                <Field label="Alamat (dari database company)">
+                  <textarea
+                    className={inp + " h-16 resize-none bg-slate-100 text-slate-500"}
+                    value={alamatCompany || "— alamat belum diisi di database company —"}
+                    readOnly
+                  />
+                </Field>
+              </div>
+            )}
           </div>
 
           <div className="mt-3">
-            <span className="block text-sm font-medium mb-1 text-slate-700">Market Segment</span>
+            <span className="block text-sm font-medium mb-1 text-slate-700">Market Segment *</span>
             <div className="flex flex-wrap gap-2">
               {SEGMENTS.map((s) => <Chip key={s} active={form.segmentation === s} onClick={() => setForm({ ...form, segmentation: s })}>{s}</Chip>)}
             </div>
@@ -309,15 +344,15 @@ export default function AktivitasPage() {
           </div>
 
           <div className="grid sm:grid-cols-2 gap-3 mt-3">
-            <Field label="PIC Name"><input className={inp} value={form.picName} onChange={(e) => setForm({ ...form, picName: e.target.value })} /></Field>
+            <Field label="PIC Name *"><input className={inp} value={form.picName} onChange={(e) => setForm({ ...form, picName: e.target.value })} /></Field>
             <Field label="Position"><input className={inp} value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} /></Field>
-            <Field label="Phone Number"><input className={inp} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} inputMode="tel" /></Field>
-            <Field label="Foto kegiatan">
+            <Field label="Phone Number *"><input className={inp} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} inputMode="tel" /></Field>
+            <Field label="Foto kegiatan *">
               <input type="file" accept="image/*" onChange={pilihFoto} className="text-sm w-full" />
               {form.fotoNama && <p className="text-xs text-emerald-700 mt-1">Siap unggah: {form.fotoNama}</p>}
             </Field>
             <div className="sm:col-span-2">
-              <Field label="Description"><textarea className={inp + " h-20 resize-none"} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
+              <Field label="Hasil meeting"><textarea className={inp + " h-20 resize-none"} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
             </div>
           </div>
 
@@ -417,8 +452,9 @@ function ActivityCard({ x }) {
       {x.Segmentation && <span className={"self-start text-xs font-medium px-2 py-0.5 rounded-full " + SEG_STYLE}>{x.Segmentation}</span>}
       <div className="text-sm text-slate-600">
         {(x.PICName || x.Position) && <div>👤 {x.PICName}{x.Position ? " — " + x.Position : ""}</div>}
+        {x.Alamat && <div className="text-slate-500">📍 {x.Alamat}</div>}
       </div>
-      {x.Description && <p className="text-sm text-slate-600">{x.Description}</p>}
+      {x.Description && <p className="text-sm text-slate-600"><span className="text-slate-400">Hasil: </span>{x.Description}</p>}
       <div className="flex flex-wrap items-center gap-3 text-xs mt-1">
         {x.PhoneNumber && (
           <a href={"https://wa.me/" + String(x.PhoneNumber).replace(/[^\d]/g, "").replace(/^0/, "62")} target="_blank" rel="noreferrer" className="text-emerald-700 font-medium">💬 {x.PhoneNumber}</a>

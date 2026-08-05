@@ -32,6 +32,7 @@ export async function POST(req) {
       ID: id, Date: b.date || "", Time: b.time || "", SalesName: b.salesName || "", CompanyName: comp,
       Segmentation: b.segmentation || "", PICName: b.picName || "", Position: b.position || "",
       PhoneNumber: b.phone || "", Description: b.description || "", Activity: b.activity || "", Photo: foto,
+      Alamat: b.alamat || "",
     };
     await db.collection("aktivitas").doc(id).set(doc);
     return NextResponse.json({ status: "ok", id, photo: foto });

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import PasswordInput from "@/components/PasswordInput";
 import { Donut, BarList, ChartCard, hitungPer, beriWarna } from "@/components/Charts";
+import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
 
 const STATUS_HEX = { Tentative: "#f59e0b", Definite: "#10b981", Cancel: "#f43f5e" };
 
@@ -215,6 +216,15 @@ export default function Dashboard() {
     }
   }
 
+  function exportCSV() {
+    const header = ["Tanggal", "Nama", "Instansi", "NoHP", "Email", "Jenis Event", "Tanggal Event", "Jumlah", "Estimasi Nilai", "Sumber", "Status", "PIC", "Alasan Cancel", "Update", "Oleh", "Catatan"];
+    const rows = leadsTampil.map((l) => [
+      l.Tanggal, l.Nama, l.Instansi, l.NoHP, l.Email, l.JenisEvent, l.TanggalEvent, l.JumlahPax,
+      l.EstimasiNilai, l.Sumber, l.Status, l.PIC, l.AlasanCancel, l.UpdatedAt, l.UpdatedBy, l.Catatan,
+    ]);
+    unduhCSV(namaFileTanggal("leads"), [header, ...rows]);
+  }
+
   if (!user) return null;
 
   return (
@@ -299,6 +309,9 @@ export default function Dashboard() {
               <option key={s}>{s}</option>
             ))}
           </select>
+          <button onClick={exportCSV} disabled={leadsTampil.length === 0} className="border border-slate-300 text-[#12263a] font-semibold rounded-lg px-3 py-2.5 hover:bg-slate-50 whitespace-nowrap disabled:opacity-50">
+            ⬇ Export
+          </button>
         </div>
 
         {/* Daftar leads */}

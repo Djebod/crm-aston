@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ProfilSaya from "@/components/ProfilSaya";
 import { Modal, Field, inp } from "@/components/Modal";
 import { Donut, BarList, ChartCard, hitungPer, beriWarna } from "@/components/Charts";
+import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
 
 const SEGMENTS = [
   "Online Travel Agent", "Company", "Government", "Tour & Travel",
@@ -110,6 +111,12 @@ export default function CompanyPage() {
     );
   }, [companies, cari]);
 
+  function exportCSV() {
+    const header = ["CompanyName", "Segmentation", "Alamat"];
+    const rows = tampil.map((c) => [c.CompanyName, c.Segmentation, c.Alamat]);
+    unduhCSV(namaFileTanggal("company"), [header, ...rows]);
+  }
+
   if (!user) return null;
 
   return (
@@ -145,6 +152,9 @@ export default function CompanyPage() {
             <p className="text-sm text-slate-500">Total {companies.length} perusahaan.</p>
           </div>
           <div className="flex gap-2">
+            <button onClick={exportCSV} disabled={tampil.length === 0} className="border border-slate-300 text-[#12263a] font-semibold rounded-lg px-3 py-2.5 hover:bg-slate-50 whitespace-nowrap disabled:opacity-50">
+              ⬇ Export
+            </button>
             <button onClick={() => setModalImport(true)} className="border border-slate-300 text-[#12263a] font-semibold rounded-lg px-3 py-2.5 hover:bg-slate-50 whitespace-nowrap">
               Import CSV
             </button>
