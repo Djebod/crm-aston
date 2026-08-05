@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Semua data hanya diakses server (Firebase Admin SDK), yang mem-bypass rules ini.
+    // Akses langsung dari browser/klien ditolak total demi keamanan.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

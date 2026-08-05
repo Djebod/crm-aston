@@ -5,10 +5,13 @@ node_modules
 .next
 out
 
-# rahasia (JANGAN di-push)
+# RAHASIA — JANGAN pernah di-push
 .env
 .env.local
-service-account.json
+serviceAccountKey.json
+
+# data ekspor untuk migrasi (lokal saja)
+migrasi/
 
 # lain-lain
 .DS_Store

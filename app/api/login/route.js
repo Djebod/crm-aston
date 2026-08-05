@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { asPost } from "@/lib/appscript";
+import { db } from "@/lib/firebase";
 
 export const runtime = "nodejs";
 
@@ -8,43 +8,31 @@ export async function POST(req) {
   try {
     const { email, password } = await req.json();
     const em = String(email || "").toLowerCase().trim();
-    if (!em || !password) {
-      return NextResponse.json({ ok: false, message: "Email dan password wajib diisi." });
-    }
+    if (!em || !password) return NextResponse.json({ ok: false, message: "Email dan password wajib diisi." });
 
-    // 1) Super admin — data dari Environment Variable (paling aman)
+    // Super admin dari Environment Variable
     const adminEmail = String(process.env.ADMIN_EMAIL || "").toLowerCase().trim();
     if (adminEmail && em === adminEmail) {
       const hash = process.env.ADMIN_PASSWORD_HASH || "";
-      if (!hash) {
-        return NextResponse.json({ ok: false, message: "ADMIN_PASSWORD_HASH belum di-set di Environment Variable." });
-      }
-      const cocok = bcrypt.compareSync(password, hash);
-      if (cocok) {
-        return NextResponse.json({
-          ok: true,
-          user: { email: em, nama: process.env.ADMIN_NAME || "Super Admin", role: "admin" },
-        });
+      if (!hash) return NextResponse.json({ ok: false, message: "ADMIN_PASSWORD_HASH belum di-set." });
+      if (bcrypt.compareSync(password, hash)) {
+        return NextResponse.json({ ok: true, user: { email: em, nama: process.env.ADMIN_NAME || "Super Admin", role: "admin" } });
       }
       return NextResponse.json({ ok: false, message: "Password salah." });
     }
 
-    // 2) User tim marketing — data dari Google Sheets
-    const r = await asPost({ action: "auth", email: em });
-    const u = r && r.user;
-    if (!u) return NextResponse.json({ ok: false, message: "Akun tidak ditemukan." });
-    if (String(u.Aktif).toLowerCase() === "false") {
+    // User tim dari Firestore
+    const snap = await db.collection("users").doc(em).get();
+    if (!snap.exists) return NextResponse.json({ ok: false, message: "Akun tidak ditemukan." });
+    const u = snap.data();
+    if (u.Aktif === false || String(u.Aktif).toLowerCase() === "false") {
       return NextResponse.json({ ok: false, message: "Akun ini non-aktif." });
     }
     if (!bcrypt.compareSync(password, u.PasswordHash || "")) {
       return NextResponse.json({ ok: false, message: "Password salah." });
     }
-    return NextResponse.json({
-      ok: true,
-      user: { email: u.Email, nama: u.Nama, role: u.Role || "marketing" },
-    });
+    return NextResponse.json({ ok: true, user: { email: u.Email, nama: u.Nama, role: u.Role || "marketing" } });
   } catch (e) {
-    // Tampilkan penyebab asli supaya mudah diperbaiki saat setup
     return NextResponse.json({ ok: false, message: "Server error: " + (e?.message || String(e)) });
   }
 }

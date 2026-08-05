@@ -1,187 +1,132 @@
-# Aston CRM — Sales Leads Event & Booking
+# Aston CRM — versi Firebase (foto di Google Drive)
 
-Aplikasi CRM untuk mencatat & memantau prospek event dan booking Aston Cirebon.
-Multi-user (Bang Syam sebagai super admin + tim marketing), dengan upload dokumen (KTP/foto/file).
+CRM Leads Event & Booking Aston Cirebon. Database di **Firebase Firestore**, foto kegiatan tetap di **Google Drive**.
 
-**Teknologi:** Next.js 14 (Vercel) -> Google Apps Script -> Google Sheets (data) + Google Drive (dokumen).
+**Arsitektur:** Next.js (Vercel) -> **Firestore** (data) + **Google Drive** (foto, via Apps Script kecil) + **Gmail SMTP** (email reset).
+Semua akses Firestore lewat **server** (Firebase Admin SDK). Tidak perlu upgrade Blaze — cukup paket **Spark (gratis)**.
 
----
-
-## Fitur
-
-- Login aman (password di-hash bcrypt, tidak pernah disimpan polos) + branding logo Aston
-- Pipeline status: **Tentative -> Definite -> Cancel** (status Cancel wajib mengisi Alasan Cancel). Semua perubahan status tercatat otomatis di tab `Log_Status` (waktu, status lama/baru, alasan, oleh siapa).
-- Tambah / edit prospek, ubah status cepat dari kartu
-- Upload dokumen prospek ke Google Drive (link otomatis masuk ke Sheet)
-- Ringkasan: total prospek, sedang proses, nilai pipeline, nilai deal
-- Cari & filter status, tombol WhatsApp langsung dari nomor prospek
-- **Manajemen user (admin):** tambah, edit (nama/role), aktif-nonaktifkan, dan **reset password**
-- **Lupa password (self-service):** user minta tautan reset -> dikirim ke email -> buat password baru
-- **Profil Saya (semua user):** ubah nama & ganti password sendiri (wajib password lama benar)
-- **Lihat password:** semua kolom password punya tombol mata untuk menampilkan/menyembunyikan isian
-- **Sales Activity:** catat kunjungan/aktivitas sales. Activity (Sales Visit, Sales Call, Site Inspection, Telemarketing) & Market Segment berupa pilihan, upload foto kegiatan. Nama Company unik (tidak boleh dobel persis); PIC Name & Position bebas tiap aktivitas. Filter pull-down: Activity, Market Segment, By Sales.
-- **Import Database Company:** tombol "Database Company" -> unduh template CSV -> isi -> upload massal (duplikat otomatis dilewati).
-- **Potensi lead:** di form aktivitas ada tombol "Apakah ada potensi lead?". Jika "Ya", muncul Form Leads di bawahnya (tanpa upload foto) dan lead langsung tersimpan ke menu Leads.
-- **Menu Leads:** hanya menampilkan lead yang sudah disubmit (dibuat dari Activity). Status/detail masih bisa diedit di sini.
+Tampilan & alur pemakaian **sama persis** seperti versi Google Sheets — yang berubah hanya "mesin" di belakang.
 
 ---
 
-## URUTAN SETUP (ikuti dari atas ke bawah)
+## Struktur data (otomatis dibuat di Firestore)
+- `users` (id = email huruf kecil): Email, Nama, PasswordHash, Role, Aktif, ResetToken, ResetExpiry
+- `leads` (id = ID lead): kolom lead + AlasanCancel, UpdatedBy
+- `aktivitas` (id = ID): kolom aktivitas + Photo (link Google Drive)
+- `companies` (id = nama huruf kecil -> otomatis unik): CompanyName, Segmentation
+- `log_status`: riwayat perubahan status (Waktu, LeadID, Nama, StatusLama, StatusBaru, AlasanCancel, Oleh)
 
-### 1) Siapkan Google Sheet (database)
+---
 
-1. Buka https://sheets.google.com -> **Blank**.
-2. **Tab pertama** beri nama `Leads`. Baris pertama isi judul kolom ini (urutan persis):
-   ```
-   ID | Tanggal | Nama | Instansi | NoHP | Email | JenisEvent | TanggalEvent | JumlahPax | EstimasiNilai | Sumber | Status | PIC | Catatan | LinkDokumen | UpdatedAt | AlasanCancel | UpdatedBy
-   ```
-   (2 kolom terakhir `AlasanCancel` & `UpdatedBy` untuk fitur status Cancel dan pencatatan siapa yang terakhir mengubah. Tab `Log_Status` tidak perlu dibuat manual — dibuat otomatis saat ada perubahan status.)
-3. **Tab kedua** beri nama `Users`. Baris pertama (7 kolom):
-   ```
-   Email | Nama | PasswordHash | Role | Aktif | ResetToken | ResetExpiry
-   ```
-   (Kolom `ResetToken` & `ResetExpiry` biarkan kosong; dipakai otomatis saat fitur lupa password.)
-4. **Tab ketiga** beri nama `Aktivitas`. Baris pertama (12 kolom, urutan persis):
-   ```
-   ID | Date | Time | SalesName | CompanyName | Segmentation | PICName | Position | PhoneNumber | Description | Activity | Photo
-   ```
-5. **Tab keempat** beri nama `Companies`. Baris pertama (2 kolom):
-   ```
-   CompanyName | Segmentation
-   ```
-   (Terisi otomatis saat menambah aktivitas; nama company dijaga unik.)
+# LANGKAH SETUP (urut dari atas)
 
-### 2) Siapkan folder Google Drive (untuk dokumen)
+## 1) Buat project Firebase
+1. https://console.firebase.google.com -> **Add project** -> beri nama -> selesai.
+2. Catat **Project ID** (di Project settings).
 
-1. Buka https://drive.google.com -> **New -> Folder** -> beri nama `Dokumen-CRM-Aston`.
-2. Buka folder itu, salin **ID folder** dari URL (bagian setelah `/folders/`).
+## 2) Aktifkan Firestore
+1. Menu kiri **Build -> Firestore Database** -> **Create database**.
+2. **Production mode** -> lokasi `asia-southeast2` (Jakarta) -> Enable.
 
-### 3) Pasang Apps Script (jembatan + pengirim email)
+## 3) Pasang aturan Firestore
+1. **Firestore -> Rules** -> hapus isi -> tempel isi file `firestore.rules` -> **Publish**.
+> Storage TIDAK dipakai (foto di Google Drive), jadi tidak perlu upgrade Blaze dan tidak ada langkah Storage rules.
 
-1. Di Google Sheet: menu **Extensions -> Apps Script**.
-2. Hapus kode contoh, salin **semua** isi `apps-script/Code.gs` ke sana.
-3. Ganti 2 baris di atas:
-   - `FOLDER_ID` = ID folder Drive dari langkah 2.
-   - `APP_URL` = URL aplikasi Anda (mis. `https://crm-aston.vercel.app`). Dipakai untuk membuat tautan reset di email. (Boleh diisi belakangan setelah dapat URL Vercel — jangan lupa re-deploy Apps Script.)
-4. **Deploy -> New deployment** -> ikon gerigi -> **Web app**.
-   - **Execute as:** `Me`  ·  **Who has access:** `Anyone`
-5. **Deploy -> Authorize access** -> izinkan. **Penting:** karena aplikasi mengirim email reset, saat Authorize akan diminta izin **kirim email atas nama Anda** — setujui.
-6. Salin **Web app URL** -> inilah **`API_URL`**.
+## 4) Buat Service Account (kunci server Firestore)
+1. **Project settings** (gerigi) -> tab **Service accounts** -> **Generate new private key** -> **Generate key**.
+2. Ganti nama file jadi `serviceAccountKey.json`, taruh di **root folder proyek**.
+3. RAHASIA — sudah di `.gitignore`, jangan di-push.
 
-> Kalau nanti mengubah `Code.gs`: **Deploy -> Manage deployments -> Edit (pensil) -> Version: New version -> Deploy**.
+## 5) Pasang Apps Script untuk upload foto ke Drive
+1. https://script.google.com -> **New project** -> tempel isi `apps-script-upload/Code.gs`.
+   (FOLDER_ID sudah terisi folder Drive Anda: `1v_vC83UUEKpw9HkK3VKNrFYpurQ2pHxO`.)
+2. **Deploy -> New deployment -> Web app** -> Execute as: **Me** | Who has access: **Anyone** -> **Deploy**.
+3. **Authorize access** (izinkan akses Drive) -> salin **Web app URL**.
+4. URL itu jadi nilai `DRIVE_UPLOAD_URL` (dipakai di langkah 8).
 
-### 4) Buat hash password super admin
-
-Password asli tidak pernah disimpan, hanya hash-nya. Di komputer (perlu Node.js):
-
+## 6) Buat hash password super admin
 ```bash
 npm install bcryptjs
 node -e "console.log(require('bcryptjs').hashSync('PASSWORD_ANDA', 10))"
 ```
+Salin hasilnya (mulai `$2a$10$...`).
 
-Ganti `PASSWORD_ANDA` dengan password pilihan Anda. Salin hasilnya (mulai `$2a$10$...`).
+## 7) Buat Gmail App Password (untuk email reset)
+1. Aktifkan **Verifikasi 2 Langkah** di akun Google.
+2. https://myaccount.google.com/apppasswords -> buat App Password -> salin 16 huruf (tanpa spasi).
+3. `MAIL_USER` = alamat Gmail; `MAIL_APP_PASSWORD` = 16 huruf tadi.
 
-### 5) Jalankan di komputer (uji coba lokal)
+## 8) Isi file .env.local
+1. Salin `.env.local.example` menjadi `.env.local`.
+2. Isi:
+   - `FIREBASE_PROJECT_ID` = `project_id` di serviceAccountKey.json
+   - `FIREBASE_CLIENT_EMAIL` = `client_email` di serviceAccountKey.json
+   - `FIREBASE_PRIVATE_KEY` = `private_key` di serviceAccountKey.json — **1 baris**, dibungkus kutip, tiap baris baru jadi `\n`. Contoh:
+     `FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----\n"`
+   - `DRIVE_UPLOAD_URL` = Web app URL dari langkah 5
+   - `ADMIN_PASSWORD_HASH` = hash dari langkah 6
+   - `MAIL_USER`, `MAIL_APP_PASSWORD` = dari langkah 7
+   - `APP_URL` = `http://localhost:3000` (untuk tes lokal; ganti ke URL Vercel setelah deploy)
 
-1. Salin `.env.local.example` menjadi `.env.local`, lalu isi:
-   ```
-   API_URL=(tempel Web app URL dari langkah 3)
-   ADMIN_EMAIL=syam.rakhmany@gmail.com
-   ADMIN_NAME=Bang Syam
-   ADMIN_PASSWORD_HASH=(tempel hash dari langkah 4)
-   ```
-   > **PENTING (khusus file `.env.local` lokal):** hash bcrypt mengandung tanda `$`.
-   > Next.js bisa salah mengira `$` sebagai variabel. Beri tanda `\` di depan tiap `$`, contoh:
-   > `ADMIN_PASSWORD_HASH=\$2a\$10\$abcdefg...`
-   > (Di **Vercel** tidak perlu di-escape — isi apa adanya.)
-2. Di terminal folder proyek:
+## 9) Migrasi data lama (Sheets -> Firestore)
+> Lewati kalau ingin mulai dari kosong.
+1. Di Sheet lama, ekspor tiap tab jadi CSV: **File -> Download -> .csv** untuk **Leads, Users, Aktivitas, Companies**.
+2. Buat folder `migrasi/` di root, ganti nama file jadi: `Leads.csv`, `Users.csv`, `Aktivitas.csv`, `Companies.csv`.
+3. Pastikan `serviceAccountKey.json` ada di root.
+4. Jalankan:
    ```bash
    npm install
-   npm run dev
+   npm run migrate
    ```
-3. Buka http://localhost:3000 -> login pakai email super admin + password asli Anda.
+5. Muncul jumlah dokumen -> "Migrasi selesai". Password tim lama tetap berlaku; foto lama tetap link Drive.
+
+## 10) Jalankan lokal
+```bash
+npm install
+npm run dev
+```
+Buka http://localhost:3000 -> login super admin.
 
 ---
 
-## UPLOAD KE GITHUB (step-by-step)
-
-**Pertama kali (sekali saja):**
-1. Buka https://github.com/new -> nama repo `crm-aston` -> **Private** -> **Create repository**.
-2. Di terminal folder proyek:
-   ```bash
-   git init
-   git add .
-   git commit -m "Pertama kali upload aplikasi CRM Aston"
-   git branch -M main
-   git remote add origin https://github.com/Djebod/crm-aston.git
-   git push -u origin main
-   ```
-
-**Setiap ada perubahan (WAJIB di akhir tiap update):**
+## UPLOAD KE GITHUB
+Pertama kali:
 ```bash
+git init
 git add .
-git commit -m "Jelaskan perubahannya"
-git push
+git commit -m "CRM Aston versi Firebase (foto di Google Drive)"
+git branch -M main
+git remote add origin https://github.com/Djebod/crm-aston.git
+git push -u origin main
 ```
-
-**Kalau error antar-PC (dubious ownership / konflik):**
-```bash
-git config --global --add safe.directory "*"
-git pull --rebase
-git push
-```
+Berikutnya: `git add .` -> `git commit -m "..."` -> `git push`.
+> Cek `git status`: `.env.local` dan `serviceAccountKey.json` TIDAK boleh muncul.
 
 ---
 
-## DEPLOY KE VERCEL (step-by-step)
-
-1. Buka https://vercel.com -> **Login with GitHub**.
-2. **Add New... -> Project** -> pilih repo `crm-aston` -> **Import**.
-3. Di **Environment Variables**, isi 4 ini (di Vercel isi apa adanya, TANPA escape `$`):
-   - `API_URL`
-   - `ADMIN_EMAIL` = `syam.rakhmany@gmail.com`
-   - `ADMIN_NAME` = `Bang Syam`
-   - `ADMIN_PASSWORD_HASH` = hash bcrypt Anda
-4. **Deploy** -> dapat link `https://crm-aston.vercel.app`.
-5. Setelah dapat URL, kembali ke Apps Script, isi `APP_URL` dengan URL ini, lalu **re-deploy** Apps Script (agar tautan email reset benar).
-6. Update berikutnya cukup `git push`, Vercel deploy otomatis.
-
-**Domain sendiri (opsional):** Project -> **Settings -> Domains -> Add** -> ikuti instruksi DNS (Squarespace Domains). Kalau pakai domain sendiri, samakan juga `APP_URL` di Apps Script.
+## DEPLOY KE VERCEL
+1. https://vercel.com -> Add New -> Project -> pilih repo -> Import.
+2. Isi **Environment Variables** (sama seperti `.env.local`):
+   `APP_URL`, `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_PASSWORD_HASH`,
+   `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`,
+   `DRIVE_UPLOAD_URL`, `MAIL_USER`, `MAIL_APP_PASSWORD`.
+   - `FIREBASE_PRIVATE_KEY` di Vercel: tempel nilai sama seperti `.env.local` **tanpa tanda kutip**; biarkan `\n` apa adanya.
+3. **Deploy** -> dapat link. Ganti `APP_URL` ke URL final -> **Redeploy**.
 
 ---
 
-## Cara pakai fitur user
+## Catatan keamanan
+- Password hanya disimpan sebagai **hash bcrypt**.
+- Kunci Firebase & Gmail hanya di **Environment Variable** (server).
+- `serviceAccountKey.json` & `.env.local` tidak boleh masuk GitHub (sudah di `.gitignore`).
+- Firestore Rules mengunci akses klien — semua data lewat server aplikasi.
 
-- **Tambah/edit/reset (admin):** login sebagai admin -> tombol **Kelola Tim** -> tambah anggota, atau klik **Kelola** pada anggota untuk ubah nama/role, aktif-nonaktif, dan reset password.
-- **Profil Saya (semua user):** klik nama Anda di kanan atas -> ubah nama, atau ganti password (isi password lama + password baru). Klik ikon mata untuk melihat isian password.
-- **Lupa password (semua user tim):** di halaman masuk -> **Lupa password?** -> isi email -> tautan reset dikirim ke email -> buka tautan -> buat password baru (berlaku 1 jam).
-- **Super admin lupa password:** buat hash baru (langkah 4), ganti `ADMIN_PASSWORD_HASH` di Vercel, lalu Redeploy. (Super admin tidak lewat email karena datanya di Environment Variable, bukan di Sheet.)
-
----
-
-## Kalau login gagal "Server error: ..."
-
-Pesan errornya sekarang menampilkan penyebab asli. Yang paling sering:
-- **`API_URL belum diisi`** -> Environment Variable belum di-set / salah nama. Isi lalu **restart** `npm run dev` (lokal) atau **Redeploy** (Vercel). Env baru tidak terbaca sampai restart/redeploy.
-- **Password salah** padahal benar -> hash di `.env.local` rusak karena `$` tidak di-escape (lihat langkah 5). Perbaiki jadi `\$2a\$10\$...`.
-- **`ADMIN_PASSWORD_HASH belum di-set`** -> variabel itu kosong.
-
----
-
-## Catatan keamanan (jujur)
-
-- Semua password (admin & tim) disimpan **hanya sebagai hash bcrypt**, tidak bisa dibaca balik.
-- Data rahasia ada di **Environment Variable Vercel**, bukan di GitHub. File `.env*` sudah masuk `.gitignore`.
-- Tautan reset memakai token acak yang **kedaluwarsa 1 jam** dan sekali pakai.
-- Ini alat internal tim. Sesi login disimpan di browser (localStorage) — cukup untuk pemakaian tim, belum sekuat session-token penuh. Bisa ditingkatkan bila perlu audit ketat.
-
----
-
-## Checklist akhir
-
-- [ ] Tab `Leads` (16 kolom) & `Users` (7 kolom) dibuat dengan judul persis.
-- [ ] `FOLDER_ID` dan `APP_URL` di `Code.gs` sudah diisi.
-- [ ] Apps Script di-deploy sebagai Web App (`Anyone`) + izin kirim email disetujui; `API_URL` didapat.
-- [ ] Hash password dibuat, dimasukkan ke Environment Variable (escape `$` di lokal).
-- [ ] `.env.local` terisi & `npm run dev` jalan.
-- [ ] Repo GitHub `Djebod/crm-aston` terisi; Vercel ter-deploy dengan 4 Environment Variables.
+## Checklist
+- [ ] Project Firebase + Firestore aktif (Spark gratis; TANPA Storage/Blaze).
+- [ ] Rules Firestore dipasang.
+- [ ] serviceAccountKey.json di root (lokal).
+- [ ] Apps Script upload foto ter-deploy; DRIVE_UPLOAD_URL didapat.
+- [ ] .env.local terisi lengkap (9 variabel).
+- [ ] (Opsional) Migrasi CSV berhasil.
+- [ ] npm run dev jalan & bisa login.
+- [ ] Repo GitHub tanpa file rahasia; Vercel ter-deploy + env lengkap + APP_URL final.
