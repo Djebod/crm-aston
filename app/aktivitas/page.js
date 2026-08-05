@@ -51,36 +51,6 @@ function fileKeBase64(file) {
   });
 }
 
-// ---- CSV helper untuk import company ----
-function splitCsvLine(line) {
-  const out = []; let cur = ""; let q = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (q) {
-      if (c === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else q = false; }
-      else cur += c;
-    } else {
-      if (c === '"') q = true;
-      else if (c === ",") { out.push(cur); cur = ""; }
-      else cur += c;
-    }
-  }
-  out.push(cur);
-  return out;
-}
-function parseCSV(text) {
-  const lines = text.replace(/\r/g, "").split("\n").filter((l) => l.trim() !== "");
-  const rows = [];
-  for (let i = 0; i < lines.length; i++) {
-    const cols = splitCsvLine(lines[i]);
-    if (i === 0 && /company/i.test(cols[0] || "")) continue; // lewati header
-    const companyName = (cols[0] || "").trim();
-    const segmentation = (cols[1] || "").trim();
-    if (companyName) rows.push({ companyName, segmentation });
-  }
-  return rows;
-}
-
 export default function AktivitasPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -98,7 +68,6 @@ export default function AktivitasPage() {
   const [lead, setLead] = useState(LEAD_KOSONG);
   const [menyimpan, setMenyimpan] = useState(false);
   const [modalProfil, setModalProfil] = useState(false);
-  const [modalCompany, setModalCompany] = useState(false);
 
   useEffect(() => {
     const raw = typeof window !== "undefined" ? localStorage.getItem("crm_user") : null;
@@ -258,9 +227,6 @@ export default function AktivitasPage() {
             <p className="text-sm text-slate-500">Catatan kunjungan &amp; aktivitas sales.</p>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setModalCompany(true)} className="border border-slate-300 text-[#12263a] font-semibold rounded-lg px-3 py-2.5 hover:bg-slate-50 whitespace-nowrap">
-              Database Company
-            </button>
             <button onClick={bukaTambah} className="bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg px-4 py-2.5 transition whitespace-nowrap">
               + Tambah Aktivitas
             </button>
@@ -420,9 +386,6 @@ export default function AktivitasPage() {
         </Modal>
       )}
 
-      {/* Modal Database Company */}
-      {modalCompany && <DatabaseCompany companies={companies} onClose={() => setModalCompany(false)} onImported={ambil} />}
-
       {/* Modal Profil */}
       {modalProfil && (
         <ProfilSaya user={user} onClose={() => setModalProfil(false)}
@@ -463,91 +426,5 @@ function ActivityCard({ x }) {
         {x.Photo && <a href={x.Photo} target="_blank" rel="noreferrer" className="text-blue-700 font-medium">📷 Foto</a>}
       </div>
     </div>
-  );
-}
-
-function DatabaseCompany({ companies, onClose, onImported }) {
-  const [rows, setRows] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [pesan, setPesan] = useState("");
-
-  function unduhTemplate() {
-    const isi = "CompanyName,Segmentation\nPT Contoh Sejahtera,Company\nDinas Pariwisata Kota,Government\nUniversitas Contoh,University / School\n";
-    const blob = new Blob([isi], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "template-company.csv";
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
-  async function pilihFile(e) {
-    setPesan("");
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const text = await file.text();
-    const parsed = parseCSV(text);
-    if (parsed.length === 0) { setPesan("File kosong / format tidak sesuai template."); setRows(null); return; }
-    setRows(parsed);
-    setPesan(parsed.length + " baris terbaca dari file. Klik Import untuk menyimpan.");
-  }
-
-  async function importData() {
-    if (!rows || rows.length === 0) return;
-    setBusy(true); setPesan("");
-    try {
-      const res = await fetch("/api/companies", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "importCompanies", rows }),
-      });
-      const data = await res.json();
-      if (data.status === "ok") {
-        setPesan("✓ " + (data.ditambah || 0) + " company baru ditambahkan (duplikat dilewati).");
-        setRows(null);
-        await onImported();
-      } else {
-        setPesan("Gagal: " + (data.message || "coba lagi"));
-      }
-    } catch (e) {
-      setPesan("Tidak bisa terhubung ke server.");
-    } finally { setBusy(false); }
-  }
-
-  return (
-    <Modal title="Database Company" onClose={onClose}>
-      <p className="text-sm text-slate-600 mb-3">
-        Upload banyak company sekaligus. <b>Unduh template</b> dulu, isi kolom <code>CompanyName</code> dan <code>Segmentation</code>, lalu upload. Nama yang sudah ada otomatis dilewati (tidak dobel).
-      </p>
-
-      <div className="flex flex-col sm:flex-row gap-2 mb-4">
-        <button onClick={unduhTemplate} className="border border-slate-300 text-[#12263a] font-semibold rounded-lg py-2.5 px-4 hover:bg-slate-50">
-          ⬇ Unduh Template (CSV)
-        </button>
-        <label className="flex-1">
-          <span className="block text-sm font-medium mb-1 text-slate-700">Upload file CSV terisi</span>
-          <input type="file" accept=".csv,text/csv" onChange={pilihFile} className="text-sm w-full" />
-        </label>
-      </div>
-
-      {pesan && <p className="text-sm mb-3">{pesan}</p>}
-
-      <button onClick={importData} disabled={busy || !rows} className="bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg py-2.5 px-4 disabled:opacity-60">
-        {busy ? "Mengimport…" : "Import"}
-      </button>
-
-      <div className="mt-5">
-        <div className="text-sm font-semibold text-slate-700 mb-1">Company tersimpan: {companies.length}</div>
-        <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
-          {companies.length === 0 && <div className="p-2 text-sm text-slate-500">Belum ada.</div>}
-          {companies.map((c) => (
-            <div key={c.CompanyName} className="p-2 text-sm flex items-center justify-between">
-              <span className="truncate">{c.CompanyName}</span>
-              <span className="text-xs text-slate-400 ml-2 shrink-0">{c.Segmentation}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </Modal>
   );
 }

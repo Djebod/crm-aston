@@ -23,7 +23,7 @@ export async function POST(req) {
     if (comp) {
       const cref = db.collection("companies").doc(comp.toLowerCase());
       const cs = await cref.get();
-      if (!cs.exists) await cref.set({ CompanyName: comp, Segmentation: b.segmentation || "" });
+      if (!cs.exists) await cref.set({ CompanyName: comp, Segmentation: b.segmentation || "", Alamat: "" });
     }
     let foto = "";
     if (b.fotoBase64) foto = await uploadFotoDrive(b.fotoBase64, id + "_" + (b.fotoNama || "foto"));
