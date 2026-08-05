@@ -224,10 +224,11 @@ export default function AktivitasPage() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/aston-logo.png" alt="Aston Cirebon" className="h-7 w-auto object-contain" />
             </span>
-            <nav className="flex items-center gap-1 text-sm">
-              <a href="/dashboard" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition">Leads</a>
-              <a href="/aktivitas" className="px-3 py-1.5 rounded-lg bg-white/15 font-semibold">Activity</a>
-              <a href="/company" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition">Company</a>
+            <nav className="flex items-center gap-0.5 text-sm overflow-x-auto">
+              <a href="/dashboard" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Leads</a>
+              <a href="/aktivitas" className="px-3 py-1.5 rounded-lg bg-white/15 font-semibold whitespace-nowrap">Activity</a>
+              <a href="/company" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Company</a>
+              <a href="/log" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Log</a>
             </nav>
           </div>
           <div className="flex items-center gap-2 shrink-0">
