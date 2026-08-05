@@ -198,7 +198,7 @@ export default function Dashboard() {
       if (!alasanCancel) return; // batal kalau alasan kosong
     }
     try {
-      await fetch("/api/leads", {
+      const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -210,6 +210,10 @@ export default function Dashboard() {
           oleh: user?.nama || user?.email || "",
         }),
       });
+      const data = await res.json();
+      if (data.status !== "ok") {
+        alert("Gagal mengubah status: " + (data.message || "coba lagi"));
+      }
       await ambilLeads();
     } catch (e) {
       alert("Gagal mengubah status.");
