@@ -4,8 +4,11 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Modal, Field, inp } from "@/components/Modal";
 import ProfilSaya from "@/components/ProfilSaya";
-import { Donut, BarList, ChartCard, hitungPer, beriWarna } from "@/components/Charts";
+import { Donut, BarList, ChartCard, hitungPer, beriWarna, topN } from "@/components/Charts";
 import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
+import Pager from "@/components/Pager";
+
+const PER_HAL = 25;
 
 const ACTIVITIES = ["Sales Call", "Site Inspection", "Telemarketing"];
 const SEGMENTS = [
@@ -182,8 +185,8 @@ export default function AktivitasPage() {
   }, [list]);
 
   const chartActivity = useMemo(() => beriWarna(hitungPer(list, (x) => x.Activity || "(kosong)")), [list]);
-  const chartSegmen = useMemo(() => beriWarna(hitungPer(list, (x) => x.Segmentation || "(kosong)")), [list]);
-  const chartSales = useMemo(() => beriWarna(hitungPer(list, (x) => x.SalesName || "(kosong)")), [list]);
+  const chartSegmen = useMemo(() => beriWarna(topN(hitungPer(list, (x) => x.Segmentation || "(kosong)"), 10)), [list]);
+  const chartSales = useMemo(() => beriWarna(topN(hitungPer(list, (x) => x.SalesName || "(kosong)"), 10)), [list]);
 
   const tampil = useMemo(() => {
     const q = cari.toLowerCase().trim();
@@ -197,6 +200,11 @@ export default function AktivitasPage() {
       })
       .reverse();
   }, [list, cari, fActivity, fSeg, fSales]);
+
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [cari, fActivity, fSeg, fSales]);
+  const totalHal = Math.max(1, Math.ceil(tampil.length / PER_HAL));
+  const paged = tampil.slice((page - 1) * PER_HAL, page * PER_HAL);
 
   const companyMatch = companies.find(
     (c) => String(c.CompanyName).trim().toLowerCase() === form.companyName.trim().toLowerCase()
@@ -298,8 +306,11 @@ export default function AktivitasPage() {
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            {tampil.map((x) => <ActivityCard key={x.ID} x={x} />)}
+            {paged.map((x) => <ActivityCard key={x.ID} x={x} />)}
           </div>
+        )}
+        {!loading && tampil.length > 0 && (
+          <Pager page={page} total={totalHal} per={PER_HAL} count={tampil.length} onChange={setPage} />
         )}
       </main>
 

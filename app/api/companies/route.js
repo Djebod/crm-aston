@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
+import { db, companyId } from "@/lib/firebase";
 
 export const runtime = "nodejs";
 
@@ -29,7 +29,7 @@ export async function POST(req) {
       const alamat = String(body.alamat || "").trim();
       if (!nama) return err("Nama company wajib diisi.");
       if (!alamat) return err("Alamat Lengkap wajib diisi.");
-      const ref = db.collection("companies").doc(nama.toLowerCase());
+      const ref = db.collection("companies").doc(companyId(nama));
       if ((await ref.get()).exists) return err("Company dengan nama itu sudah ada.");
       await ref.set({ CompanyName: nama, Segmentation: body.segmentation || "", Alamat: alamat });
       return ok();
@@ -40,7 +40,7 @@ export async function POST(req) {
       const nama = String(body.companyName || "").trim();
       const alamat = String(body.alamat || "").trim();
       if (!alamat) return err("Alamat Lengkap wajib diisi.");
-      const ref = db.collection("companies").doc(nama.toLowerCase());
+      const ref = db.collection("companies").doc(companyId(nama));
       if (!(await ref.get()).exists) return err("Company tidak ditemukan.");
       await ref.update({ Segmentation: body.segmentation || "", Alamat: alamat });
       return ok();
@@ -55,7 +55,7 @@ export async function POST(req) {
       for (const r of rows) {
         const nm = String(r.companyName || "").trim();
         if (!nm) continue;
-        const cid = nm.toLowerCase();
+        const cid = companyId(nm);
         if (ada.has(cid)) continue;
         ada.add(cid);
         baru.push({ cid, nm, seg: r.segmentation || "", alamat: r.alamat || "" });

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
+import { db, companyId } from "@/lib/firebase";
 import { uploadFotoDrive } from "@/lib/drive";
 
 export const runtime = "nodejs";
@@ -21,7 +21,7 @@ export async function POST(req) {
     const id = "A" + Date.now();
     const comp = String(b.companyName || "").trim();
     if (comp) {
-      const cref = db.collection("companies").doc(comp.toLowerCase());
+      const cref = db.collection("companies").doc(companyId(comp));
       const cs = await cref.get();
       if (!cs.exists) await cref.set({ CompanyName: comp, Segmentation: b.segmentation || "", Alamat: "" });
     }

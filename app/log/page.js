@@ -4,6 +4,9 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import ProfilSaya from "@/components/ProfilSaya";
 import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
+import Pager from "@/components/Pager";
+
+const PER_HAL = 25;
 
 const STATUS_STYLE = {
   Tentative: "bg-amber-100 text-amber-800",
@@ -47,6 +50,11 @@ export default function LogPage() {
       !q || [x.Nama, x.Oleh, x.StatusLama, x.StatusBaru, x.AlasanCancel].join(" ").toLowerCase().includes(q)
     );
   }, [list, cari]);
+
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [cari]);
+  const totalHal = Math.max(1, Math.ceil(tampil.length / PER_HAL));
+  const paged = tampil.slice((page - 1) * PER_HAL, page * PER_HAL);
 
   function exportCSV() {
     const header = ["Waktu", "Lead", "Status Lama", "Status Baru", "Alasan Cancel", "Oleh"];
@@ -115,7 +123,7 @@ export default function LogPage() {
               <div className="w-56">PERUBAHAN</div>
               <div className="w-32">OLEH</div>
             </div>
-            {tampil.map((x, i) => (
+            {paged.map((x, i) => (
               <div key={i} className={"flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 px-4 py-3 " + (i % 2 === 0 ? "bg-white" : "bg-slate-50")}>
                 <div className="w-32 text-xs text-slate-500">{x.Waktu}</div>
                 <div className="flex-1 font-medium text-[#12263a]">{x.Nama || "-"}</div>
@@ -133,6 +141,9 @@ export default function LogPage() {
               </div>
             ))}
           </div>
+        )}
+        {!loading && tampil.length > 0 && (
+          <Pager page={page} total={totalHal} per={PER_HAL} count={tampil.length} onChange={setPage} />
         )}
       </main>
 

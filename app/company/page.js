@@ -4,8 +4,11 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import ProfilSaya from "@/components/ProfilSaya";
 import { Modal, Field, inp } from "@/components/Modal";
-import { Donut, BarList, ChartCard, hitungPer, beriWarna } from "@/components/Charts";
+import { Donut, BarList, ChartCard, hitungPer, beriWarna, topN } from "@/components/Charts";
 import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
+import Pager from "@/components/Pager";
+
+const PER_HAL = 25;
 
 const SEGMENTS = [
   "Online Travel Agent", "Company", "Government", "Tour & Travel",
@@ -98,7 +101,7 @@ export default function CompanyPage() {
   }
 
   const perSegmen = useMemo(
-    () => beriWarna(hitungPer(companies, (c) => c.Segmentation || "(tanpa segmen)")),
+    () => beriWarna(topN(hitungPer(companies, (c) => c.Segmentation || "(tanpa segmen)"), 10)),
     [companies]
   );
 
@@ -110,6 +113,11 @@ export default function CompanyPage() {
         || String(c.Alamat).toLowerCase().includes(q)
     );
   }, [companies, cari]);
+
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [cari]);
+  const totalHal = Math.max(1, Math.ceil(tampil.length / PER_HAL));
+  const paged = tampil.slice((page - 1) * PER_HAL, page * PER_HAL);
 
   function exportCSV() {
     const header = ["CompanyName", "Segmentation", "Alamat"];
@@ -195,7 +203,7 @@ export default function CompanyPage() {
               <div className="flex-1">ALAMAT</div>
               <div className="w-16 text-right">AKSI</div>
             </div>
-            {tampil.map((c, i) => (
+            {paged.map((c, i) => (
               <div
                 key={c.CompanyName}
                 className={"flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 px-4 py-3 " + (i % 2 === 0 ? "bg-white" : "bg-slate-50")}
@@ -211,6 +219,9 @@ export default function CompanyPage() {
               </div>
             ))}
           </div>
+        )}
+        {!loading && tampil.length > 0 && (
+          <Pager page={page} total={totalHal} per={PER_HAL} count={tampil.length} onChange={setPage} />
         )}
       </main>
 

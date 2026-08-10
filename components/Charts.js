@@ -26,6 +26,14 @@ export function beriWarna(data, warnaMap) {
   }));
 }
 
+// Ambil top-N (data harus sudah terurut menurun); sisanya digabung jadi "Lainnya"
+export function topN(data, n = 10) {
+  if (data.length <= n) return data;
+  const atas = data.slice(0, n);
+  const sisa = data.slice(n).reduce((s, d) => s + d.value, 0);
+  return sisa > 0 ? [...atas, { label: "Lainnya", value: sisa }] : atas;
+}
+
 // ---- Donut interaktif (hover slice / legend) ----
 export function Donut({ data, size = 168, thickness = 26 }) {
   const [hover, setHover] = useState(null);

@@ -3,8 +3,11 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import PasswordInput from "@/components/PasswordInput";
-import { Donut, BarList, ChartCard, hitungPer, beriWarna } from "@/components/Charts";
+import { Donut, BarList, ChartCard, hitungPer, beriWarna, topN } from "@/components/Charts";
 import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
+import Pager from "@/components/Pager";
+
+const PER_HAL = 25;
 
 const STATUS_HEX = { Tentative: "#f59e0b", Definite: "#10b981", Cancel: "#f43f5e" };
 
@@ -111,7 +114,7 @@ export default function Dashboard() {
     [leads]
   );
   const chartSumber = useMemo(
-    () => beriWarna(hitungPer(leads, (l) => l.Sumber || "(kosong)")),
+    () => beriWarna(topN(hitungPer(leads, (l) => l.Sumber || "(kosong)"), 10)),
     [leads]
   );
 
@@ -129,6 +132,11 @@ export default function Dashboard() {
       })
       .reverse(); // terbaru di atas
   }, [leads, cari, filterStatus]);
+
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [cari, filterStatus]);
+  const totalHal = Math.max(1, Math.ceil(leadsTampil.length / PER_HAL));
+  const pagedLeads = leadsTampil.slice((page - 1) * PER_HAL, page * PER_HAL);
 
   function bukaEdit(l) {
     setForm({
@@ -328,7 +336,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            {leadsTampil.map((l) => (
+            {pagedLeads.map((l) => (
               <LeadCard
                 key={l.ID}
                 lead={l}
@@ -337,6 +345,9 @@ export default function Dashboard() {
               />
             ))}
           </div>
+        )}
+        {!loading && leadsTampil.length > 0 && (
+          <Pager page={page} total={totalHal} per={PER_HAL} count={leadsTampil.length} onChange={setPage} />
         )}
       </main>
 
