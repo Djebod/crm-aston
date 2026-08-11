@@ -451,28 +451,56 @@ function Chip({ active, onClick, children }) {
   );
 }
 
+function driveId(url) {
+  const u = String(url || "");
+  let m = u.match(/\/d\/([-\w]{20,})/); if (m) return m[1];
+  m = u.match(/[?&]id=([-\w]{20,})/); if (m) return m[1];
+  m = u.match(/([-\w]{25,})/); if (m) return m[1];
+  return "";
+}
+function driveThumb(url, w = 400) {
+  const id = driveId(url);
+  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w${w}` : "";
+}
+
 function ActivityCard({ x }) {
+  const thumb = driveThumb(x.Photo, 400);
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col gap-2">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="font-bold text-[#12263a] truncate">{x.CompanyName}</div>
-          <div className="text-xs text-slate-500">{x.Date} · {x.Time} · {x.SalesName}</div>
+    <div className="bg-white rounded-xl border border-slate-200 p-4 flex gap-3">
+      <div className="flex flex-col gap-2 min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="font-bold text-[#12263a] truncate">{x.CompanyName}</div>
+            <div className="text-xs text-slate-500">{x.Date} · {x.Time} · {x.SalesName}</div>
+          </div>
+          {x.Activity && <span className={"text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap " + (ACT_STYLE[x.Activity] || "bg-slate-100 text-slate-700")}>{x.Activity}</span>}
         </div>
-        {x.Activity && <span className={"text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap " + (ACT_STYLE[x.Activity] || "bg-slate-100 text-slate-700")}>{x.Activity}</span>}
+        {x.Segmentation && <span className={"self-start text-xs font-medium px-2 py-0.5 rounded-full " + SEG_STYLE}>{x.Segmentation}</span>}
+        <div className="text-sm text-slate-600">
+          {(x.PICName || x.Position) && <div>👤 {x.PICName}{x.Position ? " — " + x.Position : ""}</div>}
+          {x.Alamat && <div className="text-slate-500">📍 {x.Alamat}</div>}
+        </div>
+        {x.Description && <p className="text-sm text-slate-600"><span className="text-slate-400">Hasil: </span>{x.Description}</p>}
+        <div className="flex flex-wrap items-center gap-3 text-xs mt-1">
+          {x.PhoneNumber && (
+            <a href={"https://wa.me/" + String(x.PhoneNumber).replace(/[^\d]/g, "").replace(/^0/, "62")} target="_blank" rel="noreferrer" className="text-emerald-700 font-medium">💬 {x.PhoneNumber}</a>
+          )}
+          {x.Photo && !thumb && <a href={x.Photo} target="_blank" rel="noreferrer" className="text-blue-700 font-medium">📷 Foto</a>}
+        </div>
       </div>
-      {x.Segmentation && <span className={"self-start text-xs font-medium px-2 py-0.5 rounded-full " + SEG_STYLE}>{x.Segmentation}</span>}
-      <div className="text-sm text-slate-600">
-        {(x.PICName || x.Position) && <div>👤 {x.PICName}{x.Position ? " — " + x.Position : ""}</div>}
-        {x.Alamat && <div className="text-slate-500">📍 {x.Alamat}</div>}
-      </div>
-      {x.Description && <p className="text-sm text-slate-600"><span className="text-slate-400">Hasil: </span>{x.Description}</p>}
-      <div className="flex flex-wrap items-center gap-3 text-xs mt-1">
-        {x.PhoneNumber && (
-          <a href={"https://wa.me/" + String(x.PhoneNumber).replace(/[^\d]/g, "").replace(/^0/, "62")} target="_blank" rel="noreferrer" className="text-emerald-700 font-medium">💬 {x.PhoneNumber}</a>
-        )}
-        {x.Photo && <a href={x.Photo} target="_blank" rel="noreferrer" className="text-blue-700 font-medium">📷 Foto</a>}
-      </div>
+      {thumb && (
+        <a href={x.Photo || thumb} target="_blank" rel="noreferrer" className="shrink-0" title="Lihat foto">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={thumb}
+            alt="Foto kegiatan"
+            referrerPolicy="no-referrer"
+            loading="lazy"
+            className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-lg border border-slate-200 bg-slate-100"
+            onError={(e) => { e.currentTarget.style.display = "none"; }}
+          />
+        </a>
+      )}
     </div>
   );
 }
