@@ -6,6 +6,7 @@ import PasswordInput from "@/components/PasswordInput";
 import { Donut, BarList, ChartCard, hitungPer, beriWarna, topN } from "@/components/Charts";
 import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
 import Pager from "@/components/Pager";
+import Header from "@/components/Header";
 
 const PER_HAL = 25;
 
@@ -242,46 +243,10 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="bg-[#12263a] text-white sticky top-0 z-20">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="bg-white rounded-lg px-2 py-1 flex items-center shrink-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/aston-logo.png" alt="Aston Cirebon" className="h-7 w-auto object-contain" />
-            </span>
-            <nav className="flex items-center gap-0.5 text-sm overflow-x-auto">
-              <a href="/dashboard" className="px-3 py-1.5 rounded-lg bg-white/15 font-semibold whitespace-nowrap">Leads</a>
-              <a href="/aktivitas" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Activity</a>
-              <a href="/company" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Company</a>
-              <a href="/log" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Log</a>
-            </nav>
-          </div>
-          <div className="flex items-center gap-3">
-            {user.role === "admin" && (
-              <button
-                onClick={() => setModalUser(true)}
-                className="text-sm bg-white/10 hover:bg-white/20 rounded-lg px-3 py-1.5 transition"
-              >
-                Kelola Tim
-              </button>
-            )}
-            <button
-              onClick={() => setModalProfil(true)}
-              className="text-right leading-tight bg-white/10 hover:bg-white/20 rounded-lg px-3 py-1.5 transition"
-              title="Profil saya"
-            >
-              <div className="text-sm font-semibold">{user.nama}</div>
-              <div className="text-xs text-slate-300 capitalize">{user.role}</div>
-            </button>
-            <button
-              onClick={logout}
-              className="text-sm bg-[#c8962c] hover:brightness-95 text-[#12263a] font-semibold rounded-lg px-3 py-1.5 transition"
-            >
-              Keluar
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header active="leads" user={user}
+        onKelolaTim={() => setModalUser(true)}
+        onProfil={() => setModalProfil(true)}
+        onKeluar={logout} />
 
       <main className="max-w-5xl mx-auto px-4 py-5">
         {/* Ringkasan */}

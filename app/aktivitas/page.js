@@ -7,6 +7,7 @@ import ProfilSaya from "@/components/ProfilSaya";
 import { Donut, BarList, ChartCard, hitungPer, beriWarna, topN } from "@/components/Charts";
 import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
 import Pager from "@/components/Pager";
+import Header from "@/components/Header";
 
 const PER_HAL = 25;
 
@@ -225,30 +226,7 @@ export default function AktivitasPage() {
 
   return (
     <div className="min-h-screen">
-      <header className="bg-[#12263a] text-white sticky top-0 z-20">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="bg-white rounded-lg px-2 py-1 flex items-center shrink-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/aston-logo.png" alt="Aston Cirebon" className="h-7 w-auto object-contain" />
-            </span>
-            <nav className="flex items-center gap-0.5 text-sm overflow-x-auto">
-              <a href="/dashboard" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Leads</a>
-              <a href="/aktivitas" className="px-3 py-1.5 rounded-lg bg-white/15 font-semibold whitespace-nowrap">Activity</a>
-              <a href="/company" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Company</a>
-              <a href="/log" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Log</a>
-            </nav>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button onClick={() => setModalProfil(true)} className="text-right leading-tight bg-white/10 hover:bg-white/20 rounded-lg px-3 py-1.5 transition hidden sm:block" title="Profil saya">
-              <div className="text-sm font-semibold">{user.nama}</div>
-              <div className="text-xs text-slate-300 capitalize">{user.role}</div>
-            </button>
-            <button onClick={() => setModalProfil(true)} className="sm:hidden bg-white/10 rounded-lg px-3 py-1.5 text-sm">Profil</button>
-            <button onClick={logout} className="text-sm bg-[#c8962c] hover:brightness-95 text-[#12263a] font-semibold rounded-lg px-3 py-1.5 transition">Keluar</button>
-          </div>
-        </div>
-      </header>
+      <Header active="activity" user={user} onProfil={() => setModalProfil(true)} onKeluar={logout} />
 
       <main className="max-w-5xl mx-auto px-4 py-5">
         <div className="flex items-center justify-between mb-4 gap-2">
@@ -322,11 +300,8 @@ export default function AktivitasPage() {
             <Field label="Jam"><input type="time" className={inp} value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} /></Field>
             <Field label="Sales Name"><input className={inp} value={form.salesName} onChange={(e) => setForm({ ...form, salesName: e.target.value })} /></Field>
             <Field label="Company Name">
-              <input className={inp} list="daftar-company" value={form.companyName} onChange={(e) => isiCompany(e.target.value)} placeholder="opsional — kosongkan jika perorangan" />
-              <datalist id="daftar-company">
-                {companies.map((c) => <option key={c.CompanyName} value={c.CompanyName} />)}
-              </datalist>
-              <p className="text-xs text-slate-400 mt-1">Boleh dikosongkan (kunjungan perorangan). Kalau sudah ada, pilih dari daftar.</p>
+              <CompanyPicker value={form.companyName} companies={companies} onChange={isiCompany} />
+              <p className="text-xs text-slate-400 mt-1">Boleh dikosongkan (kunjungan perorangan). Ketik untuk mencari.</p>
             </Field>
             {companyTerpilih && (
               <div className="sm:col-span-2">
@@ -460,7 +435,45 @@ function driveId(url) {
 }
 function driveThumb(url, w = 400) {
   const id = driveId(url);
-  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w${w}` : "";
+  return id ? `https://lh3.googleusercontent.com/d/${id}=w${w}` : "";
+}
+
+function CompanyPicker({ value, companies, onChange }) {
+  const [open, setOpen] = useState(false);
+  const hasil = useMemo(() => {
+    const s = String(value || "").toLowerCase().trim();
+    if (!s) return [];
+    return companies.filter((c) => String(c.CompanyName).toLowerCase().includes(s)).slice(0, 12);
+  }, [value, companies]);
+
+  return (
+    <div className="relative">
+      <input
+        className={inp}
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="opsional — ketik untuk cari perusahaan"
+        autoComplete="off"
+      />
+      {open && hasil.length > 0 && (
+        <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+          {hasil.map((c) => (
+            <button
+              type="button"
+              key={c.CompanyName}
+              onMouseDown={(e) => { e.preventDefault(); onChange(c.CompanyName); setOpen(false); }}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 border-b border-slate-100 last:border-0"
+            >
+              <div className="font-medium text-[#12263a] truncate uppercase">{c.CompanyName}</div>
+              {c.Segmentation && <div className="text-xs text-slate-400">{c.Segmentation}</div>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ActivityCard({ x }) {
@@ -485,7 +498,7 @@ function ActivityCard({ x }) {
           {x.PhoneNumber && (
             <a href={"https://wa.me/" + String(x.PhoneNumber).replace(/[^\d]/g, "").replace(/^0/, "62")} target="_blank" rel="noreferrer" className="text-emerald-700 font-medium">💬 {x.PhoneNumber}</a>
           )}
-          {x.Photo && !thumb && <a href={x.Photo} target="_blank" rel="noreferrer" className="text-blue-700 font-medium">📷 Foto</a>}
+          {x.Photo && <a href={x.Photo} target="_blank" rel="noreferrer" className="text-blue-700 font-medium">📷 Foto</a>}
         </div>
       </div>
       {thumb && (
@@ -496,8 +509,18 @@ function ActivityCard({ x }) {
             alt="Foto kegiatan"
             referrerPolicy="no-referrer"
             loading="lazy"
+            data-id={driveId(x.Photo)}
             className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-lg border border-slate-200 bg-slate-100"
-            onError={(e) => { e.currentTarget.style.display = "none"; }}
+            onError={(e) => {
+              const el = e.currentTarget;
+              const id = el.getAttribute("data-id");
+              if (id && !el.dataset.tried) {
+                el.dataset.tried = "1";
+                el.src = `https://drive.google.com/thumbnail?id=${id}&sz=w400`;
+              } else {
+                el.style.display = "none";
+              }
+            }}
           />
         </a>
       )}
