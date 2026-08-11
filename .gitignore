@@ -1,18 +1,7 @@
-# dependency
 node_modules
-
-# next.js
 .next
-out
-
-# RAHASIA — JANGAN pernah di-push
-.env
 .env.local
+.env
 serviceAccountKey.json
-
-# data ekspor untuk migrasi (lokal saja)
-migrasi/
-
-# lain-lain
-.DS_Store
+migrasi
 *.log

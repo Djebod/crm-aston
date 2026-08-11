@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
-import { db, companyId } from "@/lib/firebase";
+import { sql, raw, companyId } from "@/lib/db";
 import { uploadFotoDrive } from "@/lib/drive";
 
 export const runtime = "nodejs";
 
+const SEL = `SELECT id AS "ID", tanggal AS "Date", jam AS "Time", sales_name AS "SalesName",
+  company_name AS "CompanyName", segmentation AS "Segmentation", pic_name AS "PICName", position AS "Position",
+  phone_number AS "PhoneNumber", description AS "Description", activity AS "Activity", photo AS "Photo", alamat AS "Alamat"
+  FROM aktivitas`;
+
 export async function GET() {
   try {
-    const snap = await db.collection("aktivitas").orderBy("ID", "asc").get();
-    return NextResponse.json({ status: "ok", data: snap.docs.map((d) => d.data()) });
+    const rows = await raw(`${SEL} ORDER BY id ASC`);
+    return NextResponse.json({ status: "ok", data: rows });
   } catch (e) {
     return NextResponse.json({ status: "error", message: e?.message || String(e) });
   }
@@ -21,20 +26,18 @@ export async function POST(req) {
     const id = "A" + Date.now();
     const comp = String(b.companyName || "").trim();
     if (comp) {
-      const cref = db.collection("companies").doc(companyId(comp));
-      const cs = await cref.get();
-      if (!cs.exists) await cref.set({ CompanyName: comp, Segmentation: b.segmentation || "", Alamat: "" });
+      await sql`INSERT INTO companies (id, company_name, segmentation, alamat)
+                VALUES (${companyId(comp)}, ${comp}, ${b.segmentation || ""}, ${""})
+                ON CONFLICT (id) DO NOTHING`;
     }
     let foto = "";
     if (b.fotoBase64) foto = await uploadFotoDrive(b.fotoBase64, id + "_" + (b.fotoNama || "foto"));
 
-    const doc = {
-      ID: id, Date: b.date || "", Time: b.time || "", SalesName: b.salesName || "", CompanyName: comp,
-      Segmentation: b.segmentation || "", PICName: b.picName || "", Position: b.position || "",
-      PhoneNumber: b.phone || "", Description: b.description || "", Activity: b.activity || "", Photo: foto,
-      Alamat: b.alamat || "",
-    };
-    await db.collection("aktivitas").doc(id).set(doc);
+    await sql`INSERT INTO aktivitas (id, tanggal, jam, sales_name, company_name, segmentation, pic_name, position,
+      phone_number, description, activity, photo, alamat)
+      VALUES (${id}, ${b.date || ""}, ${b.time || ""}, ${b.salesName || ""}, ${comp}, ${b.segmentation || ""},
+      ${b.picName || ""}, ${b.position || ""}, ${b.phone || ""}, ${b.description || ""}, ${b.activity || ""},
+      ${foto}, ${b.alamat || ""})`;
     return NextResponse.json({ status: "ok", id, photo: foto });
   } catch (e) {
     return NextResponse.json({ status: "error", message: e?.message || String(e) });

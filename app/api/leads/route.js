@@ -1,19 +1,23 @@
 import { NextResponse } from "next/server";
-import { db, waktuJakarta } from "@/lib/firebase";
+import { sql, raw, exec, waktuJakarta } from "@/lib/db";
 
 export const runtime = "nodejs";
 
 async function logStatus(id, nama, lama, baru, alasan, oleh) {
-  await db.collection("log_status").add({
-    Waktu: waktuJakarta(), LeadID: id, Nama: nama || "",
-    StatusLama: lama || "", StatusBaru: baru || "", AlasanCancel: alasan || "", Oleh: oleh || "",
-  });
+  await sql`INSERT INTO log_status (waktu, lead_id, nama, status_lama, status_baru, alasan_cancel, oleh)
+            VALUES (${waktuJakarta()}, ${id}, ${nama || ""}, ${lama || ""}, ${baru || ""}, ${alasan || ""}, ${oleh || ""})`;
 }
+
+const SEL = `SELECT id AS "ID", tanggal AS "Tanggal", nama AS "Nama", instansi AS "Instansi", nohp AS "NoHP",
+  email AS "Email", jenis_event AS "JenisEvent", tanggal_event AS "TanggalEvent", jumlah_pax AS "JumlahPax",
+  estimasi_nilai AS "EstimasiNilai", sumber AS "Sumber", status AS "Status", pic AS "PIC", catatan AS "Catatan",
+  link_dokumen AS "LinkDokumen", updated_at AS "UpdatedAt", alasan_cancel AS "AlasanCancel", updated_by AS "UpdatedBy"
+  FROM leads`;
 
 export async function GET() {
   try {
-    const snap = await db.collection("leads").orderBy("Tanggal", "asc").get();
-    return NextResponse.json({ status: "ok", data: snap.docs.map((d) => d.data()) });
+    const rows = await raw(`${SEL} ORDER BY tanggal ASC`);
+    return NextResponse.json({ status: "ok", data: rows });
   } catch (e) {
     return NextResponse.json({ status: "error", message: e?.message || String(e) });
   }
@@ -27,33 +31,37 @@ export async function POST(req) {
       const id = "L" + Date.now();
       const now = waktuJakarta();
       const status = b.status || "Tentative";
-      const doc = {
-        ID: id, Tanggal: now, Nama: b.nama || "", Instansi: b.instansi || "", NoHP: b.nohp || "",
-        Email: b.email || "", JenisEvent: b.jenisEvent || "", TanggalEvent: b.tanggalEvent || "",
-        JumlahPax: b.jumlahPax || "", EstimasiNilai: b.estimasiNilai || "", Sumber: b.sumber || "",
-        Status: status, PIC: b.pic || "", Catatan: b.catatan || "", LinkDokumen: "",
-        UpdatedAt: now, AlasanCancel: b.alasanCancel || "", UpdatedBy: b.oleh || "",
-      };
-      await db.collection("leads").doc(id).set(doc);
+      await sql`INSERT INTO leads (id, tanggal, nama, instansi, nohp, email, jenis_event, tanggal_event, jumlah_pax,
+        estimasi_nilai, sumber, status, pic, catatan, link_dokumen, updated_at, alasan_cancel, updated_by)
+        VALUES (${id}, ${now}, ${b.nama || ""}, ${b.instansi || ""}, ${b.nohp || ""}, ${b.email || ""},
+        ${b.jenisEvent || ""}, ${b.tanggalEvent || ""}, ${String(b.jumlahPax ?? "")}, ${String(b.estimasiNilai ?? "")},
+        ${b.sumber || ""}, ${status}, ${b.pic || ""}, ${b.catatan || ""}, ${""}, ${now}, ${b.alasanCancel || ""}, ${b.oleh || ""})`;
       await logStatus(id, b.nama || "", "-", status, b.alasanCancel || "", b.oleh || "");
       return NextResponse.json({ status: "ok", id });
     }
 
     if (b.action === "updateLead") {
-      const ref = db.collection("leads").doc(String(b.id));
-      const snap = await ref.get();
-      if (!snap.exists) return NextResponse.json({ status: "error", message: "ID tidak ditemukan" });
-      const old = snap.data();
-      const map = {
-        Nama: b.nama, Instansi: b.instansi, NoHP: b.nohp, Email: b.email, JenisEvent: b.jenisEvent,
-        TanggalEvent: b.tanggalEvent, JumlahPax: b.jumlahPax, EstimasiNilai: b.estimasiNilai,
-        Sumber: b.sumber, Status: b.status, PIC: b.pic, Catatan: b.catatan, AlasanCancel: b.alasanCancel,
-      };
-      const upd = {};
-      Object.keys(map).forEach((k) => { if (map[k] !== undefined) upd[k] = map[k]; });
-      upd.UpdatedAt = waktuJakarta();
-      if (b.oleh !== undefined) upd.UpdatedBy = b.oleh || "";
-      await ref.update(upd);
+      const cur = await sql`SELECT status AS "Status", nama AS "Nama" FROM leads WHERE id = ${b.id}`;
+      if (!cur.length) return NextResponse.json({ status: "error", message: "ID tidak ditemukan" });
+      const old = cur[0];
+
+      const map = { nama: "nama", instansi: "instansi", nohp: "nohp", email: "email", jenisEvent: "jenis_event",
+        tanggalEvent: "tanggal_event", jumlahPax: "jumlah_pax", estimasiNilai: "estimasi_nilai", sumber: "sumber",
+        status: "status", pic: "pic", catatan: "catatan", alasanCancel: "alasan_cancel" };
+      const cols = [];
+      for (const k in map) {
+        if (b[k] !== undefined) cols.push({ col: map[k], val: k === "estimasiNilai" || k === "jumlahPax" ? String(b[k]) : b[k] });
+      }
+      cols.push({ col: "updated_at", val: waktuJakarta() });
+      if (b.oleh !== undefined) cols.push({ col: "updated_by", val: b.oleh || "" });
+
+      const parts = ["UPDATE leads SET " + cols[0].col + " = "];
+      for (let i = 1; i < cols.length; i++) parts.push(", " + cols[i].col + " = ");
+      parts.push(" WHERE id = ");
+      parts.push("");
+      const values = cols.map((c) => c.val).concat([b.id]);
+      await exec(parts, values);
+
       if (b.status !== undefined && String(b.status) !== String(old.Status || "")) {
         await logStatus(b.id, b.nama || old.Nama || "", old.Status || "", b.status, b.alasanCancel || "", b.oleh || "");
       }

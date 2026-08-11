@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { db } from "@/lib/firebase";
+import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -11,14 +11,13 @@ export async function POST(req) {
     if (!em || !token || !password) return NextResponse.json({ status: "error", message: "Data tidak lengkap." });
     if (String(password).length < 6) return NextResponse.json({ status: "error", message: "Password minimal 6 karakter." });
 
-    const ref = db.collection("users").doc(em);
-    const snap = await ref.get();
-    if (!snap.exists) return NextResponse.json({ status: "error", message: "Akun tidak ditemukan." });
-    const u = snap.data();
-    if (!u.ResetToken || u.ResetToken !== token) return NextResponse.json({ status: "error", message: "Link reset tidak valid." });
-    if (Date.now() > Number(u.ResetExpiry || 0)) return NextResponse.json({ status: "error", message: "Link reset sudah kedaluwarsa. Minta ulang." });
+    const rows = await sql`SELECT reset_token AS "ResetToken", reset_expiry AS "ResetExpiry" FROM users WHERE email = ${em}`;
+    if (!rows.length) return NextResponse.json({ status: "error", message: "Tautan tidak valid." });
+    const u = rows[0];
+    if (!u.ResetToken || u.ResetToken !== token) return NextResponse.json({ status: "error", message: "Tautan tidak valid." });
+    if (!u.ResetExpiry || Date.now() > Number(u.ResetExpiry)) return NextResponse.json({ status: "error", message: "Tautan sudah kedaluwarsa. Minta ulang." });
 
-    await ref.update({ PasswordHash: bcrypt.hashSync(String(password), 10), ResetToken: "", ResetExpiry: 0 });
+    await sql`UPDATE users SET password_hash = ${bcrypt.hashSync(String(password), 10)}, reset_token = ${""}, reset_expiry = ${0} WHERE email = ${em}`;
     return NextResponse.json({ status: "ok" });
   } catch (e) {
     return NextResponse.json({ status: "error", message: e?.message || String(e) });

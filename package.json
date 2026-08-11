@@ -1,22 +1,23 @@
 {
   "name": "crm-aston",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "migrate": "node scripts/migrate.mjs",
-    "cek": "node scripts/cek-firebase.mjs"
+    "init-db": "node scripts/init-neon.mjs",
+    "migrate": "node scripts/migrate-neon.mjs"
   },
   "dependencies": {
     "next": "14.2.5",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "bcryptjs": "2.4.3",
-    "firebase-admin": "12.3.0",
-    "nodemailer": "6.9.14"
+    "@neondatabase/serverless": "0.9.4",
+    "nodemailer": "6.9.14",
+    "firebase-admin": "12.3.0"
   },
   "devDependencies": {
     "autoprefixer": "10.4.19",

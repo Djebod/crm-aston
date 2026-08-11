@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { db } from "@/lib/firebase";
+import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -10,7 +10,6 @@ export async function POST(req) {
     const em = String(email || "").toLowerCase().trim();
     if (!em || !password) return NextResponse.json({ ok: false, message: "Email dan password wajib diisi." });
 
-    // Super admin dari Environment Variable
     const adminEmail = String(process.env.ADMIN_EMAIL || "").toLowerCase().trim();
     if (adminEmail && em === adminEmail) {
       const hash = process.env.ADMIN_PASSWORD_HASH || "";
@@ -21,16 +20,11 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, message: "Password salah." });
     }
 
-    // User tim dari Firestore
-    const snap = await db.collection("users").doc(em).get();
-    if (!snap.exists) return NextResponse.json({ ok: false, message: "Akun tidak ditemukan." });
-    const u = snap.data();
-    if (u.Aktif === false || String(u.Aktif).toLowerCase() === "false") {
-      return NextResponse.json({ ok: false, message: "Akun ini non-aktif." });
-    }
-    if (!bcrypt.compareSync(password, u.PasswordHash || "")) {
-      return NextResponse.json({ ok: false, message: "Password salah." });
-    }
+    const rows = await sql`SELECT email AS "Email", nama AS "Nama", password_hash AS "PasswordHash", role AS "Role", aktif AS "Aktif" FROM users WHERE email = ${em}`;
+    if (!rows.length) return NextResponse.json({ ok: false, message: "Akun tidak ditemukan." });
+    const u = rows[0];
+    if (u.Aktif === false) return NextResponse.json({ ok: false, message: "Akun ini non-aktif." });
+    if (!bcrypt.compareSync(password, u.PasswordHash || "")) return NextResponse.json({ ok: false, message: "Password salah." });
     return NextResponse.json({ ok: true, user: { email: u.Email, nama: u.Nama, role: u.Role || "marketing" } });
   } catch (e) {
     return NextResponse.json({ ok: false, message: "Server error: " + (e?.message || String(e)) });
