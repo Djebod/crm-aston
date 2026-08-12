@@ -3,6 +3,7 @@ import { sql, raw, companyId } from "@/lib/db";
 import { uploadFotoDrive } from "@/lib/drive";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const SEL = `SELECT id AS "ID", tanggal AS "Date", jam AS "Time", sales_name AS "SalesName",
   company_name AS "CompanyName", segmentation AS "Segmentation", pic_name AS "PICName", position AS "Position",

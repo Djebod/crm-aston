@@ -58,6 +58,29 @@ function fileKeBase64(file) {
   });
 }
 
+// Perkecil & kompres foto di browser sebelum diunggah (hemat kuota & cepat).
+function muatGambar(src) {
+  return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+}
+async function kompresFoto(file, maxDim = 1600, quality = 0.7) {
+  try {
+    const dataUrl = await fileKeBase64(file);
+    if (!String(file.type).startsWith("image/")) return dataUrl; // bukan gambar, biarkan apa adanya
+    const img = await muatGambar(dataUrl);
+    let w = img.width, h = img.height;
+    if (w > maxDim || h > maxDim) {
+      const r = Math.min(maxDim / w, maxDim / h);
+      w = Math.round(w * r); h = Math.round(h * r);
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL("image/jpeg", quality);
+  } catch (e) {
+    return await fileKeBase64(file); // kalau gagal kompres, pakai asli
+  }
+}
+
 export default function AktivitasPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -159,8 +182,10 @@ export default function AktivitasPage() {
   async function pilihFoto(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const base64 = await fileKeBase64(file);
-    setForm((f) => ({ ...f, fotoBase64: base64, fotoNama: file.name }));
+    setForm((f) => ({ ...f, fotoNama: "memproses foto…" }));
+    const base64 = await kompresFoto(file, 1600, 0.7);
+    const kb = Math.round((base64.length * 3) / 4 / 1024);
+    setForm((f) => ({ ...f, fotoBase64: base64, fotoNama: file.name + " (~" + kb + " KB)" }));
   }
 
   async function simpan() {
