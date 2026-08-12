@@ -79,7 +79,7 @@ export default function CallPlanPage() {
   const stat = useMemo(() => {
     let plan = 0, real = 0, batal = 0;
     tampil.forEach((x) => { if (x.Status === "Realisasi") real++; else if (x.Status === "Batal") batal++; else plan++; });
-    const dasar = plan + real;
+    const dasar = real + batal; // dari rencana yang sudah selesai (realisasi/batal)
     return { total: tampil.length, plan, real, batal, persen: dasar ? Math.round((real / dasar) * 100) : 0 };
   }, [tampil]);
 
@@ -165,9 +165,10 @@ export default function CallPlanPage() {
         </div>
 
         {/* Ringkasan */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
           <Kartu label="Total Plan" nilai={stat.total} />
           <Kartu label="Terealisasi" nilai={stat.real} warna="text-emerald-700" />
+          <Kartu label="Batal" nilai={stat.batal} warna="text-rose-700" />
           <Kartu label="Belum (Plan)" nilai={stat.plan} warna="text-amber-700" />
           <Kartu label="% Realisasi" nilai={stat.persen + "%"} warna="text-[#c8962c]" highlight />
         </div>
@@ -183,10 +184,12 @@ export default function CallPlanPage() {
         {/* Filter */}
         <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 mb-4">
           <input value={cari} onChange={(e) => setCari(e.target.value)} placeholder="Cari…" className="col-span-2 sm:flex-1 border border-slate-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#c8962c]" />
-          <select value={fSales} onChange={(e) => setFSales(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
-            <option value="">Semua Sales</option>
-            {salesOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+          {isAdmin && (
+            <select value={fSales} onChange={(e) => setFSales(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
+              <option value="">Semua Sales</option>
+              {salesOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
           <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
             <option value="">Semua Status</option>
             <option>Plan</option><option>Realisasi</option><option>Batal</option>
