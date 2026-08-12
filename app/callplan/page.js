@@ -10,6 +10,7 @@ import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
 import Pager from "@/components/Pager";
 import Header from "@/components/Header";
 import DateRange, { dalamRentang } from "@/components/DateRange";
+import { normalizeWA } from "@/lib/phone";
 
 const PER_HAL = 25;
 const STATUS_HEX = { Plan: "#f59e0b", Realisasi: "#10b981", Batal: "#f43f5e" };
@@ -34,9 +35,6 @@ export default function CallPlanPage() {
   const [modalForm, setModalForm] = useState(false);
   const [form, setForm] = useState(FORM_KOSONG);
   const [menyimpan, setMenyimpan] = useState(false);
-
-  const [modalReal, setModalReal] = useState(null); // plan yang mau direalisasi
-  const [real, setReal] = useState({ tanggalRealisasi: "", hasil: "" });
 
   useEffect(() => {
     const raw = typeof window !== "undefined" ? localStorage.getItem("crm_user") : null;
@@ -65,14 +63,18 @@ export default function CallPlanPage() {
     return Array.from(s);
   }, [list]);
 
+  const isAdmin = user?.role === "admin";
   const tampil = useMemo(() => {
     const q = cari.toLowerCase().trim();
+    const namaU = String(user?.nama || "").toLowerCase();
+    const emailU = String(user?.email || "").toLowerCase();
     return list
+      .filter((x) => isAdmin || String(x.SalesName || "").toLowerCase() === namaU || String(x.CreatedBy || "").toLowerCase() === namaU || String(x.CreatedBy || "").toLowerCase() === emailU)
       .filter((x) => (!fSales ? true : x.SalesName === fSales))
       .filter((x) => (!fStatus ? true : x.Status === fStatus))
       .filter((x) => dalamRentang(x.TanggalRencana, dari, sampai))
       .filter((x) => !q || [x.CompanyName, x.PICName, x.SalesName, x.Phone, x.Tujuan].join(" ").toLowerCase().includes(q));
-  }, [list, cari, fSales, fStatus, dari, sampai]);
+  }, [list, cari, fSales, fStatus, dari, sampai, isAdmin, user]);
 
   const stat = useMemo(() => {
     let plan = 0, real = 0, batal = 0;
@@ -102,7 +104,7 @@ export default function CallPlanPage() {
     try {
       const res = await fetch("/api/callplan", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: form.isEdit ? "updatePlan" : "addPlan", ...form, oleh: user?.nama || user?.email || "" }),
+        body: JSON.stringify({ action: form.isEdit ? "updatePlan" : "addPlan", ...form, phone: form.phone ? normalizeWA(form.phone) : "", oleh: user?.nama || user?.email || "" }),
       });
       const data = await res.json();
       if (data.status === "ok") { setModalForm(false); await ambil(); }
@@ -111,19 +113,19 @@ export default function CallPlanPage() {
     finally { setMenyimpan(false); }
   }
 
-  function bukaRealisasi(x) { setModalReal(x); setReal({ tanggalRealisasi: hariIni(), hasil: "" }); }
-  async function simpanRealisasi() {
-    setMenyimpan(true);
-    try {
-      const res = await fetch("/api/callplan", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "realisasi", id: modalReal.ID, tanggalRealisasi: real.tanggalRealisasi, hasil: real.hasil }),
-      });
-      const data = await res.json();
-      if (data.status === "ok") { setModalReal(null); await ambil(); }
-      else alert("Gagal: " + (data.message || "coba lagi"));
-    } catch (e) { alert("Tidak bisa terhubung ke server."); }
-    finally { setMenyimpan(false); }
+  function bukaRealisasi(x) {
+    // Bawa data plan ke form Sales Activity (Type otomatis "Sales Call"),
+    // lalu tandai plan realisasi setelah aktivitas tersimpan.
+    const prefill = {
+      planId: x.ID,
+      companyName: x.CompanyName || "",
+      picName: x.PICName || "",
+      phone: x.Phone || "",
+      salesName: x.SalesName || "",
+      activity: "Sales Call",
+    };
+    try { localStorage.setItem("crm_prefill_activity", JSON.stringify(prefill)); } catch (e) {}
+    router.push("/aktivitas");
   }
 
   async function batalkan(x) {
@@ -223,7 +225,7 @@ export default function CallPlanPage() {
                 <div className="flex flex-wrap gap-2 mt-1">
                   {x.Status === "Plan" && (
                     <>
-                      <button onClick={() => bukaRealisasi(x)} className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md px-3 py-1.5">✓ Realisasi</button>
+                      <button onClick={() => bukaRealisasi(x)} title="Isi Sales Activity (Sales Call)" className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md px-3 py-1.5">✓ Realisasi → Activity</button>
                       <button onClick={() => batalkan(x)} className="text-xs font-semibold border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">Batal</button>
                       <button onClick={() => bukaEdit(x)} className="text-xs font-semibold border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">Edit</button>
                     </>
@@ -258,21 +260,6 @@ export default function CallPlanPage() {
           <div className="flex gap-2 mt-5">
             <button onClick={() => setModalForm(false)} className="flex-1 border border-slate-300 rounded-lg py-2.5 font-medium hover:bg-slate-50">Batal</button>
             <button onClick={simpan} disabled={menyimpan} className="flex-1 bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg py-2.5 disabled:opacity-60">{menyimpan ? "Menyimpan…" : "Simpan"}</button>
-          </div>
-        </Modal>
-      )}
-
-      {/* Modal realisasi */}
-      {modalReal && (
-        <Modal title="Realisasi Call Plan" onClose={() => setModalReal(null)}>
-          <p className="text-sm text-slate-600 mb-3">{modalReal.CompanyName || "(tanpa company)"} · rencana {modalReal.TanggalRencana}</p>
-          <div className="space-y-3">
-            <Field label="Tanggal Realisasi"><input type="date" className={inp} value={real.tanggalRealisasi} onChange={(e) => setReal({ ...real, tanggalRealisasi: e.target.value })} /></Field>
-            <Field label="Hasil"><textarea className={inp + " h-24 resize-none"} value={real.hasil} onChange={(e) => setReal({ ...real, hasil: e.target.value })} placeholder="Catatan hasil kunjungan/telepon…" /></Field>
-          </div>
-          <div className="flex gap-2 mt-5">
-            <button onClick={() => setModalReal(null)} className="flex-1 border border-slate-300 rounded-lg py-2.5 font-medium hover:bg-slate-50">Batal</button>
-            <button onClick={simpanRealisasi} disabled={menyimpan} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg py-2.5 disabled:opacity-60">{menyimpan ? "Menyimpan…" : "✓ Tandai Realisasi"}</button>
           </div>
         </Modal>
       )}

@@ -9,7 +9,7 @@ export const STATEMENTS = [
     id TEXT PRIMARY KEY, tanggal TEXT, nama TEXT, instansi TEXT, nohp TEXT, email TEXT,
     jenis_event TEXT, tanggal_event TEXT, jumlah_pax TEXT, estimasi_nilai TEXT, sumber TEXT,
     status TEXT, pic TEXT, catatan TEXT, link_dokumen TEXT, updated_at TEXT,
-    alasan_cancel TEXT, updated_by TEXT )`,
+    alasan_cancel TEXT, updated_by TEXT, perlu_kamar TEXT, jumlah_kamar TEXT, revenue_room TEXT )`,
   `CREATE TABLE IF NOT EXISTS aktivitas (
     id TEXT PRIMARY KEY, tanggal TEXT, jam TEXT, sales_name TEXT, company_name TEXT,
     segmentation TEXT, pic_name TEXT, position TEXT, phone_number TEXT, description TEXT,
@@ -20,6 +20,9 @@ export const STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_companies_seg ON companies (segmentation)`,
   `CREATE INDEX IF NOT EXISTS idx_leads_status ON leads (status)`,
   `CREATE INDEX IF NOT EXISTS idx_aktivitas_activity ON aktivitas (activity)`,
+  `ALTER TABLE leads ADD COLUMN IF NOT EXISTS perlu_kamar TEXT`,
+  `ALTER TABLE leads ADD COLUMN IF NOT EXISTS jumlah_kamar TEXT`,
+  `ALTER TABLE leads ADD COLUMN IF NOT EXISTS revenue_room TEXT`,
   `CREATE TABLE IF NOT EXISTS call_plan (
     id TEXT PRIMARY KEY, tanggal_rencana TEXT, sales_name TEXT, company_name TEXT,
     pic_name TEXT, phone TEXT, tujuan TEXT, status TEXT DEFAULT 'Plan',

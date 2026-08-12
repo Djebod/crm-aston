@@ -8,6 +8,7 @@ import { Donut, BarList, ChartCard, hitungPer, beriWarna, topN } from "@/compone
 import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
 import Pager from "@/components/Pager";
 import DateRange, { dalamRentang } from "@/components/DateRange";
+import { normalizeWA, validWA } from "@/lib/phone";
 import Header from "@/components/Header";
 
 const PER_HAL = 25;
@@ -75,6 +76,7 @@ export default function AktivitasPage() {
   const [form, setForm] = useState(FORM_KOSONG);
   const [lead, setLead] = useState(LEAD_KOSONG);
   const [menyimpan, setMenyimpan] = useState(false);
+  const [realisasiPlanId, setRealisasiPlanId] = useState("");
   const [modalProfil, setModalProfil] = useState(false);
 
   useEffect(() => {
@@ -97,6 +99,29 @@ export default function AktivitasPage() {
 
   useEffect(() => { if (user) ambil(); }, [user, ambil]);
 
+  // Prefill dari Sales Call Plan (klik "Realisasi → Activity")
+  useEffect(() => {
+    if (!user) return;
+    let raw = null;
+    try { raw = localStorage.getItem("crm_prefill_activity"); } catch (e) {}
+    if (!raw) return;
+    try { localStorage.removeItem("crm_prefill_activity"); } catch (e) {}
+    try {
+      const p = JSON.parse(raw);
+      setRealisasiPlanId(p.planId || "");
+      setForm({
+        ...FORM_KOSONG, date: today(), time: nowTime(),
+        salesName: p.salesName || user?.nama || "",
+        companyName: p.companyName || "",
+        picName: p.picName || "",
+        phone: p.phone || "",
+        activity: "Sales Call",
+      });
+      setLead(LEAD_KOSONG);
+      setModalForm(true);
+    } catch (e) {}
+  }, [user]);
+
   function logout() { localStorage.removeItem("crm_user"); router.replace("/"); }
 
   function bukaTambah() {
@@ -109,6 +134,13 @@ export default function AktivitasPage() {
     const ada = companies.find((c) => String(c.CompanyName).trim().toLowerCase() === nilai.trim().toLowerCase());
     setForm((f) => ({ ...f, companyName: nilai, segmentation: ada ? ada.Segmentation || f.segmentation : f.segmentation }));
   }
+
+  // Lengkapi segmentation otomatis untuk company hasil prefill (saat companies sudah termuat)
+  useEffect(() => {
+    if (!form.companyName || form.segmentation) return;
+    const ada = companies.find((c) => String(c.CompanyName).trim().toLowerCase() === form.companyName.trim().toLowerCase());
+    if (ada && ada.Segmentation) setForm((f) => ({ ...f, segmentation: ada.Segmentation }));
+  }, [companies, form.companyName]);
 
   function togglePotensi(val) {
     setForm((f) => ({ ...f, potensiLead: val }));
@@ -136,11 +168,13 @@ export default function AktivitasPage() {
     if (!form.segmentation) { alert("Pilih Market Segment."); return; }
     if (!form.picName.trim()) { alert("PIC Name wajib diisi."); return; }
     if (!form.phone.trim()) { alert("Phone Number wajib diisi."); return; }
+    if (!validWA(form.phone)) { alert("Nomor WA belum benar. Gunakan format 08xx / 62xx (mis. 081234567890)."); return; }
     if (!form.fotoBase64) { alert("Foto kegiatan wajib diunggah."); return; }
     if (form.potensiLead === "Ya" && (!lead.nama.trim() || !lead.nohp.trim())) {
       alert("Karena ada potensi lead, isi minimal Nama Prospek dan No. HP pada form Leads.");
       return;
     }
+    if (form.potensiLead === "Ya" && !validWA(lead.nohp)) { alert("Nomor WA prospek belum benar (format 08xx / 62xx)."); return; }
     if (form.potensiLead === "Ya" && lead.status === "Cancel" && !lead.alasanCancel.trim()) {
       alert("Status Cancel wajib disertai Alasan Cancel.");
       return;
@@ -152,7 +186,7 @@ export default function AktivitasPage() {
       const resA = await fetch("/api/aktivitas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "addActivity", ...form, alamat }),
+        body: JSON.stringify({ action: "addActivity", ...form, phone: normalizeWA(form.phone), alamat }),
       });
       const dataA = await resA.json();
       if (dataA.status !== "ok") { alert("Gagal menyimpan aktivitas: " + (dataA.message || "coba lagi")); setMenyimpan(false); return; }
@@ -164,6 +198,7 @@ export default function AktivitasPage() {
           body: JSON.stringify({
             action: "addLead",
             ...lead,
+            nohp: normalizeWA(lead.nohp),
             estimasiNilai: Number(String(lead.estimasiNilai).replace(/[^\d]/g, "")) || 0,
             alasanCancel: lead.status === "Cancel" ? lead.alasanCancel.trim() : "",
             oleh: form.salesName || user?.nama || user?.email || "",
@@ -171,6 +206,17 @@ export default function AktivitasPage() {
         });
         const dataL = await resL.json();
         if (dataL.status !== "ok") { alert("Aktivitas tersimpan, tapi lead gagal: " + (dataL.message || "coba lagi")); }
+      }
+
+      // Kalau ini realisasi dari Call Plan -> tandai plan sebagai Realisasi
+      if (realisasiPlanId) {
+        try {
+          await fetch("/api/callplan", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "realisasi", id: realisasiPlanId, tanggalRealisasi: form.date, hasil: form.description || "" }),
+          });
+        } catch (e) {}
+        setRealisasiPlanId("");
       }
 
       setModalForm(false);
@@ -339,7 +385,7 @@ export default function AktivitasPage() {
           <div className="grid sm:grid-cols-2 gap-3 mt-3">
             <Field label="PIC Name *"><input className={inp} value={form.picName} onChange={(e) => setForm({ ...form, picName: e.target.value })} /></Field>
             <Field label="Position"><input className={inp} value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} /></Field>
-            <Field label="Phone Number *"><input className={inp} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} inputMode="tel" /></Field>
+            <Field label="Phone Number *"><input className={inp} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} onBlur={(e) => { const v = e.target.value.trim(); if (v) setForm((f) => ({ ...f, phone: normalizeWA(v) })); }} inputMode="tel" placeholder="mis. 081234567890" /></Field>
             <Field label="Foto kegiatan *">
               <input type="file" accept="image/*" onChange={pilihFoto} className="text-sm w-full" />
               {form.fotoNama && <p className="text-xs text-emerald-700 mt-1">Siap unggah: {form.fotoNama}</p>}

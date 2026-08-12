@@ -8,6 +8,7 @@ import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
 import Pager from "@/components/Pager";
 import Header from "@/components/Header";
 import DateRange, { dalamRentang } from "@/components/DateRange";
+import { normalizeWA, validWA } from "@/lib/phone";
 
 const PER_HAL = 25;
 
@@ -32,6 +33,9 @@ const FORM_KOSONG = {
   tanggalEvent: "",
   jumlahPax: "",
   estimasiNilai: "",
+  perluKamar: false,
+  jumlahKamar: "",
+  revenueRoom: "",
   sumber: "Walk-in",
   status: "Tentative",
   pic: "",
@@ -57,6 +61,7 @@ export default function Dashboard() {
   const [filterStatus, setFilterStatus] = useState("Semua");
   const [dari, setDari] = useState("");
   const [sampai, setSampai] = useState("");
+  const [fSales, setFSales] = useState("");
 
   const [modalForm, setModalForm] = useState(false);
   const [form, setForm] = useState(FORM_KOSONG);
@@ -96,20 +101,31 @@ export default function Dashboard() {
     router.replace("/");
   }
 
+  const salesOptions = useMemo(() => {
+    const s = new Set();
+    leads.forEach((l) => { if (l.PIC) s.add(l.PIC); });
+    return Array.from(s);
+  }, [leads]);
+
   // Filter (dipakai untuk chart, ringkasan, dan daftar)
   const leadsTampil = useMemo(() => {
     const q = cari.toLowerCase().trim();
     return leads
       .filter((l) => (filterStatus === "Semua" ? true : (l.Status || "Tentative") === filterStatus))
+      .filter((l) => (!fSales ? true : l.PIC === fSales))
       .filter((l) => dalamRentang(l.Tanggal, dari, sampai))
       .filter((l) => {
         if (!q) return true;
         return [l.Nama, l.Instansi, l.NoHP, l.Email, l.PIC, l.JenisEvent].join(" ").toLowerCase().includes(q);
       })
       .reverse(); // terbaru di atas
-  }, [leads, cari, filterStatus, dari, sampai]);
+  }, [leads, cari, filterStatus, fSales, dari, sampai]);
 
-  // Ringkasan (mengikuti filter)
+  const nilaiTotal = (l) =>
+    (Number(String(l.EstimasiNilai).replace(/[^\d]/g, "")) || 0) +
+    (Number(String(l.RevenueRoom).replace(/[^\d]/g, "")) || 0);
+
+  // Ringkasan (mengikuti filter) — nilai = revenue pax + revenue room
   const ringkasan = useMemo(() => {
     const perStatus = {};
     STATUS.forEach((s) => (perStatus[s] = 0));
@@ -118,7 +134,7 @@ export default function Dashboard() {
     leadsTampil.forEach((l) => {
       const s = l.Status || "Tentative";
       if (perStatus[s] !== undefined) perStatus[s]++;
-      const nilai = Number(String(l.EstimasiNilai).replace(/[^\d]/g, "")) || 0;
+      const nilai = nilaiTotal(l);
       if (s === "Definite") nilaiDefinite += nilai;
       else if (s !== "Cancel") nilaiPipeline += nilai;
     });
@@ -136,7 +152,7 @@ export default function Dashboard() {
   );
 
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [cari, filterStatus, dari, sampai]);
+  useEffect(() => { setPage(1); }, [cari, filterStatus, fSales, dari, sampai]);
   const totalHal = Math.max(1, Math.ceil(leadsTampil.length / PER_HAL));
   const pagedLeads = leadsTampil.slice((page - 1) * PER_HAL, page * PER_HAL);
 
@@ -151,6 +167,9 @@ export default function Dashboard() {
       tanggalEvent: l.TanggalEvent || "",
       jumlahPax: l.JumlahPax || "",
       estimasiNilai: String(l.EstimasiNilai || "").replace(/[^\d]/g, ""),
+      perluKamar: !!(l.PerluKamar === "Ya" || l.RevenueRoom || l.JumlahKamar),
+      jumlahKamar: l.JumlahKamar || "",
+      revenueRoom: String(l.RevenueRoom || "").replace(/[^\d]/g, ""),
       sumber: l.Sumber || "Walk-in",
       status: l.Status || "Tentative",
       pic: l.PIC || "",
@@ -168,6 +187,14 @@ export default function Dashboard() {
       alert("Nama prospek dan No. HP wajib diisi.");
       return;
     }
+    if (!validWA(form.nohp)) {
+      alert("Nomor WA belum benar. Gunakan format 08xx / 62xx (mis. 081234567890).");
+      return;
+    }
+    if (form.tanggalEvent && form.tanggalEvent < new Date().toISOString().slice(0, 10)) {
+      alert("Tanggal Event tidak boleh sebelum hari ini.");
+      return;
+    }
     if (form.status === "Cancel" && !form.alasanCancel.trim()) {
       alert("Status Cancel wajib disertai Alasan Cancel.");
       return;
@@ -177,7 +204,11 @@ export default function Dashboard() {
       const payload = {
         action: form.id ? "updateLead" : "addLead",
         ...form,
+        nohp: normalizeWA(form.nohp),
         estimasiNilai: Number(String(form.estimasiNilai).replace(/[^\d]/g, "")) || 0,
+        perluKamar: form.perluKamar ? "Ya" : "Tidak",
+        jumlahKamar: form.perluKamar ? (Number(String(form.jumlahKamar).replace(/[^\d]/g, "")) || 0) : 0,
+        revenueRoom: form.perluKamar ? (Number(String(form.revenueRoom).replace(/[^\d]/g, "")) || 0) : 0,
         alasanCancel: form.status === "Cancel" ? form.alasanCancel.trim() : "",
         oleh: user?.nama || user?.email || "",
       };
@@ -231,10 +262,11 @@ export default function Dashboard() {
   }
 
   function exportCSV() {
-    const header = ["Tanggal", "Nama", "Instansi", "NoHP", "Email", "Jenis Event", "Tanggal Event", "Jumlah", "Estimasi Nilai", "Sumber", "Status", "PIC", "Alasan Cancel", "Update", "Oleh", "Catatan"];
+    const header = ["Tanggal", "Nama", "Instansi", "NoHP", "Email", "Jenis Event", "Tanggal Event", "Jumlah Pax", "Estimasi Revenue Pax", "Perlu Kamar", "Jumlah Kamar", "Revenue Room", "Total Revenue", "Sumber", "Status", "PIC", "Alasan Cancel", "Update", "Oleh", "Catatan"];
     const rows = leadsTampil.map((l) => [
       l.Tanggal, l.Nama, l.Instansi, l.NoHP, l.Email, l.JenisEvent, l.TanggalEvent, l.JumlahPax,
-      l.EstimasiNilai, l.Sumber, l.Status, l.PIC, l.AlasanCancel, l.UpdatedAt, l.UpdatedBy, l.Catatan,
+      l.EstimasiNilai, l.PerluKamar, l.JumlahKamar, l.RevenueRoom, nilaiTotal(l),
+      l.Sumber, l.Status, l.PIC, l.AlasanCancel, l.UpdatedAt, l.UpdatedBy, l.Catatan,
     ]);
     unduhCSV(namaFileTanggal("leads"), [header, ...rows]);
   }
@@ -288,6 +320,10 @@ export default function Dashboard() {
               <option key={s}>{s}</option>
             ))}
           </select>
+          <select value={fSales} onChange={(e) => setFSales(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
+            <option value="">Semua Sales</option>
+            {salesOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
           <DateRange dari={dari} sampai={sampai} setDari={setDari} setSampai={setSampai} />
           <button onClick={exportCSV} disabled={leadsTampil.length === 0} className="border border-slate-300 text-[#12263a] font-semibold rounded-lg px-3 py-2.5 hover:bg-slate-50 whitespace-nowrap disabled:opacity-50">
             ⬇ Export
@@ -329,7 +365,11 @@ export default function Dashboard() {
               <input className={inp} value={form.instansi} onChange={(e) => setForm({ ...form, instansi: e.target.value })} />
             </Field>
             <Field label="No. HP / WA *">
-              <input className={inp} value={form.nohp} onChange={(e) => setForm({ ...form, nohp: e.target.value })} />
+              <input className={inp} value={form.nohp}
+                onChange={(e) => setForm({ ...form, nohp: e.target.value })}
+                onBlur={(e) => { const v = e.target.value.trim(); if (v) setForm((f) => ({ ...f, nohp: normalizeWA(v) })); }}
+                inputMode="tel" placeholder="mis. 081234567890" />
+              <p className="text-xs text-slate-400 mt-1">Otomatis dirapikan ke format 62… (mis. 6281234567890).</p>
             </Field>
             <Field label="Email">
               <input className={inp} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
@@ -340,12 +380,12 @@ export default function Dashboard() {
               </select>
             </Field>
             <Field label="Tanggal Event">
-              <input type="date" className={inp} value={form.tanggalEvent} onChange={(e) => setForm({ ...form, tanggalEvent: e.target.value })} />
+              <input type="date" min={new Date().toISOString().slice(0, 10)} className={inp} value={form.tanggalEvent} onChange={(e) => setForm({ ...form, tanggalEvent: e.target.value })} />
             </Field>
-            <Field label="Jumlah Tamu / Kamar">
-              <input className={inp} value={form.jumlahPax} onChange={(e) => setForm({ ...form, jumlahPax: e.target.value })} />
+            <Field label="Jumlah Tamu / Pax">
+              <input className={inp} value={form.jumlahPax} onChange={(e) => setForm({ ...form, jumlahPax: e.target.value })} inputMode="numeric" />
             </Field>
-            <Field label="Estimasi Nilai (Rp)">
+            <Field label="Estimasi Revenue Pax (Rp)">
               <input
                 className={inp}
                 value={form.estimasiNilai ? Number(String(form.estimasiNilai).replace(/[^\d]/g, "")).toLocaleString("id-ID") : ""}
@@ -354,6 +394,36 @@ export default function Dashboard() {
                 inputMode="numeric"
               />
             </Field>
+
+            {/* Arrangement kamar */}
+            <div className="sm:col-span-2 rounded-lg border border-slate-200 p-3">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={form.perluKamar} onChange={(e) => setForm({ ...form, perluKamar: e.target.checked })} className="w-4 h-4 accent-[#12263a]" />
+                <span className="text-sm font-medium text-slate-700">Perlu arrangement kamar?</span>
+              </label>
+              {form.perluKamar && (
+                <div className="grid sm:grid-cols-2 gap-3 mt-3">
+                  <Field label="Jumlah Kamar">
+                    <input className={inp} value={form.jumlahKamar} onChange={(e) => setForm({ ...form, jumlahKamar: e.target.value.replace(/[^\d]/g, "") })} inputMode="numeric" placeholder="mis. 20" />
+                  </Field>
+                  <Field label="Estimasi Revenue Room (Rp)">
+                    <input
+                      className={inp}
+                      value={form.revenueRoom ? Number(String(form.revenueRoom).replace(/[^\d]/g, "")).toLocaleString("id-ID") : ""}
+                      onChange={(e) => setForm({ ...form, revenueRoom: e.target.value.replace(/[^\d]/g, "") })}
+                      placeholder="mis. 15.000.000"
+                      inputMode="numeric"
+                    />
+                  </Field>
+                </div>
+              )}
+              <div className="mt-3 text-sm bg-[#fdf6e9] border border-[#e7d3a1] rounded-md px-3 py-2 flex justify-between">
+                <span className="text-slate-600">Total Revenue Projection</span>
+                <span className="font-bold text-[#12263a]">
+                  Rp {((Number(String(form.estimasiNilai).replace(/[^\d]/g, "")) || 0) + (form.perluKamar ? (Number(String(form.revenueRoom).replace(/[^\d]/g, "")) || 0) : 0)).toLocaleString("id-ID")}
+                </span>
+              </div>
+            </div>
             <Field label="Sumber">
               <select className={inp} value={form.sumber} onChange={(e) => setForm({ ...form, sumber: e.target.value })}>
                 {SUMBER.map((x) => <option key={x}>{x}</option>)}
@@ -439,7 +509,10 @@ function Kartu({ label, nilai, kecil, emas }) {
 }
 
 function LeadCard({ lead, onEdit, onStatus }) {
-  const nilai = Number(String(lead.EstimasiNilai).replace(/[^\d]/g, "")) || 0;
+  const pax = Number(String(lead.EstimasiNilai).replace(/[^\d]/g, "")) || 0;
+  const room = Number(String(lead.RevenueRoom).replace(/[^\d]/g, "")) || 0;
+  const total = pax + room;
+  const adaKamar = lead.PerluKamar === "Ya" || room > 0 || (Number(String(lead.JumlahKamar).replace(/[^\d]/g, "")) || 0) > 0;
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col gap-2">
       <div className="flex items-start justify-between gap-2">
@@ -456,9 +529,15 @@ function LeadCard({ lead, onEdit, onStatus }) {
         <span>📅 {lead.JenisEvent || "-"}</span>
         {lead.TanggalEvent && <span>🗓 {lead.TanggalEvent}</span>}
         {lead.JumlahPax && <span>👥 {lead.JumlahPax}</span>}
+        {adaKamar && lead.JumlahKamar && <span>🛏 {lead.JumlahKamar} kamar</span>}
       </div>
 
-      {nilai > 0 && <div className="text-sm font-semibold text-[#a9781f]">Rp {nilai.toLocaleString("id-ID")}</div>}
+      {total > 0 && (
+        <div className="text-sm font-semibold text-[#a9781f]">
+          Rp {total.toLocaleString("id-ID")}
+          {adaKamar && room > 0 && <span className="text-xs font-normal text-slate-400"> (Pax {pax.toLocaleString("id-ID")} + Room {room.toLocaleString("id-ID")})</span>}
+        </div>
+      )}
 
       {lead.Status === "Cancel" && lead.AlasanCancel && (
         <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-md px-2 py-1">
