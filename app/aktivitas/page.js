@@ -7,6 +7,7 @@ import ProfilSaya from "@/components/ProfilSaya";
 import { Donut, BarList, ChartCard, hitungPer, beriWarna, topN } from "@/components/Charts";
 import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
 import Pager from "@/components/Pager";
+import DateRange, { dalamRentang } from "@/components/DateRange";
 import Header from "@/components/Header";
 
 const PER_HAL = 25;
@@ -67,6 +68,8 @@ export default function AktivitasPage() {
   const [fActivity, setFActivity] = useState("");
   const [fSeg, setFSeg] = useState("");
   const [fSales, setFSales] = useState("");
+  const [dari, setDari] = useState("");
+  const [sampai, setSampai] = useState("");
 
   const [modalForm, setModalForm] = useState(false);
   const [form, setForm] = useState(FORM_KOSONG);
@@ -185,25 +188,27 @@ export default function AktivitasPage() {
     return Array.from(set);
   }, [list]);
 
-  const chartActivity = useMemo(() => beriWarna(hitungPer(list, (x) => x.Activity || "(kosong)")), [list]);
-  const chartSegmen = useMemo(() => beriWarna(topN(hitungPer(list, (x) => x.Segmentation || "(kosong)"), 10)), [list]);
-  const chartSales = useMemo(() => beriWarna(topN(hitungPer(list, (x) => x.SalesName || "(kosong)"), 10)), [list]);
-
   const tampil = useMemo(() => {
     const q = cari.toLowerCase().trim();
     return list
       .filter((x) => (!fActivity ? true : x.Activity === fActivity))
       .filter((x) => (!fSeg ? true : x.Segmentation === fSeg))
       .filter((x) => (!fSales ? true : x.SalesName === fSales))
+      .filter((x) => dalamRentang(x.Date, dari, sampai))
       .filter((x) => {
         if (!q) return true;
         return [x.CompanyName, x.PICName, x.SalesName, x.PhoneNumber, x.Position].join(" ").toLowerCase().includes(q);
       })
       .reverse();
-  }, [list, cari, fActivity, fSeg, fSales]);
+  }, [list, cari, fActivity, fSeg, fSales, dari, sampai]);
+
+  // chart mengikuti filter
+  const chartActivity = useMemo(() => beriWarna(hitungPer(tampil, (x) => x.Activity || "(kosong)")), [tampil]);
+  const chartSegmen = useMemo(() => beriWarna(topN(hitungPer(tampil, (x) => x.Segmentation || "(kosong)"), 10)), [tampil]);
+  const chartSales = useMemo(() => beriWarna(topN(hitungPer(tampil, (x) => x.SalesName || "(kosong)"), 10)), [tampil]);
 
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [cari, fActivity, fSeg, fSales]);
+  useEffect(() => { setPage(1); }, [cari, fActivity, fSeg, fSales, dari, sampai]);
   const totalHal = Math.max(1, Math.ceil(tampil.length / PER_HAL));
   const paged = tampil.slice((page - 1) * PER_HAL, page * PER_HAL);
 
@@ -259,6 +264,7 @@ export default function AktivitasPage() {
             <option value="">By Sales</option>
             {salesOptions.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
+          <DateRange className="col-span-2 sm:col-span-1" dari={dari} sampai={sampai} setDari={setDari} setSampai={setSampai} />
         </div>
 
         {/* Chart */}

@@ -20,4 +20,10 @@ export const STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_companies_seg ON companies (segmentation)`,
   `CREATE INDEX IF NOT EXISTS idx_leads_status ON leads (status)`,
   `CREATE INDEX IF NOT EXISTS idx_aktivitas_activity ON aktivitas (activity)`,
+  `CREATE TABLE IF NOT EXISTS call_plan (
+    id TEXT PRIMARY KEY, tanggal_rencana TEXT, sales_name TEXT, company_name TEXT,
+    pic_name TEXT, phone TEXT, tujuan TEXT, status TEXT DEFAULT 'Plan',
+    tanggal_realisasi TEXT, hasil TEXT, created_at TEXT, created_by TEXT )`,
+  `CREATE INDEX IF NOT EXISTS idx_callplan_sales ON call_plan (sales_name)`,
+  `CREATE INDEX IF NOT EXISTS idx_callplan_status ON call_plan (status)`,
 ];

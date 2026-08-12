@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ProfilSaya from "@/components/ProfilSaya";
 import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
 import Pager from "@/components/Pager";
+import DateRange, { dalamRentang } from "@/components/DateRange";
 import Header from "@/components/Header";
 
 const PER_HAL = 25;
@@ -25,6 +26,8 @@ export default function LogPage() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cari, setCari] = useState("");
+  const [dari, setDari] = useState("");
+  const [sampai, setSampai] = useState("");
   const [modalProfil, setModalProfil] = useState(false);
 
   useEffect(() => {
@@ -47,13 +50,13 @@ export default function LogPage() {
 
   const tampil = useMemo(() => {
     const q = cari.toLowerCase().trim();
-    return list.filter((x) =>
-      !q || [x.Nama, x.Oleh, x.StatusLama, x.StatusBaru, x.AlasanCancel].join(" ").toLowerCase().includes(q)
-    );
-  }, [list, cari]);
+    return list
+      .filter((x) => dalamRentang(x.Waktu, dari, sampai))
+      .filter((x) => !q || [x.Nama, x.Oleh, x.StatusLama, x.StatusBaru, x.AlasanCancel].join(" ").toLowerCase().includes(q));
+  }, [list, cari, dari, sampai]);
 
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [cari]);
+  useEffect(() => { setPage(1); }, [cari, dari, sampai]);
   const totalHal = Math.max(1, Math.ceil(tampil.length / PER_HAL));
   const paged = tampil.slice((page - 1) * PER_HAL, page * PER_HAL);
 
@@ -80,12 +83,15 @@ export default function LogPage() {
           </button>
         </div>
 
-        <input
-          value={cari}
-          onChange={(e) => setCari(e.target.value)}
-          placeholder="Cari nama lead / oleh / status…"
-          className="w-full border border-slate-300 rounded-lg px-3 py-2.5 mb-4 outline-none focus:ring-2 focus:ring-[#c8962c]"
-        />
+        <div className="flex flex-col sm:flex-row gap-2 mb-4">
+          <input
+            value={cari}
+            onChange={(e) => setCari(e.target.value)}
+            placeholder="Cari nama lead / oleh / status…"
+            className="flex-1 border border-slate-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#c8962c]"
+          />
+          <DateRange dari={dari} sampai={sampai} setDari={setDari} setSampai={setSampai} />
+        </div>
 
         {loading ? (
           <div className="text-center text-slate-500 py-16">Memuat data…</div>

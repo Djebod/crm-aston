@@ -7,6 +7,7 @@ import { Donut, BarList, ChartCard, hitungPer, beriWarna, topN } from "@/compone
 import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
 import Pager from "@/components/Pager";
 import Header from "@/components/Header";
+import DateRange, { dalamRentang } from "@/components/DateRange";
 
 const PER_HAL = 25;
 
@@ -54,6 +55,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [cari, setCari] = useState("");
   const [filterStatus, setFilterStatus] = useState("Semua");
+  const [dari, setDari] = useState("");
+  const [sampai, setSampai] = useState("");
 
   const [modalForm, setModalForm] = useState(false);
   const [form, setForm] = useState(FORM_KOSONG);
@@ -93,49 +96,47 @@ export default function Dashboard() {
     router.replace("/");
   }
 
-  // Ringkasan
+  // Filter (dipakai untuk chart, ringkasan, dan daftar)
+  const leadsTampil = useMemo(() => {
+    const q = cari.toLowerCase().trim();
+    return leads
+      .filter((l) => (filterStatus === "Semua" ? true : (l.Status || "Tentative") === filterStatus))
+      .filter((l) => dalamRentang(l.Tanggal, dari, sampai))
+      .filter((l) => {
+        if (!q) return true;
+        return [l.Nama, l.Instansi, l.NoHP, l.Email, l.PIC, l.JenisEvent].join(" ").toLowerCase().includes(q);
+      })
+      .reverse(); // terbaru di atas
+  }, [leads, cari, filterStatus, dari, sampai]);
+
+  // Ringkasan (mengikuti filter)
   const ringkasan = useMemo(() => {
     const perStatus = {};
     STATUS.forEach((s) => (perStatus[s] = 0));
     let nilaiPipeline = 0;
     let nilaiDefinite = 0;
-    leads.forEach((l) => {
+    leadsTampil.forEach((l) => {
       const s = l.Status || "Tentative";
       if (perStatus[s] !== undefined) perStatus[s]++;
       const nilai = Number(String(l.EstimasiNilai).replace(/[^\d]/g, "")) || 0;
       if (s === "Definite") nilaiDefinite += nilai;
       else if (s !== "Cancel") nilaiPipeline += nilai;
     });
-    return { perStatus, nilaiPipeline, nilaiDefinite, total: leads.length };
-  }, [leads]);
+    return { perStatus, nilaiPipeline, nilaiDefinite, total: leadsTampil.length };
+  }, [leadsTampil]);
 
-  // Data chart
+  // Data chart (mengikuti filter)
   const chartStatus = useMemo(
-    () => beriWarna(hitungPer(leads, (l) => l.Status || "Tentative"), STATUS_HEX),
-    [leads]
+    () => beriWarna(hitungPer(leadsTampil, (l) => l.Status || "Tentative"), STATUS_HEX),
+    [leadsTampil]
   );
   const chartSumber = useMemo(
-    () => beriWarna(topN(hitungPer(leads, (l) => l.Sumber || "(kosong)"), 10)),
-    [leads]
+    () => beriWarna(topN(hitungPer(leadsTampil, (l) => l.Sumber || "(kosong)"), 10)),
+    [leadsTampil]
   );
 
-  // Filter + cari
-  const leadsTampil = useMemo(() => {
-    const q = cari.toLowerCase().trim();
-    return leads
-      .filter((l) => (filterStatus === "Semua" ? true : (l.Status || "Tentative") === filterStatus))
-      .filter((l) => {
-        if (!q) return true;
-        return [l.Nama, l.Instansi, l.NoHP, l.Email, l.PIC, l.JenisEvent]
-          .join(" ")
-          .toLowerCase()
-          .includes(q);
-      })
-      .reverse(); // terbaru di atas
-  }, [leads, cari, filterStatus]);
-
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [cari, filterStatus]);
+  useEffect(() => { setPage(1); }, [cari, filterStatus, dari, sampai]);
   const totalHal = Math.max(1, Math.ceil(leadsTampil.length / PER_HAL));
   const pagedLeads = leadsTampil.slice((page - 1) * PER_HAL, page * PER_HAL);
 
@@ -287,6 +288,7 @@ export default function Dashboard() {
               <option key={s}>{s}</option>
             ))}
           </select>
+          <DateRange dari={dari} sampai={sampai} setDari={setDari} setSampai={setSampai} />
           <button onClick={exportCSV} disabled={leadsTampil.length === 0} className="border border-slate-300 text-[#12263a] font-semibold rounded-lg px-3 py-2.5 hover:bg-slate-50 whitespace-nowrap disabled:opacity-50">
             ⬇ Export
           </button>

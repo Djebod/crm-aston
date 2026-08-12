@@ -101,11 +101,6 @@ export default function CompanyPage() {
     finally { setMenyimpan(false); }
   }
 
-  const perSegmen = useMemo(
-    () => beriWarna(topN(hitungPer(companies, (c) => c.Segmentation || "(tanpa segmen)"), 10)),
-    [companies]
-  );
-
   const tampil = useMemo(() => {
     const q = cari.toLowerCase().trim();
     return companies.filter((c) =>
@@ -114,6 +109,11 @@ export default function CompanyPage() {
         || String(c.Alamat).toLowerCase().includes(q)
     );
   }, [companies, cari]);
+
+  const perSegmen = useMemo(
+    () => beriWarna(topN(hitungPer(tampil, (c) => c.Segmentation || "(tanpa segmen)"), 10)),
+    [tampil]
+  );
 
   const [page, setPage] = useState(1);
   useEffect(() => { setPage(1); }, [cari]);
