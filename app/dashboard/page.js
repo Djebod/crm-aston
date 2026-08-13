@@ -79,6 +79,15 @@ export default function Dashboard() {
     } catch (e) {}
   }, []);
 
+  const [teamUsers, setTeamUsers] = useState([]);
+  const ambilTeam = useCallback(async () => {
+    if (!user?.email) return;
+    try {
+      const r = await fetch("/api/users", { headers: { "x-user-email": user.email } }).then((x) => x.json());
+      if (r.status === "ok") setTeamUsers(r.data || []);
+    } catch (e) {}
+  }, [user]);
+
   // Cek login
   useEffect(() => {
     const raw = typeof window !== "undefined" ? localStorage.getItem("crm_user") : null;
@@ -105,6 +114,15 @@ export default function Dashboard() {
   useEffect(() => {
     if (user) { ambilLeads(); ambilTargets(); }
   }, [user, ambilLeads, ambilTargets]);
+
+  useEffect(() => {
+    if (user?.role === "admin") ambilTeam();
+  }, [user, ambilTeam]);
+
+  const marketingNames = useMemo(
+    () => teamUsers.filter((u) => String(u.Role) === "marketing").map((u) => u.Nama).filter(Boolean),
+    [teamUsers]
+  );
 
   function logout() {
     localStorage.removeItem("crm_user");
@@ -525,7 +543,7 @@ export default function Dashboard() {
 
       {/* Modal Kelola Tim */}
       {modalUser && <KelolaTim user={user} onClose={() => setModalUser(false)} />}
-      {modalTarget && <KelolaTarget targets={targets} salesOptions={salesOptions} onClose={() => setModalTarget(false)} onSaved={ambilTargets} />}
+      {modalTarget && <KelolaTarget targets={targets} salesOptions={marketingNames} onClose={() => setModalTarget(false)} onSaved={ambilTargets} />}
 
       {/* Modal Profil Saya */}
       {modalProfil && (
@@ -680,7 +698,7 @@ function KelolaTarget({ targets, salesOptions, onClose, onSaved }) {
 
   return (
     <Modal title="Kelola Target Sales" onClose={onClose}>
-      <p className="text-sm text-slate-500 mb-3">Target revenue (Definite) & target aktivitas per hari (default 5 company).</p>
+      <p className="text-sm text-slate-500 mb-3">Daftar sales diambil dari pengguna bertipe <b>Marketing</b> (Kelola Tim). Target revenue (Definite) &amp; target aktivitas per hari (default 5 company).</p>
       <div className="flex gap-2 mb-3">
         <input value={tambah} onChange={(e) => setTambah(e.target.value)} placeholder="Tambah nama sales…" className={inp} />
         <button onClick={() => { const s = tambah.trim(); if (s && !rows.find((r) => r.sales === s)) { setRows([...rows, { sales: s, rev: "", day: "5" }]); setTambah(""); } }} className="bg-[#12263a] text-white rounded-lg px-4 font-semibold">+</button>
