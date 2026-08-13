@@ -4,6 +4,7 @@ import { useState } from "react";
 
 const ITEMS = [
   { href: "/dashboard", label: "Leads", key: "leads" },
+  { href: "/tindaklanjut", label: "Tindak Lanjut", key: "tindaklanjut" },
   { href: "/aktivitas", label: "Activity", key: "activity" },
   { href: "/callplan", label: "Sales Call Plan", key: "callplan" },
   { href: "/company", label: "Company", key: "company" },

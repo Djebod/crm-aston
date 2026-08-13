@@ -12,7 +12,8 @@ const SEL = `SELECT id AS "ID", tanggal AS "Tanggal", nama AS "Nama", instansi A
   email AS "Email", jenis_event AS "JenisEvent", tanggal_event AS "TanggalEvent", jumlah_pax AS "JumlahPax",
   estimasi_nilai AS "EstimasiNilai", sumber AS "Sumber", status AS "Status", pic AS "PIC", catatan AS "Catatan",
   link_dokumen AS "LinkDokumen", updated_at AS "UpdatedAt", alasan_cancel AS "AlasanCancel", updated_by AS "UpdatedBy",
-  perlu_kamar AS "PerluKamar", jumlah_kamar AS "JumlahKamar", revenue_room AS "RevenueRoom"
+  perlu_kamar AS "PerluKamar", jumlah_kamar AS "JumlahKamar", revenue_room AS "RevenueRoom",
+  tindak_lanjut AS "TindakLanjut", tanggal_tindak_lanjut AS "TanggalTindakLanjut"
   FROM leads`;
 
 export async function GET() {
@@ -51,7 +52,8 @@ export async function POST(req) {
       const map = { nama: "nama", instansi: "instansi", nohp: "nohp", email: "email", jenisEvent: "jenis_event",
         tanggalEvent: "tanggal_event", jumlahPax: "jumlah_pax", estimasiNilai: "estimasi_nilai", sumber: "sumber",
         status: "status", pic: "pic", catatan: "catatan", alasanCancel: "alasan_cancel",
-        perluKamar: "perlu_kamar", jumlahKamar: "jumlah_kamar", revenueRoom: "revenue_room" };
+        perluKamar: "perlu_kamar", jumlahKamar: "jumlah_kamar", revenueRoom: "revenue_room",
+        tindakLanjut: "tindak_lanjut", tanggalTindakLanjut: "tanggal_tindak_lanjut" };
       const cols = [];
       for (const k in map) {
         if (b[k] !== undefined) cols.push({ col: map[k], val: (k === "estimasiNilai" || k === "jumlahPax" || k === "jumlahKamar" || k === "revenueRoom") ? String(b[k]) : b[k] });
