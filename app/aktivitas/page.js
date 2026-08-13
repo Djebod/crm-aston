@@ -15,6 +15,7 @@ import Header from "@/components/Header";
 const PER_HAL = 25;
 
 const ACTIVITIES = ["Sales Call", "Site Inspection", "Telemarketing"];
+const TUJUAN_LIST = ["Maintenance", "Follow up lead", "After sales service", "Administration", "Handling complain"];
 const SEGMENTS = [
   "Online Travel Agent", "Company", "Government", "Tour & Travel",
   "University / School", "Event Organizer", "Wedding Organizer", "Social Event", "Personal",
@@ -40,7 +41,7 @@ function nowTime() {
 
 const FORM_KOSONG = {
   date: today(), time: nowTime(), salesName: "", companyName: "", segmentation: "",
-  picName: "", position: "", phone: "", description: "", activity: "",
+  picName: "", position: "", phone: "", description: "", activity: "", tujuan: "",
   fotoBase64: "", fotoNama: "", potensiLead: "Tidak",
 };
 
@@ -102,6 +103,8 @@ export default function AktivitasPage() {
   const [lead, setLead] = useState(LEAD_KOSONG);
   const [menyimpan, setMenyimpan] = useState(false);
   const [realisasiPlanId, setRealisasiPlanId] = useState("");
+  const [targets, setTargets] = useState([]);
+  const isAdmin = user?.role === "admin";
   const [modalProfil, setModalProfil] = useState(false);
 
   useEffect(() => {
@@ -117,6 +120,7 @@ export default function AktivitasPage() {
       if (a.status === "ok") setList(a.data || []);
     } catch (e) {} finally { setLoading(false); }
     ambilCompanies().then(setCompanies).catch(() => {}); // company di latar belakang (cache)
+    fetch("/api/target", { cache: "no-store" }).then((r) => r.json()).then((r) => { if (r.status === "ok") setTargets(r.data || []); }).catch(() => {});
   }, []);
 
   useEffect(() => { if (user) ambil(); }, [user, ambil]);
@@ -261,6 +265,24 @@ export default function AktivitasPage() {
     return Array.from(set);
   }, [list]);
 
+  async function setValid(id, val) {
+    try {
+      const res = await fetch("/api/aktivitas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "setValid", id, valid: val }) });
+      const d = await res.json();
+      if (d.status === "ok") await ambil(); else alert("Gagal: " + (d.message || ""));
+    } catch (e) { alert("Tidak bisa terhubung ke server."); }
+  }
+
+  const targetHarian = useMemo(() => {
+    const t = targets.find((t) => t.SalesName === user?.nama);
+    const n = t ? Number(t.TargetActivityDay) : 0;
+    return n > 0 ? n : 5;
+  }, [targets, user]);
+  const aktivitasHariIni = useMemo(() => {
+    const h = today();
+    return list.filter((x) => x.Date === h && String(x.SalesName || "") === String(user?.nama || "")).length;
+  }, [list, user]);
+
   const tampil = useMemo(() => {
     const q = cari.toLowerCase().trim();
     return list
@@ -292,10 +314,10 @@ export default function AktivitasPage() {
   const alamatCompany = companyTerpilih ? (companyMatch.Alamat || "") : "";
 
   function exportCSV() {
-    const header = ["Tanggal", "Jam", "Sales", "Company", "Alamat", "Market Segment", "PIC Name", "Position", "Phone Number", "Activity", "Hasil Meeting", "Foto"];
+    const header = ["Tanggal", "Jam", "Sales", "Company", "Alamat", "Market Segment", "Activity", "Tujuan", "PIC Name", "Position", "Phone Number", "Hasil Meeting", "Valid", "Foto"];
     const rows = tampil.map((x) => [
-      x.Date, x.Time, x.SalesName, x.CompanyName, x.Alamat || "", x.Segmentation,
-      x.PICName, x.Position, x.PhoneNumber, x.Activity, x.Description, x.Photo,
+      x.Date, x.Time, x.SalesName, x.CompanyName, x.Alamat || "", x.Segmentation, x.Activity, x.Tujuan || "",
+      x.PICName, x.Position, x.PhoneNumber, x.Description, x.Valid || "", x.Photo,
     ]);
     unduhCSV(namaFileTanggal("aktivitas"), [header, ...rows]);
   }
@@ -311,6 +333,11 @@ export default function AktivitasPage() {
           <div>
             <h1 className="text-xl font-extrabold text-[#12263a]">Sales Activity</h1>
             <p className="text-sm text-slate-500">Catatan kunjungan &amp; aktivitas sales.</p>
+            {user?.nama && (
+              <p className={"text-xs mt-1 font-semibold " + (aktivitasHariIni >= targetHarian ? "text-emerald-700" : "text-amber-700")}>
+                🎯 Aktivitas Anda hari ini: {aktivitasHariIni}/{targetHarian} company {aktivitasHariIni >= targetHarian ? "✓ tercapai" : ""}
+              </p>
+            )}
           </div>
           <div className="flex gap-2">
             <button onClick={exportCSV} disabled={tampil.length === 0} className="border border-slate-300 text-[#12263a] font-semibold rounded-lg px-3 py-2.5 hover:bg-slate-50 whitespace-nowrap disabled:opacity-50">
@@ -363,7 +390,7 @@ export default function AktivitasPage() {
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            {paged.map((x) => <ActivityCard key={x.ID} x={x} />)}
+            {paged.map((x) => <ActivityCard key={x.ID} x={x} isAdmin={isAdmin} onSetValid={setValid} />)}
           </div>
         )}
         {!loading && tampil.length > 0 && (
@@ -375,7 +402,7 @@ export default function AktivitasPage() {
       {modalForm && (
         <Modal title="Tambah Aktivitas" onClose={() => setModalForm(false)}>
           <div className="grid sm:grid-cols-2 gap-3">
-            <Field label="Tanggal"><input type="date" className={inp} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></Field>
+            <Field label="Tanggal (terkunci hari ini)"><input type="date" className={inp + " bg-slate-100 text-slate-500"} value={form.date} readOnly title="Tanggal aktivitas selalu hari berjalan" /></Field>
             <Field label="Jam"><input type="time" className={inp} value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} /></Field>
             <Field label="Sales Name"><input className={inp} value={form.salesName} onChange={(e) => setForm({ ...form, salesName: e.target.value })} /></Field>
             <Field label="Company Name">
@@ -406,6 +433,13 @@ export default function AktivitasPage() {
             <span className="block text-sm font-medium mb-1 text-slate-700">Activity *</span>
             <div className="flex flex-wrap gap-2">
               {ACTIVITIES.map((a) => <Chip key={a} active={form.activity === a} onClick={() => setForm({ ...form, activity: a })}>{a}</Chip>)}
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <span className="block text-sm font-medium mb-1 text-slate-700">Tujuan</span>
+            <div className="flex flex-wrap gap-2">
+              {TUJUAN_LIST.map((t) => <Chip key={t} active={form.tujuan === t} onClick={() => setForm({ ...form, tujuan: form.tujuan === t ? "" : t })}>{t}</Chip>)}
             </div>
           </div>
 
@@ -581,8 +615,9 @@ function CompanyPicker({ value, companies, onChange }) {
   );
 }
 
-function ActivityCard({ x }) {
+function ActivityCard({ x, isAdmin, onSetValid }) {
   const thumb = driveThumb(x.Photo, 400);
+  const validStyle = x.Valid === "Valid" ? "bg-emerald-100 text-emerald-800" : x.Valid === "Tidak Valid" ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-500";
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 flex gap-3">
       <div className="flex flex-col gap-2 min-w-0 flex-1">
@@ -593,7 +628,11 @@ function ActivityCard({ x }) {
           </div>
           {x.Activity && <span className={"text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap " + (ACT_STYLE[x.Activity] || "bg-slate-100 text-slate-700")}>{x.Activity}</span>}
         </div>
-        {x.Segmentation && <span className={"self-start text-xs font-medium px-2 py-0.5 rounded-full " + SEG_STYLE}>{x.Segmentation}</span>}
+        <div className="flex flex-wrap items-center gap-2">
+          {x.Segmentation && <span className={"text-xs font-medium px-2 py-0.5 rounded-full " + SEG_STYLE}>{x.Segmentation}</span>}
+          {x.Tujuan && <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">🎯 {x.Tujuan}</span>}
+          <span className={"text-xs font-medium px-2 py-0.5 rounded-full " + validStyle}>{x.Valid || "Belum divalidasi"}</span>
+        </div>
         <div className="text-sm text-slate-600">
           {(x.PICName || x.Position) && <div>👤 {x.PICName}{x.Position ? " — " + x.Position : ""}</div>}
           {x.Alamat && <div className="text-slate-500">📍 {x.Alamat}</div>}
@@ -605,6 +644,12 @@ function ActivityCard({ x }) {
           )}
           {x.Photo && <a href={x.Photo} target="_blank" rel="noreferrer" className="text-blue-700 font-medium">📷 Foto</a>}
         </div>
+        {isAdmin && (
+          <div className="flex gap-2 mt-1">
+            <button onClick={() => onSetValid(x.ID, x.Valid === "Valid" ? "" : "Valid")} className={"text-xs font-semibold rounded-md px-3 py-1.5 " + (x.Valid === "Valid" ? "bg-emerald-600 text-white" : "border border-emerald-300 text-emerald-700 hover:bg-emerald-50")}>✓ Valid</button>
+            <button onClick={() => onSetValid(x.ID, x.Valid === "Tidak Valid" ? "" : "Tidak Valid")} className={"text-xs font-semibold rounded-md px-3 py-1.5 " + (x.Valid === "Tidak Valid" ? "bg-rose-600 text-white" : "border border-rose-300 text-rose-700 hover:bg-rose-50")}>✕ Tidak Valid</button>
+          </div>
+        )}
       </div>
       {thumb && (
         <a href={x.Photo || thumb} target="_blank" rel="noreferrer" className="shrink-0" title="Lihat foto">

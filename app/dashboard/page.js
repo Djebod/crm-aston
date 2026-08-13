@@ -68,6 +68,16 @@ export default function Dashboard() {
   const [menyimpan, setMenyimpan] = useState(false);
   const [modalUser, setModalUser] = useState(false);
   const [modalProfil, setModalProfil] = useState(false);
+  const [modalTarget, setModalTarget] = useState(false);
+  const [targets, setTargets] = useState([]);
+  const isAdmin = user?.role === "admin";
+
+  const ambilTargets = useCallback(async () => {
+    try {
+      const r = await fetch("/api/target", { cache: "no-store" }).then((x) => x.json());
+      if (r.status === "ok") setTargets(r.data || []);
+    } catch (e) {}
+  }, []);
 
   // Cek login
   useEffect(() => {
@@ -93,8 +103,8 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (user) ambilLeads();
-  }, [user, ambilLeads]);
+    if (user) { ambilLeads(); ambilTargets(); }
+  }, [user, ambilLeads, ambilTargets]);
 
   function logout() {
     localStorage.removeItem("crm_user");
@@ -150,6 +160,24 @@ export default function Dashboard() {
     () => beriWarna(topN(hitungPer(leadsTampil, (l) => l.Sumber || "(kosong)"), 10)),
     [leadsTampil]
   );
+
+  // Target vs realisasi Definite per sales (PIC)
+  const targetVs = useMemo(() => {
+    const ach = {};
+    leadsTampil.forEach((l) => {
+      if ((l.Status || "") === "Definite") {
+        const pic = l.PIC || "(tanpa PIC)";
+        ach[pic] = (ach[pic] || 0) + nilaiTotal(l);
+      }
+    });
+    let arr = targets.map((t) => {
+      const target = Number(String(t.TargetRevenue).replace(/[^\d]/g, "")) || 0;
+      const achieved = ach[t.SalesName] || 0;
+      return { sales: t.SalesName, target, achieved, persen: target ? Math.round((achieved / target) * 100) : 0 };
+    });
+    if (!isAdmin) arr = arr.filter((r) => r.sales === user?.nama);
+    return arr.sort((a, b) => b.achieved - a.achieved);
+  }, [targets, leadsTampil, isAdmin, user]);
 
   const [page, setPage] = useState(1);
   useEffect(() => { setPage(1); }, [cari, filterStatus, fSales, dari, sampai]);
@@ -299,6 +327,34 @@ export default function Dashboard() {
             <ChartCard title="Lead per Sumber">
               <BarList data={chartSumber} />
             </ChartCard>
+          </div>
+        )}
+
+        {/* Target vs Definite */}
+        {targetVs.length > 0 && (
+          <div className="bg-white rounded-xl border border-slate-200 p-4 mb-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-sm text-slate-700">🎯 Target vs Realisasi (Definite)</h3>
+              {isAdmin && <button onClick={() => setModalTarget(true)} className="text-xs font-semibold text-[#12263a] border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">Kelola Target</button>}
+            </div>
+            <div className="space-y-3">
+              {targetVs.map((r) => (
+                <div key={r.sales} className="text-sm">
+                  <div className="flex justify-between mb-1">
+                    <span className="font-medium text-[#12263a]">{r.sales}</span>
+                    <span className="text-slate-500">Rp {r.achieved.toLocaleString("id-ID")} / {r.target.toLocaleString("id-ID")} <b className={r.persen >= 100 ? "text-emerald-700" : "text-amber-700"}>({r.persen}%)</b></span>
+                  </div>
+                  <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: Math.min(100, r.persen) + "%", background: r.persen >= 100 ? "#10b981" : "#c8962c" }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {targetVs.length === 0 && isAdmin && (
+          <div className="mb-4">
+            <button onClick={() => setModalTarget(true)} className="text-sm font-semibold text-[#12263a] border border-slate-300 rounded-lg px-3 py-2 hover:bg-slate-50">🎯 Atur Target Sales</button>
           </div>
         )}
 
@@ -469,6 +525,7 @@ export default function Dashboard() {
 
       {/* Modal Kelola Tim */}
       {modalUser && <KelolaTim user={user} onClose={() => setModalUser(false)} />}
+      {modalTarget && <KelolaTarget targets={targets} salesOptions={salesOptions} onClose={() => setModalTarget(false)} onSaved={ambilTargets} />}
 
       {/* Modal Profil Saya */}
       {modalProfil && (
@@ -599,6 +656,58 @@ function Modal({ title, children, onClose }) {
         <div className="p-5">{children}</div>
       </div>
     </div>
+  );
+}
+
+function KelolaTarget({ targets, salesOptions, onClose, onSaved }) {
+  const awal = {};
+  const nama = new Set();
+  targets.forEach((t) => { nama.add(t.SalesName); awal[t.SalesName] = { rev: String(t.TargetRevenue || ""), day: String(t.TargetActivityDay || "5") }; });
+  salesOptions.forEach((s) => nama.add(s));
+  const daftar = Array.from(nama).filter(Boolean).sort();
+  const [rows, setRows] = useState(() => daftar.map((s) => ({ sales: s, rev: awal[s]?.rev || "", day: awal[s]?.day || "5" })));
+  const [tambah, setTambah] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function simpanSatu(r) {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/target", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "setTarget", salesName: r.sales, targetRevenue: r.rev, targetActivityDay: r.day }) });
+      const d = await res.json();
+      if (d.status === "ok") { await onSaved(); } else alert("Gagal: " + (d.message || ""));
+    } catch (e) { alert("Tidak bisa terhubung ke server."); } finally { setBusy(false); }
+  }
+
+  return (
+    <Modal title="Kelola Target Sales" onClose={onClose}>
+      <p className="text-sm text-slate-500 mb-3">Target revenue (Definite) & target aktivitas per hari (default 5 company).</p>
+      <div className="flex gap-2 mb-3">
+        <input value={tambah} onChange={(e) => setTambah(e.target.value)} placeholder="Tambah nama sales…" className={inp} />
+        <button onClick={() => { const s = tambah.trim(); if (s && !rows.find((r) => r.sales === s)) { setRows([...rows, { sales: s, rev: "", day: "5" }]); setTambah(""); } }} className="bg-[#12263a] text-white rounded-lg px-4 font-semibold">+</button>
+      </div>
+      <div className="space-y-3 max-h-80 overflow-y-auto">
+        {rows.length === 0 && <div className="text-sm text-slate-400">Belum ada sales. Tambahkan di atas.</div>}
+        {rows.map((r, i) => (
+          <div key={r.sales} className="border border-slate-200 rounded-lg p-3">
+            <div className="font-semibold text-[#12263a] text-sm mb-2">{r.sales}</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="text-xs text-slate-500">Target Revenue (Rp)</span>
+                <input className={inp} inputMode="numeric" value={r.rev ? Number(String(r.rev).replace(/[^\d]/g, "")).toLocaleString("id-ID") : ""}
+                  onChange={(e) => { const v = e.target.value.replace(/[^\d]/g, ""); setRows(rows.map((x, j) => j === i ? { ...x, rev: v } : x)); }} placeholder="mis. 100.000.000" />
+              </div>
+              <div>
+                <span className="text-xs text-slate-500">Target Aktivitas/hari</span>
+                <input className={inp} inputMode="numeric" value={r.day}
+                  onChange={(e) => { const v = e.target.value.replace(/[^\d]/g, ""); setRows(rows.map((x, j) => j === i ? { ...x, day: v } : x)); }} placeholder="5" />
+              </div>
+            </div>
+            <button onClick={() => simpanSatu(r)} disabled={busy} className="mt-2 text-xs font-semibold bg-[#12263a] text-white rounded-md px-3 py-1.5 disabled:opacity-60">Simpan</button>
+          </div>
+        ))}
+      </div>
+      <button onClick={onClose} className="w-full mt-4 border border-slate-300 rounded-lg py-2.5 font-medium hover:bg-slate-50">Tutup</button>
+    </Modal>
   );
 }
 

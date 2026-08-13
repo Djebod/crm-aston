@@ -13,7 +13,7 @@ export const STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS aktivitas (
     id TEXT PRIMARY KEY, tanggal TEXT, jam TEXT, sales_name TEXT, company_name TEXT,
     segmentation TEXT, pic_name TEXT, position TEXT, phone_number TEXT, description TEXT,
-    activity TEXT, photo TEXT, alamat TEXT )`,
+    activity TEXT, photo TEXT, alamat TEXT, tujuan TEXT, valid TEXT )`,
   `CREATE TABLE IF NOT EXISTS log_status (
     id BIGSERIAL PRIMARY KEY, waktu TEXT, lead_id TEXT, nama TEXT,
     status_lama TEXT, status_baru TEXT, alasan_cancel TEXT, oleh TEXT )`,
@@ -23,6 +23,10 @@ export const STATEMENTS = [
   `ALTER TABLE leads ADD COLUMN IF NOT EXISTS perlu_kamar TEXT`,
   `ALTER TABLE leads ADD COLUMN IF NOT EXISTS jumlah_kamar TEXT`,
   `ALTER TABLE leads ADD COLUMN IF NOT EXISTS revenue_room TEXT`,
+  `CREATE TABLE IF NOT EXISTS sales_target (
+    sales_name TEXT PRIMARY KEY, target_revenue TEXT, target_activity_day TEXT )`,
+  `ALTER TABLE aktivitas ADD COLUMN IF NOT EXISTS tujuan TEXT`,
+  `ALTER TABLE aktivitas ADD COLUMN IF NOT EXISTS valid TEXT`,
   `CREATE TABLE IF NOT EXISTS call_plan (
     id TEXT PRIMARY KEY, tanggal_rencana TEXT, sales_name TEXT, company_name TEXT,
     pic_name TEXT, phone TEXT, tujuan TEXT, status TEXT DEFAULT 'Plan',

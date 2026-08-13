@@ -98,6 +98,17 @@ export default function CallPlanPage() {
   async function simpan() {
     if (!form.tanggalRencana) { alert("Tanggal rencana wajib diisi."); return; }
     if (!form.salesName.trim()) { alert("Sales wajib diisi."); return; }
+    if (!form.isEdit) {
+      const now = new Date();
+      const day = now.getDay(); // 0=Min..6=Sab
+      const sat = new Date(now);
+      sat.setDate(now.getDate() + (day === 0 ? -1 : (6 - day)));
+      sat.setHours(12, 0, 0, 0);
+      if (now > sat) {
+        alert("Batas input Sales Call Plan minggu ini sudah lewat (Sabtu 12:00 siang). Input untuk minggu berikutnya dibuka lagi hari Senin.");
+        return;
+      }
+    }
     setMenyimpan(true);
     try {
       const res = await fetch("/api/callplan", {

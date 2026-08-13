@@ -7,7 +7,8 @@ export const maxDuration = 60;
 
 const SEL = `SELECT id AS "ID", tanggal AS "Date", jam AS "Time", sales_name AS "SalesName",
   company_name AS "CompanyName", segmentation AS "Segmentation", pic_name AS "PICName", position AS "Position",
-  phone_number AS "PhoneNumber", description AS "Description", activity AS "Activity", photo AS "Photo", alamat AS "Alamat"
+  phone_number AS "PhoneNumber", description AS "Description", activity AS "Activity", photo AS "Photo", alamat AS "Alamat",
+  tujuan AS "Tujuan", valid AS "Valid"
   FROM aktivitas`;
 
 export async function GET() {
@@ -22,6 +23,12 @@ export async function GET() {
 export async function POST(req) {
   try {
     const b = await req.json();
+
+    if (b.action === "setValid") {
+      await sql`UPDATE aktivitas SET valid = ${b.valid || ""} WHERE id = ${b.id}`;
+      return NextResponse.json({ status: "ok" });
+    }
+
     if (b.action !== "addActivity") return NextResponse.json({ status: "error", message: "action tidak dikenal" });
 
     const id = "A" + Date.now();
@@ -35,10 +42,10 @@ export async function POST(req) {
     if (b.fotoBase64) foto = await uploadFotoDrive(b.fotoBase64, id + "_" + (b.fotoNama || "foto"));
 
     await sql`INSERT INTO aktivitas (id, tanggal, jam, sales_name, company_name, segmentation, pic_name, position,
-      phone_number, description, activity, photo, alamat)
+      phone_number, description, activity, photo, alamat, tujuan, valid)
       VALUES (${id}, ${b.date || ""}, ${b.time || ""}, ${b.salesName || ""}, ${comp}, ${b.segmentation || ""},
       ${b.picName || ""}, ${b.position || ""}, ${b.phone || ""}, ${b.description || ""}, ${b.activity || ""},
-      ${foto}, ${b.alamat || ""})`;
+      ${foto}, ${b.alamat || ""}, ${b.tujuan || ""}, ${""})`;
     return NextResponse.json({ status: "ok", id, photo: foto });
   } catch (e) {
     return NextResponse.json({ status: "error", message: e?.message || String(e) });
