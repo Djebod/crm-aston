@@ -11,6 +11,7 @@ import Pager from "@/components/Pager";
 import Header from "@/components/Header";
 import DateRange, { dalamRentang } from "@/components/DateRange";
 import { normalizeWA } from "@/lib/phone";
+import { ambilCompanies } from "@/lib/companiesCache";
 
 const PER_HAL = 25;
 const STATUS_HEX = { Plan: "#f59e0b", Realisasi: "#10b981", Batal: "#f43f5e" };
@@ -45,13 +46,10 @@ export default function CallPlanPage() {
   const ambil = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, c] = await Promise.all([
-        fetch("/api/callplan", { cache: "no-store" }).then((x) => x.json()),
-        fetch("/api/companies", { cache: "no-store" }).then((x) => x.json()),
-      ]);
+      const p = await fetch("/api/callplan", { cache: "no-store" }).then((x) => x.json());
       if (p.status === "ok") setList(p.data || []);
-      if (c.status === "ok") setCompanies(c.data || []);
     } catch (e) {} finally { setLoading(false); }
+    ambilCompanies().then(setCompanies).catch(() => {}); // company di latar belakang (cache)
   }, []);
   useEffect(() => { if (user) ambil(); }, [user, ambil]);
 

@@ -9,6 +9,7 @@ import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
 import Pager from "@/components/Pager";
 import DateRange, { dalamRentang } from "@/components/DateRange";
 import { normalizeWA, validWA } from "@/lib/phone";
+import { ambilCompanies } from "@/lib/companiesCache";
 import Header from "@/components/Header";
 
 const PER_HAL = 25;
@@ -112,13 +113,10 @@ export default function AktivitasPage() {
   const ambil = useCallback(async () => {
     setLoading(true);
     try {
-      const [a, c] = await Promise.all([
-        fetch("/api/aktivitas", { cache: "no-store" }).then((r) => r.json()),
-        fetch("/api/companies", { cache: "no-store" }).then((r) => r.json()),
-      ]);
+      const a = await fetch("/api/aktivitas", { cache: "no-store" }).then((r) => r.json());
       if (a.status === "ok") setList(a.data || []);
-      if (c.status === "ok") setCompanies(c.data || []);
     } catch (e) {} finally { setLoading(false); }
+    ambilCompanies().then(setCompanies).catch(() => {}); // company di latar belakang (cache)
   }, []);
 
   useEffect(() => { if (user) ambil(); }, [user, ambil]);

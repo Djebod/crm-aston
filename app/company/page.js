@@ -7,6 +7,7 @@ import { Modal, Field, inp } from "@/components/Modal";
 import { Donut, BarList, ChartCard, hitungPer, beriWarna, topN } from "@/components/Charts";
 import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
 import Pager from "@/components/Pager";
+import { ambilCompanies } from "@/lib/companiesCache";
 import Header from "@/components/Header";
 
 const PER_HAL = 25;
@@ -64,8 +65,8 @@ export default function CompanyPage() {
   const ambil = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch("/api/companies", { cache: "no-store" }).then((x) => x.json());
-      if (r.status === "ok") setCompanies(r.data || []);
+      const data = await ambilCompanies(true); // fresh + perbarui cache
+      setCompanies(data);
     } catch (e) {} finally { setLoading(false); }
   }, []);
 
