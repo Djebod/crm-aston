@@ -9,6 +9,7 @@ import Pager from "@/components/Pager";
 import Header from "@/components/Header";
 import DateRange, { dalamRentang } from "@/components/DateRange";
 import { normalizeWA, validWA } from "@/lib/phone";
+import OfferingLetter from "@/components/OfferingLetter";
 
 const PER_HAL = 25;
 
@@ -69,6 +70,7 @@ export default function Dashboard() {
   const [modalUser, setModalUser] = useState(false);
   const [modalProfil, setModalProfil] = useState(false);
   const [modalTarget, setModalTarget] = useState(false);
+  const [offeringLead, setOfferingLead] = useState(null);
   const [targets, setTargets] = useState([]);
   const isAdmin = user?.role === "admin";
 
@@ -419,6 +421,7 @@ export default function Dashboard() {
                 lead={l}
                 onEdit={() => bukaEdit(l)}
                 onStatus={(s) => ubahStatusCepat(l, s)}
+                onOffering={() => setOfferingLead(l)}
               />
             ))}
           </div>
@@ -544,6 +547,7 @@ export default function Dashboard() {
       {/* Modal Kelola Tim */}
       {modalUser && <KelolaTim user={user} onClose={() => setModalUser(false)} />}
       {modalTarget && <KelolaTarget targets={targets} salesOptions={marketingNames} onClose={() => setModalTarget(false)} onSaved={ambilTargets} />}
+      {offeringLead && <OfferingLetter lead={offeringLead} user={user} onClose={() => setOfferingLead(null)} />}
 
       {/* Modal Profil Saya */}
       {modalProfil && (
@@ -583,7 +587,7 @@ function Kartu({ label, nilai, kecil, emas }) {
   );
 }
 
-function LeadCard({ lead, onEdit, onStatus }) {
+function LeadCard({ lead, onEdit, onStatus, onOffering }) {
   const pax = Number(String(lead.EstimasiNilai).replace(/[^\d]/g, "")) || 0;
   const room = Number(String(lead.RevenueRoom).replace(/[^\d]/g, "")) || 0;
   const total = pax + room;
@@ -655,6 +659,9 @@ function LeadCard({ lead, onEdit, onStatus }) {
             <option key={s}>{s}</option>
           ))}
         </select>
+        <button onClick={onOffering} className="text-xs font-semibold text-white bg-[#c8962c] hover:brightness-95 rounded-md px-3 py-1.5">
+          📄 Offering
+        </button>
         <button onClick={onEdit} className="text-xs font-semibold text-[#12263a] border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">
           Edit
         </button>
