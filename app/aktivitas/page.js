@@ -45,7 +45,8 @@ const FORM_KOSONG = {
 
 const LEAD_KOSONG = {
   nama: "", instansi: "", nohp: "", email: "", jenisEvent: "Wedding", tanggalEvent: "",
-  jumlahPax: "", estimasiNilai: "", sumber: "Sales Call", status: "Tentative", pic: "", catatan: "",
+  jumlahPax: "", estimasiNilai: "", perluKamar: false, jumlahKamar: "", revenueRoom: "",
+  sumber: "Sales Call", status: "Tentative", pic: "", catatan: "",
   alasanCancel: "",
 };
 
@@ -225,6 +226,9 @@ export default function AktivitasPage() {
             ...lead,
             nohp: normalizeWA(lead.nohp),
             estimasiNilai: Number(String(lead.estimasiNilai).replace(/[^\d]/g, "")) || 0,
+            perluKamar: lead.perluKamar ? "Ya" : "Tidak",
+            jumlahKamar: lead.perluKamar ? (Number(String(lead.jumlahKamar).replace(/[^\d]/g, "")) || 0) : 0,
+            revenueRoom: lead.perluKamar ? (Number(String(lead.revenueRoom).replace(/[^\d]/g, "")) || 0) : 0,
             alasanCancel: lead.status === "Cancel" ? lead.alasanCancel.trim() : "",
             oleh: form.salesName || user?.nama || user?.email || "",
           }),
@@ -443,13 +447,39 @@ export default function AktivitasPage() {
                     {JENIS_EVENT.map((x) => <option key={x}>{x}</option>)}
                   </select>
                 </Field>
-                <Field label="Tanggal Event"><input type="date" className={inp} value={lead.tanggalEvent} onChange={(e) => setLead({ ...lead, tanggalEvent: e.target.value })} /></Field>
-                <Field label="Jumlah Tamu / Kamar"><input className={inp} value={lead.jumlahPax} onChange={(e) => setLead({ ...lead, jumlahPax: e.target.value })} /></Field>
-                <Field label="Estimasi Nilai (Rp)">
+                <Field label="Tanggal Event"><input type="date" min={new Date().toISOString().slice(0, 10)} className={inp} value={lead.tanggalEvent} onChange={(e) => setLead({ ...lead, tanggalEvent: e.target.value })} /></Field>
+                <Field label="Jumlah Tamu / Pax"><input className={inp} inputMode="numeric" value={lead.jumlahPax} onChange={(e) => setLead({ ...lead, jumlahPax: e.target.value })} /></Field>
+                <Field label="Estimasi Revenue Pax (Rp)">
                   <input className={inp} inputMode="numeric"
                     value={lead.estimasiNilai ? Number(String(lead.estimasiNilai).replace(/[^\d]/g, "")).toLocaleString("id-ID") : ""}
                     onChange={(e) => setLead({ ...lead, estimasiNilai: e.target.value.replace(/[^\d]/g, "") })} placeholder="mis. 25.000.000" />
                 </Field>
+
+                {/* Arrangement kamar */}
+                <div className="sm:col-span-2 rounded-lg border border-slate-200 p-3">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" checked={lead.perluKamar} onChange={(e) => setLead({ ...lead, perluKamar: e.target.checked })} className="w-4 h-4 accent-[#12263a]" />
+                    <span className="text-sm font-medium text-slate-700">Perlu arrangement kamar?</span>
+                  </label>
+                  {lead.perluKamar && (
+                    <div className="grid sm:grid-cols-2 gap-3 mt-3">
+                      <Field label="Jumlah Kamar">
+                        <input className={inp} inputMode="numeric" value={lead.jumlahKamar} onChange={(e) => setLead({ ...lead, jumlahKamar: e.target.value.replace(/[^\d]/g, "") })} placeholder="mis. 20" />
+                      </Field>
+                      <Field label="Estimasi Revenue Room (Rp)">
+                        <input className={inp} inputMode="numeric"
+                          value={lead.revenueRoom ? Number(String(lead.revenueRoom).replace(/[^\d]/g, "")).toLocaleString("id-ID") : ""}
+                          onChange={(e) => setLead({ ...lead, revenueRoom: e.target.value.replace(/[^\d]/g, "") })} placeholder="mis. 15.000.000" />
+                      </Field>
+                    </div>
+                  )}
+                  <div className="mt-3 text-sm bg-[#fdf6e9] border border-[#e7d3a1] rounded-md px-3 py-2 flex justify-between">
+                    <span className="text-slate-600">Total Revenue Projection</span>
+                    <span className="font-bold text-[#12263a]">
+                      Rp {((Number(String(lead.estimasiNilai).replace(/[^\d]/g, "")) || 0) + (lead.perluKamar ? (Number(String(lead.revenueRoom).replace(/[^\d]/g, "")) || 0) : 0)).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                </div>
                 <Field label="Sumber">
                   <select className={inp} value={lead.sumber} onChange={(e) => setLead({ ...lead, sumber: e.target.value })}>
                     {SUMBER.map((x) => <option key={x}>{x}</option>)}
