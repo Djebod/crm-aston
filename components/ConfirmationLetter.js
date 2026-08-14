@@ -83,9 +83,20 @@ function pasalList(g) {
   ];
 }
 
+function inisial(nama) { return String(nama || "").trim().split(/\s+/).map((w) => w[0] || "").join("").toUpperCase().slice(0, 4); }
+function buildNoDok(code, nomor, tgl, kode) {
+  const d = tgl ? new Date(tgl) : new Date();
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = d.getFullYear();
+  return `${code}/${nomor || "___"}/${dd}/${mm}/${yy}/SM/ACHCC/${String(kode || "").toUpperCase()}`;
+}
+
 export default function ConfirmationLetter({ lead, user, onClose }) {
   const [g, setG] = useState({
     clNo: "",
+    nomor: "",
+    kodeSales: user?.kode || inisial(user?.nama),
     tglSurat: hariIni(),
     sapaan: "Bapak/Ibu",
     namaTamu: lead.Nama || "",
@@ -108,6 +119,7 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
   const addRow = (arr, kosong) => setG((s) => ({ ...s, [arr]: [...s[arr], kosong] }));
   const delRow = (arr, i) => setG((s) => ({ ...s, [arr]: s[arr].filter((_, j) => j !== i) }));
   const grandTotal = g.estimasi.reduce((t, r) => t + angka(r.jumlah) * angka(r.harga), 0);
+  const clNo = buildNoDok("CL", g.nomor, g.tglSurat, g.kodeSales);
 
   function build() {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -150,7 +162,7 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
 
 <div class="logo"><img src="${origin}/aston-logo.png" onerror="this.style.display='none'"/></div>
 <div><b>Cirebon, ${tglID(g.tglSurat)}</b></div>
-<div><b>${esc(g.clNo || "CL/____/____-" + new Date().getFullYear() + "/SM")}</b></div>
+<div><b>${esc(clNo)}</b></div>
 <br>
 <div><b>${esc(g.namaTamu) || "-"}</b></div>
 ${g.instansi ? "<div><b>" + esc(g.instansi) + "</b></div>" : ""}
@@ -218,7 +230,7 @@ ${foot}
   const [busy, setBusy] = useState(false);
   async function unduh() {
     setBusy(true);
-    await unduhPDFdariHTML(build(), "Confirmation-" + (g.clNo || "letter").replace(/[^\w-]/g, "_") + ".pdf");
+    await unduhPDFdariHTML(build(), "Confirmation-" + (clNo || "letter").replace(/[^\w-]/g, "_") + ".pdf");
     setBusy(false);
   }
 
@@ -226,8 +238,10 @@ ${foot}
     <Modal title="Buat Confirmation Letter / Perjanjian" onClose={onClose}>
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
-          <Field label="No. CL"><input className={inp} value={g.clNo} onChange={(e) => set("clNo", e.target.value)} placeholder="CL/158/VI-2026/SM" /></Field>
+          <Field label="Nomor"><input className={inp} inputMode="numeric" value={g.nomor} onChange={(e) => set("nomor", e.target.value.replace(/[^\d]/g, ""))} placeholder="158" /></Field>
           <Field label="Tanggal Surat"><input type="date" className={inp} value={g.tglSurat} onChange={(e) => set("tglSurat", e.target.value)} /></Field>
+          <Field label="Kode Sales"><input className={inp} value={g.kodeSales} onChange={(e) => set("kodeSales", e.target.value.toUpperCase())} placeholder="AS" /></Field>
+          <Field label="No. CL (otomatis)"><input className={inp + " bg-slate-100 font-semibold"} value={clNo} readOnly /></Field>
         </div>
         <div className="border border-slate-200 rounded-lg p-3 grid grid-cols-2 gap-3">
           <div className="col-span-2 text-xs font-semibold text-slate-500">PENERIMA</div>

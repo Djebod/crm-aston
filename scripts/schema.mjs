@@ -31,6 +31,11 @@ export const STATEMENTS = [
   `ALTER TABLE aktivitas ADD COLUMN IF NOT EXISTS tujuan TEXT`,
   `ALTER TABLE aktivitas ADD COLUMN IF NOT EXISTS valid TEXT`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS kode TEXT`,
+  `CREATE TABLE IF NOT EXISTS room_booking (
+    id TEXT PRIMARY KEY, room TEXT, tanggal TEXT, jam_mulai TEXT, jam_selesai TEXT,
+    event_title TEXT, company TEXT, pax TEXT, setup TEXT, pic TEXT,
+    status TEXT, catatan TEXT, created_at TEXT, created_by TEXT )`,
+  `CREATE INDEX IF NOT EXISTS idx_booking_room_tgl ON room_booking (room, tanggal)`,
   `CREATE TABLE IF NOT EXISTS geo (
     id TEXT PRIMARY KEY, geo_no TEXT, event_title TEXT, company TEXT,
     data TEXT, created_at TEXT, created_by TEXT )`,

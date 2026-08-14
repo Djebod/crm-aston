@@ -66,9 +66,20 @@ const tglID = (s) => {
 };
 const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+function inisial(nama) { return String(nama || "").trim().split(/\s+/).map((w) => w[0] || "").join("").toUpperCase().slice(0, 4); }
+function buildNoDok(code, nomor, tgl, kode) {
+  const d = tgl ? new Date(tgl) : new Date();
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = d.getFullYear();
+  return `${code}/${nomor || "___"}/${dd}/${mm}/${yy}/SM/ACHCC/${String(kode || "").toUpperCase()}`;
+}
+
 export default function OfferingLetter({ lead, user, onClose }) {
   const [o, setO] = useState({
     noOL: "",
+    nomor: "",
+    kodeSales: user?.kode || inisial(user?.nama),
     tglSurat: hariIni(),
     sapaan: "Bapak/Ibu",
     namaTamu: lead.Nama || "",
@@ -100,6 +111,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
   const delRow = (arr, i) => setO((s) => ({ ...s, [arr]: s[arr].filter((_, j) => j !== i) }));
 
   const grandTotal = o.estimasi.reduce((t, r) => t + angka(r.jumlah) * angka(r.harga), 0);
+  const noOL = buildNoDok("OL", o.nomor, o.tglSurat, o.kodeSales);
 
   function cetak() {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -158,7 +170,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
   <div class="logo"><img src="${origin}/aston-logo.png" onerror="this.style.display='none'"/></div>
 
   <div><b>Cirebon, ${tglID(o.tglSurat)}</b></div>
-  <div><b>NO OL : ${esc(o.noOL || "OL/____/____-" + new Date().getFullYear() + "/SM")}</b></div>
+  <div><b>NO OL : ${esc(noOL)}</b></div>
   <br>
   <div class="to">
     <b>${esc(o.namaTamu) || "-"}</b>
@@ -250,8 +262,10 @@ export default function OfferingLetter({ lead, user, onClose }) {
     <Modal title="Buat Offering Letter" onClose={onClose}>
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
-          <Field label="No. OL"><input className={inp} value={o.noOL} onChange={(e) => set("noOL", e.target.value)} placeholder="OL/124/IV-2026/SM" /></Field>
+          <Field label="Nomor"><input className={inp} inputMode="numeric" value={o.nomor} onChange={(e) => set("nomor", e.target.value.replace(/[^\d]/g, ""))} placeholder="124" /></Field>
           <Field label="Tanggal Surat"><input type="date" className={inp} value={o.tglSurat} onChange={(e) => set("tglSurat", e.target.value)} /></Field>
+          <Field label="Kode Sales"><input className={inp} value={o.kodeSales} onChange={(e) => set("kodeSales", e.target.value.toUpperCase())} placeholder="AS" /></Field>
+          <Field label="No. OL (otomatis)"><input className={inp + " bg-slate-100 font-semibold"} value={noOL} readOnly /></Field>
         </div>
 
         <div className="border border-slate-200 rounded-lg p-3 space-y-3">
