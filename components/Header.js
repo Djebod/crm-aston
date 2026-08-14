@@ -7,6 +7,7 @@ const ITEMS = [
   { href: "/tindaklanjut", label: "Tindak Lanjut", key: "tindaklanjut" },
   { href: "/aktivitas", label: "Activity", key: "activity" },
   { href: "/callplan", label: "Sales Call Plan", key: "callplan" },
+  { href: "/geo", label: "GEO", key: "geo" },
   { href: "/company", label: "Company", key: "company" },
   { href: "/log", label: "Log", key: "log" },
 ];

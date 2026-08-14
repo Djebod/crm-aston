@@ -126,6 +126,19 @@ export default function Dashboard() {
     [teamUsers]
   );
 
+  const tindakLanjut = useMemo(() => {
+    const h = new Date().toISOString().slice(0, 10);
+    let dueToday = 0, overdue = 0;
+    leads.forEach((l) => {
+      if ((l.Status || "Tentative") !== "Tentative") return;
+      const t = l.TanggalTindakLanjut;
+      if (!t) return;
+      if (t === h) dueToday++;
+      else if (t < h) overdue++;
+    });
+    return { dueToday, overdue };
+  }, [leads]);
+
   function logout() {
     localStorage.removeItem("crm_user");
     router.replace("/");
@@ -330,6 +343,15 @@ export default function Dashboard() {
         onKeluar={logout} />
 
       <main className="max-w-5xl mx-auto px-4 py-5">
+        {(tindakLanjut.dueToday > 0 || tindakLanjut.overdue > 0) && (
+          <a href="/tindaklanjut" className="flex items-center justify-between gap-3 mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 hover:bg-amber-100 transition">
+            <span className="text-sm text-amber-900 font-medium">
+              🔔 Tindak lanjut: <b>{tindakLanjut.dueToday}</b> jatuh tempo hari ini
+              {tindakLanjut.overdue > 0 && <> · <b>{tindakLanjut.overdue}</b> terlewat</>}
+            </span>
+            <span className="text-xs font-semibold text-amber-800 whitespace-nowrap">Buka →</span>
+          </a>
+        )}
         {/* Ringkasan */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
           <Kartu label="Total Prospek" nilai={ringkasan.total} />
