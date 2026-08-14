@@ -19,7 +19,7 @@ export async function GET(req) {
   const requester = req.headers.get("x-user-email");
   if (!(await bolehKelola(requester))) return NextResponse.json({ status: "error", message: "Akses ditolak." }, { status: 403 });
   try {
-    const rows = await sql`SELECT email AS "Email", nama AS "Nama", role AS "Role", aktif AS "Aktif" FROM users ORDER BY nama ASC`;
+    const rows = await sql`SELECT email AS "Email", nama AS "Nama", role AS "Role", aktif AS "Aktif", kode AS "Kode" FROM users ORDER BY nama ASC`;
     return NextResponse.json({ status: "ok", data: rows });
   } catch (e) { return NextResponse.json({ status: "error", message: e?.message || String(e) }); }
 }
@@ -35,6 +35,7 @@ export async function POST(req) {
       if (!ada.length) return NextResponse.json({ status: "error", message: "User tidak ditemukan" });
       if (body.nama !== undefined) await sql`UPDATE users SET nama = ${body.nama} WHERE email = ${em}`;
       if (body.role !== undefined) await sql`UPDATE users SET role = ${body.role} WHERE email = ${em}`;
+      if (body.kode !== undefined) await sql`UPDATE users SET kode = ${String(body.kode || "").toUpperCase()} WHERE email = ${em}`;
       if (body.aktif !== undefined) await sql`UPDATE users SET aktif = ${!!body.aktif} WHERE email = ${em}`;
       if (body.password) await sql`UPDATE users SET password_hash = ${bcrypt.hashSync(String(body.password), 10)} WHERE email = ${em}`;
       return NextResponse.json({ status: "ok" });
@@ -44,8 +45,8 @@ export async function POST(req) {
     const em = String(body.email).toLowerCase().trim();
     const ada = await sql`SELECT 1 FROM users WHERE email = ${em}`;
     if (ada.length) return NextResponse.json({ status: "error", message: "Email sudah terdaftar." });
-    await sql`INSERT INTO users (email, nama, password_hash, role, aktif, reset_token, reset_expiry)
-      VALUES (${em}, ${body.nama || ""}, ${bcrypt.hashSync(String(body.password), 10)}, ${body.role || "marketing"}, true, ${""}, ${0})`;
+    await sql`INSERT INTO users (email, nama, password_hash, role, aktif, reset_token, reset_expiry, kode)
+      VALUES (${em}, ${body.nama || ""}, ${bcrypt.hashSync(String(body.password), 10)}, ${body.role || "marketing"}, true, ${""}, ${0}, ${String(body.kode || "").toUpperCase()})`;
     return NextResponse.json({ status: "ok" });
   } catch (e) { return NextResponse.json({ status: "error", message: e?.message || String(e) }); }
 }

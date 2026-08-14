@@ -790,6 +790,7 @@ function KelolaTim({ user, onClose }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("marketing");
+  const [kode, setKode] = useState("");
   const [loading, setLoading] = useState(false);
   const [pesan, setPesan] = useState("");
   const [editing, setEditing] = useState(null); // email user yang sedang diedit
@@ -817,12 +818,12 @@ function KelolaTim({ user, onClose }) {
       const res = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "addUser", requesterEmail: user.email, nama, email, password, role }),
+        body: JSON.stringify({ action: "addUser", requesterEmail: user.email, nama, email, password, role, kode }),
       });
       const data = await res.json();
       if (data.status === "ok") {
         setPesan("✓ User berhasil ditambahkan.");
-        setNama(""); setEmail(""); setPassword(""); setRole("marketing");
+        setNama(""); setEmail(""); setPassword(""); setRole("marketing"); setKode("");
         await muat();
       } else {
         setPesan("Gagal: " + (data.message || "coba lagi"));
@@ -850,6 +851,7 @@ function KelolaTim({ user, onClose }) {
             <option value="admin">admin</option>
           </select>
         </Field>
+        <Field label="Kode Sales (utk GEO)"><input className={inp} value={kode} onChange={(e) => setKode(e.target.value.toUpperCase())} placeholder="mis. AS" /></Field>
       </div>
       {pesan && <p className="text-sm mt-3">{pesan}</p>}
       <button onClick={tambah} disabled={loading} className="mt-4 bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg py-2.5 px-4 disabled:opacity-60">
@@ -885,6 +887,7 @@ function KelolaTim({ user, onClose }) {
 function BarisUser({ u, requester, expanded, onToggle, onSaved }) {
   const [nama, setNama] = useState(u.Nama || "");
   const [role, setRole] = useState(u.Role || "marketing");
+  const [kode, setKode] = useState(u.Kode || "");
   const [aktif, setAktif] = useState(String(u.Aktif).toLowerCase() !== "false");
   const [pwBaru, setPwBaru] = useState("");
   const [busy, setBusy] = useState(false);
@@ -927,6 +930,7 @@ function BarisUser({ u, requester, expanded, onToggle, onSaved }) {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs bg-slate-100 rounded-full px-2 py-0.5 capitalize">{u.Role}</span>
+          {u.Kode && <span className="text-xs bg-[#fdf6e9] text-[#a9781f] rounded-full px-2 py-0.5 font-semibold">{u.Kode}</span>}
           <button onClick={onToggle} className="text-xs font-semibold text-[#12263a] border border-slate-300 rounded-md px-2.5 py-1 hover:bg-slate-50">
             {expanded ? "Tutup" : "Kelola"}
           </button>
@@ -943,13 +947,14 @@ function BarisUser({ u, requester, expanded, onToggle, onSaved }) {
                 <option value="admin">admin</option>
               </select>
             </Field>
+            <Field label="Kode Sales (utk GEO)"><input className={inp} value={kode} onChange={(e) => setKode(e.target.value.toUpperCase())} placeholder="mis. AS" /></Field>
           </div>
           <div className="flex items-center gap-2 mt-3">
             <input id={"aktif-" + u.Email} type="checkbox" checked={aktif} onChange={(e) => setAktif(e.target.checked)} />
             <label htmlFor={"aktif-" + u.Email} className="text-sm text-slate-700">Akun aktif (boleh login)</label>
           </div>
           <button
-            onClick={() => kirim({ nama, role, aktif }, "✓ Perubahan disimpan.")}
+            onClick={() => kirim({ nama, role, aktif, kode }, "✓ Perubahan disimpan.")}
             disabled={busy}
             className="mt-3 bg-[#12263a] hover:bg-[#0e1f33] text-white text-sm font-semibold rounded-lg py-2 px-4 disabled:opacity-60"
           >

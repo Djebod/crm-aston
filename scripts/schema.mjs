@@ -30,6 +30,7 @@ export const STATEMENTS = [
     sales_name TEXT PRIMARY KEY, target_revenue TEXT, target_activity_day TEXT )`,
   `ALTER TABLE aktivitas ADD COLUMN IF NOT EXISTS tujuan TEXT`,
   `ALTER TABLE aktivitas ADD COLUMN IF NOT EXISTS valid TEXT`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS kode TEXT`,
   `CREATE TABLE IF NOT EXISTS geo (
     id TEXT PRIMARY KEY, geo_no TEXT, event_title TEXT, company TEXT,
     data TEXT, created_at TEXT, created_by TEXT )`,

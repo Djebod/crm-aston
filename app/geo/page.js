@@ -17,11 +17,13 @@ const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").
 function inisial(nama) {
   return String(nama || "").trim().split(/\s+/).map((w) => w[0] || "").join("").toUpperCase().slice(0, 4);
 }
-function nextNomor(list) {
+function nextNomor(list, tahun) {
   let max = 0;
   (list || []).forEach((row) => {
-    const n = parseInt(String(row.GeoNo || "").split("/")[0], 10);
-    if (!isNaN(n) && n > max) max = n;
+    const parts = String(row.GeoNo || "").split("/");
+    const n = parseInt(parts[0], 10);
+    const y = parseInt(parts[3], 10);
+    if (!isNaN(n) && y === tahun && n > max) max = n;
   });
   return max + 1;
 }
@@ -205,8 +207,8 @@ export default function GeoPage() {
       k.preparedBy = user?.nama || "";
       k.salesPerson = p.salesPerson || user?.nama || "";
       const merged = { ...k, ...p, notes: { ...DEFAULT_NOTES } };
-      merged.nomor = String(nextNomor(list));
-      merged.kodeSales = inisial(p.salesPerson || user?.nama);
+      merged.nomor = String(nextNomor(list, new Date().getFullYear()));
+      merged.kodeSales = user?.kode || inisial(p.salesPerson || user?.nama);
       merged.geoNo = rebuildNo(merged);
       setG(merged);
       setModalForm(true);
@@ -219,8 +221,8 @@ export default function GeoPage() {
     const k = GEO_KOSONG();
     k.salesPerson = user?.nama || "";
     k.preparedBy = user?.nama || "";
-    k.nomor = String(nextNomor(list));
-    k.kodeSales = inisial(user?.nama);
+    k.nomor = String(nextNomor(list, new Date().getFullYear()));
+    k.kodeSales = user?.kode || inisial(user?.nama);
     k.geoNo = rebuildNo(k);
     setG(k);
     setModalForm(true);
@@ -233,7 +235,15 @@ export default function GeoPage() {
   }
 
   const set = (k, v) => setG((s) => ({ ...s, [k]: v }));
-  const setAuto = (k, v) => setG((s) => { const n = { ...s, [k]: v }; return { ...n, geoNo: rebuildNo(n) }; });
+  const setAuto = (k, v) => setG((s) => {
+    const n = { ...s, [k]: v };
+    if (k === "issuedDate") {
+      const oldY = s.issuedDate ? new Date(s.issuedDate).getFullYear() : null;
+      const newY = v ? new Date(v).getFullYear() : new Date().getFullYear();
+      if (oldY !== newY) n.nomor = String(nextNomor(list, newY));
+    }
+    return { ...n, geoNo: rebuildNo(n) };
+  });
   const setNote = (k, v) => setG((s) => ({ ...s, notes: { ...s.notes, [k]: v } }));
   const setRoom = (i, k, v) => setG((s) => ({ ...s, rooms: s.rooms.map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
   const addRoom = () => setG((s) => ({ ...s, rooms: [...s.rooms, { type: "", checkIn: "", checkOut: "", totalRoom: "", day: "", price: "" }] }));
