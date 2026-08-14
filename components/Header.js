@@ -19,36 +19,36 @@ export default function Header({ active, user, onKelolaTim, onProfil, onKeluar }
 
   return (
     <header className="bg-[#12263a] text-white sticky top-0 z-30">
-      <div className="max-w-5xl mx-auto px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
-          {/* Kiri: logo + nav (desktop) */}
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="bg-white rounded-lg px-2 py-1 flex items-center shrink-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/aston-logo.png" alt="Aston Cirebon" className="h-7 w-auto object-contain" />
-            </span>
-            <nav className="hidden md:flex items-center gap-1 text-sm">
-              {ITEMS.map((it) => (
-                <a key={it.key} href={it.href}
-                  className={"px-3 py-1.5 rounded-lg whitespace-nowrap " + (active === it.key ? "bg-white/15 font-semibold" : "hover:bg-white/10 transition")}>
-                  {it.label}
-                </a>
-              ))}
-              {isAdmin && onKelolaTim && (
-                <button onClick={onKelolaTim} className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Kelola Tim</button>
-              )}
-            </nav>
-          </div>
+      <div className="max-w-6xl mx-auto px-4 py-3">
+        <div className="flex items-center gap-3">
+          {/* Logo */}
+          <span className="bg-white rounded-lg px-2 py-1 flex items-center shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/aston-logo.png" alt="Aston Cirebon" className="h-7 w-auto object-contain" />
+          </span>
+
+          {/* Nav desktop (bisa geser horizontal bila banyak) */}
+          <nav className="hidden md:flex items-center gap-0.5 text-[13px] flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {ITEMS.map((it) => (
+              <a key={it.key} href={it.href}
+                className={"px-2.5 py-1.5 rounded-lg whitespace-nowrap shrink-0 " + (active === it.key ? "bg-white/15 font-semibold" : "hover:bg-white/10 transition")}>
+                {it.label}
+              </a>
+            ))}
+            {isAdmin && onKelolaTim && (
+              <button onClick={onKelolaTim} className="px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition whitespace-nowrap shrink-0">Kelola Tim</button>
+            )}
+          </nav>
 
           {/* Kanan: profil+keluar (desktop) / hamburger (mobile) */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 ml-auto md:ml-0">
             <button onClick={onProfil} title="Profil saya"
               className="hidden md:block text-right leading-tight bg-white/10 hover:bg-white/20 rounded-lg px-3 py-1.5 transition">
-              <div className="text-sm font-semibold">{user?.nama}</div>
+              <div className="text-sm font-semibold whitespace-nowrap">{user?.nama}</div>
               <div className="text-xs text-slate-300 capitalize">{user?.role}</div>
             </button>
             <button onClick={onKeluar}
-              className="hidden md:block text-sm bg-[#c8962c] hover:brightness-95 text-[#12263a] font-semibold rounded-lg px-3 py-1.5 transition">
+              className="hidden md:block text-sm bg-[#c8962c] hover:brightness-95 text-[#12263a] font-semibold rounded-lg px-3 py-1.5 transition whitespace-nowrap">
               Keluar
             </button>
             <button onClick={() => setOpen((o) => !o)} aria-label="Menu"
