@@ -14,6 +14,27 @@ const angka = (n) => Number(String(n).replace(/[^\d]/g, "")) || 0;
 const fmt = (n) => angka(n).toLocaleString("id-ID");
 const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
 
+function inisial(nama) {
+  return String(nama || "").trim().split(/\s+/).map((w) => w[0] || "").join("").toUpperCase().slice(0, 4);
+}
+function nextNomor(list) {
+  let max = 0;
+  (list || []).forEach((row) => {
+    const n = parseInt(String(row.GeoNo || "").split("/")[0], 10);
+    if (!isNaN(n) && n > max) max = n;
+  });
+  return max + 1;
+}
+// Format: Nomor/Tanggal/Bulan/Tahun/SM/ACHCC/KODE_SALES
+function rebuildNo(g) {
+  if (!g.nomor) return g.geoNo || "";
+  const d = g.issuedDate ? new Date(g.issuedDate) : new Date();
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = d.getFullYear();
+  return `${g.nomor}/${dd}/${mm}/${yy}/SM/ACHCC/${String(g.kodeSales || "").toUpperCase()}`;
+}
+
 const DEFAULT_NOTES = {
   fo: "Group arrival by partial/group, check in time: 14.00 WIB.\nPlease prepare room as per requested.\nPlease prepare room keys before guest arrival.\nPlease be ready to assist guests luggage.",
   hk: "Please prepare the room based on room blocking.\nPlease make sure that all guest rooms are cleaned & tidy.",
@@ -24,7 +45,7 @@ const DEFAULT_NOTES = {
 };
 
 const GEO_KOSONG = () => ({
-  id: "", geoNo: "", issuedDate: new Date().toISOString().slice(0, 10),
+  id: "", geoNo: "", nomor: "", kodeSales: "", issuedDate: new Date().toISOString().slice(0, 10),
   eventTitle: "", company: "", contactPerson: "", address: "", phone: "", email: "",
   salesPerson: "", checkIn: "", checkOut: "", noRoom: "", guarantee: "YES",
   rooms: [{ type: "Superior", checkIn: "", checkOut: "", totalRoom: "", day: "", price: "" }],
@@ -171,9 +192,39 @@ export default function GeoPage() {
   }, []);
   useEffect(() => { if (user) ambil(); }, [user, ambil]);
 
+  // Prefill dari Leads (klik "📋 GEO" di kartu lead)
+  useEffect(() => {
+    if (!user || loading) return;
+    let raw = null;
+    try { raw = localStorage.getItem("crm_prefill_geo"); } catch (e) {}
+    if (!raw) return;
+    try { localStorage.removeItem("crm_prefill_geo"); } catch (e) {}
+    try {
+      const p = JSON.parse(raw);
+      const k = GEO_KOSONG();
+      k.preparedBy = user?.nama || "";
+      k.salesPerson = p.salesPerson || user?.nama || "";
+      const merged = { ...k, ...p, notes: { ...DEFAULT_NOTES } };
+      merged.nomor = String(nextNomor(list));
+      merged.kodeSales = inisial(p.salesPerson || user?.nama);
+      merged.geoNo = rebuildNo(merged);
+      setG(merged);
+      setModalForm(true);
+    } catch (e) {}
+  }, [user, loading, list]);
+
   function logout() { localStorage.removeItem("crm_user"); router.replace("/"); }
 
-  function bukaBaru() { const k = GEO_KOSONG(); k.salesPerson = user?.nama || ""; k.preparedBy = user?.nama || ""; setG(k); setModalForm(true); }
+  function bukaBaru() {
+    const k = GEO_KOSONG();
+    k.salesPerson = user?.nama || "";
+    k.preparedBy = user?.nama || "";
+    k.nomor = String(nextNomor(list));
+    k.kodeSales = inisial(user?.nama);
+    k.geoNo = rebuildNo(k);
+    setG(k);
+    setModalForm(true);
+  }
   function bukaEdit(row) {
     let d = {};
     try { d = JSON.parse(row.Data || "{}"); } catch (e) {}
@@ -182,6 +233,7 @@ export default function GeoPage() {
   }
 
   const set = (k, v) => setG((s) => ({ ...s, [k]: v }));
+  const setAuto = (k, v) => setG((s) => { const n = { ...s, [k]: v }; return { ...n, geoNo: rebuildNo(n) }; });
   const setNote = (k, v) => setG((s) => ({ ...s, notes: { ...s.notes, [k]: v } }));
   const setRoom = (i, k, v) => setG((s) => ({ ...s, rooms: s.rooms.map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
   const addRoom = () => setG((s) => ({ ...s, rooms: [...s.rooms, { type: "", checkIn: "", checkOut: "", totalRoom: "", day: "", price: "" }] }));
@@ -277,8 +329,10 @@ export default function GeoPage() {
         <Modal title={g.id ? "Edit GEO" : "Buat GEO"} onClose={() => setModalForm(false)}>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="GEO No *"><input className={inp} value={g.geoNo} onChange={(e) => set("geoNo", e.target.value)} placeholder="145/15/08/2026/SM/AS" /></Field>
-              <Field label="Issued Date"><input type="date" className={inp} value={g.issuedDate} onChange={(e) => set("issuedDate", e.target.value)} /></Field>
+              <Field label="Nomor"><input className={inp} inputMode="numeric" value={g.nomor} onChange={(e) => setAuto("nomor", e.target.value.replace(/[^\d]/g, ""))} /></Field>
+              <Field label="Issued Date"><input type="date" className={inp} value={g.issuedDate} onChange={(e) => setAuto("issuedDate", e.target.value)} /></Field>
+              <Field label="Kode Sales"><input className={inp} value={g.kodeSales} onChange={(e) => setAuto("kodeSales", e.target.value.toUpperCase())} placeholder="AS" /></Field>
+              <Field label="GEO No (otomatis)"><input className={inp + " bg-slate-100 font-semibold"} value={g.geoNo} readOnly title="Nomor/Tanggal/Bulan/Tahun/SM/ACHCC/Kode Sales" /></Field>
               <Field label="Event Title"><input className={inp} value={g.eventTitle} onChange={(e) => set("eventTitle", e.target.value)} /></Field>
               <Field label="Company/Organizer"><input className={inp} value={g.company} onChange={(e) => set("company", e.target.value)} /></Field>
               <Field label="Contact Person"><input className={inp} value={g.contactPerson} onChange={(e) => set("contactPerson", e.target.value)} /></Field>

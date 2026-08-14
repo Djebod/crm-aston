@@ -10,6 +10,7 @@ import Header from "@/components/Header";
 import DateRange, { dalamRentang } from "@/components/DateRange";
 import { normalizeWA, validWA } from "@/lib/phone";
 import OfferingLetter from "@/components/OfferingLetter";
+import ConfirmationLetter from "@/components/ConfirmationLetter";
 
 const PER_HAL = 25;
 
@@ -71,6 +72,7 @@ export default function Dashboard() {
   const [modalProfil, setModalProfil] = useState(false);
   const [modalTarget, setModalTarget] = useState(false);
   const [offeringLead, setOfferingLead] = useState(null);
+  const [confirmLead, setConfirmLead] = useState(null);
   const [targets, setTargets] = useState([]);
   const isAdmin = user?.role === "admin";
 
@@ -142,6 +144,21 @@ export default function Dashboard() {
   function logout() {
     localStorage.removeItem("crm_user");
     router.replace("/");
+  }
+
+  function buatGeo(l) {
+    const prefill = {
+      eventTitle: l.Instansi || l.JenisEvent || "",
+      company: l.Instansi || "",
+      contactPerson: l.Nama || "",
+      phone: l.NoHP || "",
+      checkIn: l.TanggalEvent || "",
+      noRoom: l.JumlahKamar || "",
+      salesPerson: l.PIC || user?.nama || "",
+      rooms: [{ type: "Superior", checkIn: l.TanggalEvent || "", checkOut: "", totalRoom: l.JumlahKamar || "", day: "", price: "" }],
+    };
+    try { localStorage.setItem("crm_prefill_geo", JSON.stringify(prefill)); } catch (e) {}
+    router.push("/geo");
   }
 
   const salesOptions = useMemo(() => {
@@ -444,6 +461,8 @@ export default function Dashboard() {
                 onEdit={() => bukaEdit(l)}
                 onStatus={(s) => ubahStatusCepat(l, s)}
                 onOffering={() => setOfferingLead(l)}
+                onGeo={() => buatGeo(l)}
+                onConfirm={() => setConfirmLead(l)}
               />
             ))}
           </div>
@@ -570,6 +589,7 @@ export default function Dashboard() {
       {modalUser && <KelolaTim user={user} onClose={() => setModalUser(false)} />}
       {modalTarget && <KelolaTarget targets={targets} salesOptions={marketingNames} onClose={() => setModalTarget(false)} onSaved={ambilTargets} />}
       {offeringLead && <OfferingLetter lead={offeringLead} user={user} onClose={() => setOfferingLead(null)} />}
+      {confirmLead && <ConfirmationLetter lead={confirmLead} user={user} onClose={() => setConfirmLead(null)} />}
 
       {/* Modal Profil Saya */}
       {modalProfil && (
@@ -609,7 +629,7 @@ function Kartu({ label, nilai, kecil, emas }) {
   );
 }
 
-function LeadCard({ lead, onEdit, onStatus, onOffering }) {
+function LeadCard({ lead, onEdit, onStatus, onOffering, onGeo, onConfirm }) {
   const pax = Number(String(lead.EstimasiNilai).replace(/[^\d]/g, "")) || 0;
   const room = Number(String(lead.RevenueRoom).replace(/[^\d]/g, "")) || 0;
   const total = pax + room;
@@ -683,6 +703,12 @@ function LeadCard({ lead, onEdit, onStatus, onOffering }) {
         </select>
         <button onClick={onOffering} className="text-xs font-semibold text-white bg-[#c8962c] hover:brightness-95 rounded-md px-3 py-1.5">
           📄 Offering
+        </button>
+        <button onClick={onGeo} className="text-xs font-semibold text-[#12263a] border border-[#c8962c] rounded-md px-3 py-1.5 hover:bg-[#fdf6e9]">
+          📋 GEO
+        </button>
+        <button onClick={onConfirm} className="text-xs font-semibold text-[#12263a] border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">
+          📝 Perjanjian
         </button>
         <button onClick={onEdit} className="text-xs font-semibold text-[#12263a] border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">
           Edit
