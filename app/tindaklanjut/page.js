@@ -39,6 +39,7 @@ export default function TindakLanjutPage() {
   const [loading, setLoading] = useState(true);
   const [modalProfil, setModalProfil] = useState(false);
   const [cari, setCari] = useState("");
+  const [fSales, setFSales] = useState("");
   const [dari, setDari] = useState("");
   const [sampai, setSampai] = useState("");
   const [draft, setDraft] = useState({}); // id -> {tindak, tgl}
@@ -62,16 +63,23 @@ export default function TindakLanjutPage() {
 
   function logout() { localStorage.removeItem("crm_user"); router.replace("/"); }
 
+  const salesOptions = useMemo(() => {
+    const s = new Set();
+    leads.forEach((l) => { if ((l.Status || "Tentative") === "Tentative" && l.PIC) s.add(l.PIC); });
+    return Array.from(s).sort();
+  }, [leads]);
+
   const tampil = useMemo(() => {
     const q = cari.toLowerCase().trim();
     return leads
       .filter((l) => (l.Status || "Tentative") === "Tentative")
+      .filter((l) => (!fSales ? true : l.PIC === fSales))
       .filter((l) => dalamRentang(l.TanggalTindakLanjut || l.UpdatedAt, dari, sampai))
       .filter((l) => !q || [l.Nama, l.Instansi, l.NoHP, l.PIC, l.TindakLanjut].join(" ").toLowerCase().includes(q))
       .sort((a, b) => String(a.TanggalTindakLanjut || "9999").localeCompare(String(b.TanggalTindakLanjut || "9999")));
-  }, [leads, cari, dari, sampai]);
+  }, [leads, cari, fSales, dari, sampai]);
 
-  useEffect(() => { setPage(1); }, [cari, dari, sampai]);
+  useEffect(() => { setPage(1); }, [cari, fSales, dari, sampai]);
   const totalHal = Math.max(1, Math.ceil(tampil.length / PER_HAL));
   const paged = tampil.slice((page - 1) * PER_HAL, page * PER_HAL);
 
@@ -118,6 +126,10 @@ export default function TindakLanjutPage() {
 
         <div className="flex flex-col sm:flex-row gap-2 mb-4">
           <input value={cari} onChange={(e) => setCari(e.target.value)} placeholder="Cari nama, instansi, PIC…" className="flex-1 border border-slate-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#c8962c]" />
+          <select value={fSales} onChange={(e) => setFSales(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
+            <option value="">Semua Sales</option>
+            {salesOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
           <DateRange dari={dari} sampai={sampai} setDari={setDari} setSampai={setSampai} />
         </div>
 

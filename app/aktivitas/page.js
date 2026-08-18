@@ -15,7 +15,7 @@ import Header from "@/components/Header";
 const PER_HAL = 25;
 
 const ACTIVITIES = ["Sales Call", "Site Inspection", "Telemarketing"];
-const TUJUAN_LIST = ["Maintenance", "Follow up lead", "After sales service", "Administration", "Handling complain"];
+const TUJUAN_LIST = ["Maintain Client", "Follow up lead", "After sales service", "Administration", "Handling complain"];
 const SEGMENTS = [
   "Online Travel Agent", "Company", "Government", "Tour & Travel",
   "University / School", "Event Organizer", "Wedding Organizer", "Social Event", "Personal",
