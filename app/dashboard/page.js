@@ -22,11 +22,32 @@ const STATUS_STYLE = {
   Definite: "bg-emerald-100 text-emerald-800",
   Cancel: "bg-rose-100 text-rose-700",
 };
-const JENIS_EVENT = ["Wedding", "Meeting / Rapat", "Gathering", "Ulang Tahun", "Menginap / Kamar", "Lainnya"];
+const JENIS_EVENT = ["Wedding", "Meeting / Rapat", "Gathering", "Ulang Tahun", "Lainnya"];
 const SUMBER = ["Walk-in", "WhatsApp", "Instagram", "Telepon", "Referral", "OTA", "Lainnya"];
+
+// Ruangan meeting (untuk booking langsung dari lead MICE)
+const RUANGAN = [
+  { name: "Diamond 12", cap: { theater: 120, class: 63, round: 60, ushape: 48, hollow: 36 } },
+  { name: "Diamond 3", cap: { theater: 50, class: 21, round: 30, ushape: 39, hollow: 24 } },
+  { name: "Diamond 5", cap: { theater: 50, class: 21, round: 30, ushape: 39, hollow: 24 } },
+  { name: "Diamond 6", cap: { theater: 140, class: 90, round: 80, ushape: 66, hollow: 48 } },
+  { name: "Diamond 7", cap: { theater: 140, class: 90, round: 80, ushape: 66, hollow: 48 } },
+  { name: "Crystal", cap: { theater: 80, class: 30, round: 50, ushape: 30, hollow: 30 } },
+  { name: "Emerald", cap: { theater: 120, class: 60, round: 60, ushape: 48, hollow: 36 } },
+  { name: "Iron", cap: { theater: 24, class: 18, round: 20, ushape: 27, hollow: 18 } },
+  { name: "Wood", cap: { theater: 40, class: 27, round: 30, ushape: 27, hollow: 18 } },
+  { name: "Onyx", cap: { theater: 250, class: 180, round: 200, ushape: 150, hollow: 54 } },
+  { name: "Shapier Ballroom", cap: { theater: 1445, class: 504, round: 720, ushape: 345, hollow: 345 } },
+];
+const SETUP_MEETING = [
+  { key: "theater", label: "Theater" }, { key: "class", label: "Class Room" },
+  { key: "round", label: "Round Table" }, { key: "ushape", label: "U Shape" }, { key: "hollow", label: "Hollow Square" },
+];
+const keMenit = (hhmm) => { const m = String(hhmm || "").match(/^(\d{1,2}):(\d{2})/); return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : null; };
 
 const FORM_KOSONG = {
   id: "",
+  leadType: "MICE",
   nama: "",
   instansi: "",
   nohp: "",
@@ -38,6 +59,11 @@ const FORM_KOSONG = {
   perluKamar: false,
   jumlahKamar: "",
   revenueRoom: "",
+  pesanMeeting: false,
+  meetRoom: "",
+  meetSetup: "theater",
+  meetMulai: "08:00",
+  meetSelesai: "17:00",
   sumber: "Walk-in",
   status: "Tentative",
   pic: "",
@@ -58,6 +84,7 @@ export default function Dashboard() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [leads, setLeads] = useState([]);
+  const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cari, setCari] = useState("");
   const [filterStatus, setFilterStatus] = useState("Semua");
@@ -113,6 +140,10 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
+    try {
+      const rb = await fetch("/api/roombooking", { cache: "no-store" }).then((x) => x.json());
+      if (rb.status === "ok") setBookings(rb.data || []);
+    } catch (e) {}
   }, []);
 
   useEffect(() => {
@@ -140,6 +171,25 @@ export default function Dashboard() {
     });
     return { dueToday, overdue };
   }, [leads]);
+
+  const meetCek = useMemo(() => {
+    if (form.leadType !== "MICE" || !form.pesanMeeting || !form.meetRoom) return null;
+    const r = RUANGAN.find((x) => x.name === form.meetRoom);
+    const kap = r ? r.cap[form.meetSetup] : 0;
+    const pax = Number(String(form.jumlahPax).replace(/[^\d]/g, "")) || 0;
+    const paxLebih = kap && pax > kap;
+    const s = keMenit(form.meetMulai), e = keMenit(form.meetSelesai);
+    let bentrok = null;
+    if (s !== null && e !== null && e > s && form.tanggalEvent) {
+      bentrok = bookings.find((x) => {
+        if (x.Room !== form.meetRoom || x.Tanggal !== form.tanggalEvent || x.Status === "Cancel") return false;
+        const rs = keMenit(x.JamMulai), re = keMenit(x.JamSelesai);
+        if (rs === null || re === null) return false;
+        return !(s >= re + 120 || rs >= e + 120);
+      });
+    }
+    return { kap, paxLebih, bentrok };
+  }, [form, bookings]);
 
   function logout() {
     localStorage.removeItem("crm_user");
@@ -237,6 +287,7 @@ export default function Dashboard() {
   function bukaEdit(l) {
     setForm({
       id: l.ID,
+      leadType: l.LeadType || (String(l.JenisEvent || "").toLowerCase().includes("room") || String(l.JenisEvent || "").toLowerCase().includes("menginap") ? "Room" : "MICE"),
       nama: l.Nama || "",
       instansi: l.Instansi || "",
       nohp: l.NoHP || "",
@@ -248,6 +299,7 @@ export default function Dashboard() {
       perluKamar: !!(l.PerluKamar === "Ya" || l.RevenueRoom || l.JumlahKamar),
       jumlahKamar: l.JumlahKamar || "",
       revenueRoom: String(l.RevenueRoom || "").replace(/[^\d]/g, ""),
+      pesanMeeting: false, meetRoom: "", meetSetup: "theater", meetMulai: "08:00", meetSelesai: "17:00",
       sumber: l.Sumber || "Walk-in",
       status: l.Status || "Tentative",
       pic: l.PIC || "",
@@ -277,16 +329,34 @@ export default function Dashboard() {
       alert("Status Cancel wajib disertai Alasan Cancel.");
       return;
     }
+    // Validasi pesan ruang meeting (MICE) — kapasitas & anti-overlap 2 jam
+    if (!form.id && form.leadType === "MICE" && form.pesanMeeting) {
+      if (!form.meetRoom) { alert("Silakan pilih ruang meeting, atau matikan 'Pesan Ruang Meeting'."); return; }
+      if (keMenit(form.meetSelesai) <= keMenit(form.meetMulai)) { alert("Jam selesai meeting harus setelah jam mulai."); return; }
+      const r = RUANGAN.find((x) => x.name === form.meetRoom);
+      const kap = r ? r.cap[form.meetSetup] : 0;
+      const pax = Number(String(form.jumlahPax).replace(/[^\d]/g, "")) || 0;
+      if (kap && pax > kap) { alert(`Kapasitas ${form.meetRoom} (${SETUP_MEETING.find((s) => s.key === form.meetSetup)?.label}) hanya ${kap} orang, peserta ${pax}. Pilih ruangan lebih besar / ubah setup.`); return; }
+      const s = keMenit(form.meetMulai), e = keMenit(form.meetSelesai);
+      const bentrok = bookings.find((x) => {
+        if (x.Room !== form.meetRoom || x.Tanggal !== form.tanggalEvent || x.Status === "Cancel") return false;
+        const rs = keMenit(x.JamMulai), re = keMenit(x.JamSelesai);
+        if (rs === null || re === null) return false;
+        return !(s >= re + 120 || rs >= e + 120);
+      });
+      if (bentrok) { alert(`Ruang ${form.meetRoom} pada ${form.tanggalEvent} sudah terisi ${bentrok.JamMulai}-${bentrok.JamSelesai} (${bentrok.EventTitle || "-"}). Perlu jeda minimal 2 jam. Pilih ruangan/jam lain.`); return; }
+    }
     setMenyimpan(true);
     try {
       const payload = {
         action: form.id ? "updateLead" : "addLead",
         ...form,
         nohp: normalizeWA(form.nohp),
+        jenisEvent: form.leadType === "Room" ? "Room Only" : form.jenisEvent,
         estimasiNilai: Number(String(form.estimasiNilai).replace(/[^\d]/g, "")) || 0,
-        perluKamar: form.perluKamar ? "Ya" : "Tidak",
-        jumlahKamar: form.perluKamar ? (Number(String(form.jumlahKamar).replace(/[^\d]/g, "")) || 0) : 0,
-        revenueRoom: form.perluKamar ? (Number(String(form.revenueRoom).replace(/[^\d]/g, "")) || 0) : 0,
+        perluKamar: (form.leadType === "Room" || form.perluKamar) ? "Ya" : "Tidak",
+        jumlahKamar: (form.leadType === "Room" || form.perluKamar) ? (Number(String(form.jumlahKamar).replace(/[^\d]/g, "")) || 0) : 0,
+        revenueRoom: (form.leadType === "Room" || form.perluKamar) ? (Number(String(form.revenueRoom).replace(/[^\d]/g, "")) || 0) : 0,
         alasanCancel: form.status === "Cancel" ? form.alasanCancel.trim() : "",
         oleh: user?.nama || user?.email || "",
       };
@@ -476,6 +546,17 @@ export default function Dashboard() {
       {modalForm && (
         <Modal onClose={() => setModalForm(false)} title={form.id ? "Edit Prospek" : "Tambah Prospek"}>
           <div className="grid sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2">
+              <div className="text-sm font-medium text-slate-700 mb-1">Tipe Lead</div>
+              <div className="grid grid-cols-2 gap-2">
+                {[["MICE", "MICE Lead (Event)"], ["Room", "Room Lead (Kamar)"]].map(([t, label]) => (
+                  <button key={t} type="button" onClick={() => setForm({ ...form, leadType: t })}
+                    className={"rounded-lg border px-3 py-2.5 text-sm font-semibold transition " + (form.leadType === t ? "border-[#12263a] bg-[#12263a] text-white" : "border-slate-300 text-slate-600 hover:bg-slate-50")}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <Field label="Nama Prospek *">
               <input className={inp} value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })} />
             </Field>
@@ -492,34 +573,80 @@ export default function Dashboard() {
             <Field label="Email">
               <input className={inp} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </Field>
-            <Field label="Jenis Event">
-              <select className={inp} value={form.jenisEvent} onChange={(e) => setForm({ ...form, jenisEvent: e.target.value })}>
-                {JENIS_EVENT.map((x) => <option key={x}>{x}</option>)}
-              </select>
-            </Field>
-            <Field label="Tanggal Event">
+            {form.leadType === "MICE" && (
+              <Field label="Jenis Event">
+                <select className={inp} value={form.jenisEvent} onChange={(e) => setForm({ ...form, jenisEvent: e.target.value })}>
+                  {JENIS_EVENT.map((x) => <option key={x}>{x}</option>)}
+                </select>
+              </Field>
+            )}
+            <Field label={form.leadType === "Room" ? "Tanggal Check-in" : "Tanggal Event"}>
               <input type="date" min={new Date().toISOString().slice(0, 10)} className={inp} value={form.tanggalEvent} onChange={(e) => setForm({ ...form, tanggalEvent: e.target.value })} />
             </Field>
             <Field label="Jumlah Tamu / Pax">
               <input className={inp} value={form.jumlahPax} onChange={(e) => setForm({ ...form, jumlahPax: e.target.value })} inputMode="numeric" />
             </Field>
-            <Field label="Estimasi Revenue Pax (Rp)">
-              <input
-                className={inp}
-                value={form.estimasiNilai ? Number(String(form.estimasiNilai).replace(/[^\d]/g, "")).toLocaleString("id-ID") : ""}
-                onChange={(e) => setForm({ ...form, estimasiNilai: e.target.value.replace(/[^\d]/g, "") })}
-                placeholder="mis. 25.000.000"
-                inputMode="numeric"
-              />
-            </Field>
+            {form.leadType === "MICE" && (
+              <Field label="Estimasi Revenue Pax (Rp)">
+                <input
+                  className={inp}
+                  value={form.estimasiNilai ? Number(String(form.estimasiNilai).replace(/[^\d]/g, "")).toLocaleString("id-ID") : ""}
+                  onChange={(e) => setForm({ ...form, estimasiNilai: e.target.value.replace(/[^\d]/g, "") })}
+                  placeholder="mis. 25.000.000"
+                  inputMode="numeric"
+                />
+              </Field>
+            )}
+
+            {/* MICE: pesan ruang meeting langsung */}
+            {form.leadType === "MICE" && (
+              <div className="sm:col-span-2 rounded-lg border border-slate-200 p-3">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={form.pesanMeeting} onChange={(e) => setForm({ ...form, pesanMeeting: e.target.checked })} className="w-4 h-4 accent-[#12263a]" disabled={!!form.id} />
+                  <span className="text-sm font-medium text-slate-700">Pesan Ruang Meeting sekarang (langsung buat booking)</span>
+                </label>
+                {form.id && <p className="text-xs text-slate-400 mt-1">Penjadwalan ruangan dilakukan di menu Meeting Room untuk lead yang sudah ada.</p>}
+                {form.pesanMeeting && !form.id && (
+                  <div className="mt-3 space-y-3">
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <Field label="Ruang Meeting">
+                        <select className={inp} value={form.meetRoom} onChange={(e) => setForm({ ...form, meetRoom: e.target.value })}>
+                          <option value="">— pilih ruangan —</option>
+                          {RUANGAN.map((r) => <option key={r.name} value={r.name}>{r.name}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Setup">
+                        <select className={inp} value={form.meetSetup} onChange={(e) => setForm({ ...form, meetSetup: e.target.value })}>
+                          {SETUP_MEETING.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Jam Mulai"><input type="time" className={inp} value={form.meetMulai} onChange={(e) => setForm({ ...form, meetMulai: e.target.value })} /></Field>
+                      <Field label="Jam Selesai"><input type="time" className={inp} value={form.meetSelesai} onChange={(e) => setForm({ ...form, meetSelesai: e.target.value })} /></Field>
+                    </div>
+                    {meetCek && (
+                      <div className={"text-sm rounded-md px-3 py-2 " + (meetCek.paxLebih || meetCek.bentrok ? "bg-rose-50 border border-rose-300 text-rose-700" : "bg-slate-50 border border-slate-200 text-slate-600")}>
+                        Kapasitas {form.meetRoom} ({SETUP_MEETING.find((s) => s.key === form.meetSetup)?.label}): <b>{meetCek.kap} orang</b>
+                        {meetCek.paxLebih && <div className="font-semibold mt-1">⚠ Peserta melebihi kapasitas — pilih ruangan lebih besar / ubah setup.</div>}
+                        {meetCek.bentrok && <div className="font-semibold mt-1">⚠ Bentrok dengan {meetCek.bentrok.JamMulai}–{meetCek.bentrok.JamSelesai} ({meetCek.bentrok.EventTitle || "-"}). Perlu jeda min. 2 jam.</div>}
+                      </div>
+                    )}
+                    <p className="text-xs text-slate-400">Tanggal & jumlah peserta booking mengikuti data di atas. Booking tidak bisa menimpa jadwal yang sudah ada.</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Arrangement kamar */}
             <div className="sm:col-span-2 rounded-lg border border-slate-200 p-3">
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input type="checkbox" checked={form.perluKamar} onChange={(e) => setForm({ ...form, perluKamar: e.target.checked })} className="w-4 h-4 accent-[#12263a]" />
-                <span className="text-sm font-medium text-slate-700">Perlu arrangement kamar?</span>
-              </label>
-              {form.perluKamar && (
+              {form.leadType === "Room" ? (
+                <span className="text-sm font-semibold text-[#12263a]">Arrangement Kamar</span>
+              ) : (
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={form.perluKamar} onChange={(e) => setForm({ ...form, perluKamar: e.target.checked })} className="w-4 h-4 accent-[#12263a]" />
+                  <span className="text-sm font-medium text-slate-700">Perlu arrangement kamar?</span>
+                </label>
+              )}
+              {(form.leadType === "Room" || form.perluKamar) && (
                 <div className="grid sm:grid-cols-2 gap-3 mt-3">
                   <Field label="Jumlah Kamar">
                     <input className={inp} value={form.jumlahKamar} onChange={(e) => setForm({ ...form, jumlahKamar: e.target.value.replace(/[^\d]/g, "") })} inputMode="numeric" placeholder="mis. 20" />
@@ -538,7 +665,7 @@ export default function Dashboard() {
               <div className="mt-3 text-sm bg-[#fdf6e9] border border-[#e7d3a1] rounded-md px-3 py-2 flex justify-between">
                 <span className="text-slate-600">Total Revenue Projection</span>
                 <span className="font-bold text-[#12263a]">
-                  Rp {((Number(String(form.estimasiNilai).replace(/[^\d]/g, "")) || 0) + (form.perluKamar ? (Number(String(form.revenueRoom).replace(/[^\d]/g, "")) || 0) : 0)).toLocaleString("id-ID")}
+                  Rp {((Number(String(form.estimasiNilai).replace(/[^\d]/g, "")) || 0) + ((form.leadType === "Room" || form.perluKamar) ? (Number(String(form.revenueRoom).replace(/[^\d]/g, "")) || 0) : 0)).toLocaleString("id-ID")}
                 </span>
               </div>
             </div>

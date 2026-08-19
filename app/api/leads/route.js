@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
 import { sql, raw, exec, waktuJakarta } from "@/lib/db";
 
-// event butuh meeting room? true untuk semua kecuali Menginap/Kamar (room-only)
-function perluMeetingRoom(jenis) {
-  const j = String(jenis || "").toLowerCase();
-  if (!j) return true;
-  return !j.includes("menginap");
+const keMenit = (hhmm) => { const m = String(hhmm || "").match(/^(\d{1,2}):(\d{2})/); return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : null; };
+
+// cek bentrok ruangan (jeda < 120 menit atau overlap). true = bentrok.
+async function adaBentrokRuang(room, tanggal, mulai, selesai) {
+  if (!room || !tanggal) return false;
+  const s = keMenit(mulai), e = keMenit(selesai);
+  if (s === null || e === null || e <= s) return true;
+  const rows = await sql`SELECT jam_mulai, jam_selesai FROM room_booking WHERE room = ${room} AND tanggal = ${tanggal} AND status <> ${"Cancel"}`;
+  for (const r of rows) {
+    const rs = keMenit(r.jam_mulai), re = keMenit(r.jam_selesai);
+    if (rs === null || re === null) continue;
+    if (!(s >= re + 120 || rs >= e + 120)) return true;
+  }
+  return false;
 }
 
 export const runtime = "nodejs";
@@ -20,7 +29,7 @@ const SEL = `SELECT id AS "ID", tanggal AS "Tanggal", nama AS "Nama", instansi A
   estimasi_nilai AS "EstimasiNilai", sumber AS "Sumber", status AS "Status", pic AS "PIC", catatan AS "Catatan",
   link_dokumen AS "LinkDokumen", updated_at AS "UpdatedAt", alasan_cancel AS "AlasanCancel", updated_by AS "UpdatedBy",
   perlu_kamar AS "PerluKamar", jumlah_kamar AS "JumlahKamar", revenue_room AS "RevenueRoom",
-  tindak_lanjut AS "TindakLanjut", tanggal_tindak_lanjut AS "TanggalTindakLanjut"
+  tindak_lanjut AS "TindakLanjut", tanggal_tindak_lanjut AS "TanggalTindakLanjut", lead_type AS "LeadType"
   FROM leads`;
 
 export async function GET() {
@@ -40,21 +49,29 @@ export async function POST(req) {
       const id = "L" + Date.now();
       const now = waktuJakarta();
       const status = b.status || "Tentative";
+      const leadType = b.leadType === "Room" ? "Room" : "MICE";
       await sql`INSERT INTO leads (id, tanggal, nama, instansi, nohp, email, jenis_event, tanggal_event, jumlah_pax,
         estimasi_nilai, sumber, status, pic, catatan, link_dokumen, updated_at, alasan_cancel, updated_by,
-        perlu_kamar, jumlah_kamar, revenue_room)
+        perlu_kamar, jumlah_kamar, revenue_room, lead_type)
         VALUES (${id}, ${now}, ${b.nama || ""}, ${b.instansi || ""}, ${b.nohp || ""}, ${b.email || ""},
         ${b.jenisEvent || ""}, ${b.tanggalEvent || ""}, ${String(b.jumlahPax ?? "")}, ${String(b.estimasiNilai ?? "")},
         ${b.sumber || ""}, ${status}, ${b.pic || ""}, ${b.catatan || ""}, ${""}, ${now}, ${b.alasanCancel || ""}, ${b.oleh || ""},
-        ${b.perluKamar || ""}, ${String(b.jumlahKamar ?? "")}, ${String(b.revenueRoom ?? "")})`;
+        ${b.perluKamar || ""}, ${String(b.jumlahKamar ?? "")}, ${String(b.revenueRoom ?? "")}, ${leadType})`;
       await logStatus(id, b.nama || "", "-", status, b.alasanCancel || "", b.oleh || "");
 
-      // Auto-catat booking meeting room (kecuali event Menginap/Kamar) — status ikut lead
-      if (perluMeetingRoom(b.jenisEvent)) {
+      // MICE → catat booking meeting. Room lead → tidak.
+      if (leadType === "MICE") {
         try {
           const rbId = "RB" + Date.now();
+          // jika user memesan ruangan + tidak bentrok → langsung terjadwal; jika tidak → biarkan kosong utk dijadwalkan
+          let room = "", jamMulai = "08:00", jamSelesai = "17:00", setup = "", catatan = "Otomatis dari Lead — tentukan ruangan & jam";
+          if (b.pesanMeeting && b.meetRoom) {
+            const bebas = !(await adaBentrokRuang(b.meetRoom, b.tanggalEvent, b.meetMulai, b.meetSelesai));
+            if (bebas) { room = b.meetRoom; jamMulai = b.meetMulai || "08:00"; jamSelesai = b.meetSelesai || "17:00"; setup = b.meetSetup || ""; catatan = "Dibuat dari Lead"; }
+            else { catatan = "Otomatis dari Lead — ruangan pilihan bentrok, jadwalkan ulang"; }
+          }
           await sql`INSERT INTO room_booking (id, room, tanggal, jam_mulai, jam_selesai, event_title, company, pax, setup, pic, status, catatan, created_at, created_by, lead_id)
-            VALUES (${rbId}, ${""}, ${b.tanggalEvent || ""}, ${"08:00"}, ${"17:00"}, ${b.jenisEvent || ""}, ${b.instansi || ""}, ${String(b.jumlahPax ?? "")}, ${""}, ${b.pic || ""}, ${status}, ${"Otomatis dari Lead — tentukan ruangan & jam"}, ${now}, ${b.oleh || ""}, ${id})`;
+            VALUES (${rbId}, ${room}, ${b.tanggalEvent || ""}, ${jamMulai}, ${jamSelesai}, ${b.jenisEvent || ""}, ${b.instansi || ""}, ${String(b.jumlahPax ?? "")}, ${setup}, ${b.pic || ""}, ${status}, ${catatan}, ${now}, ${b.oleh || ""}, ${id})`;
         } catch (e) {}
       }
       return NextResponse.json({ status: "ok", id });
@@ -69,7 +86,7 @@ export async function POST(req) {
         tanggalEvent: "tanggal_event", jumlahPax: "jumlah_pax", estimasiNilai: "estimasi_nilai", sumber: "sumber",
         status: "status", pic: "pic", catatan: "catatan", alasanCancel: "alasan_cancel",
         perluKamar: "perlu_kamar", jumlahKamar: "jumlah_kamar", revenueRoom: "revenue_room",
-        tindakLanjut: "tindak_lanjut", tanggalTindakLanjut: "tanggal_tindak_lanjut" };
+        tindakLanjut: "tindak_lanjut", tanggalTindakLanjut: "tanggal_tindak_lanjut", leadType: "lead_type" };
       const cols = [];
       for (const k in map) {
         if (b[k] !== undefined) cols.push({ col: map[k], val: (k === "estimasiNilai" || k === "jumlahPax" || k === "jumlahKamar" || k === "revenueRoom") ? String(b[k]) : b[k] });

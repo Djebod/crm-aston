@@ -26,6 +26,7 @@ export const STATEMENTS = [
   `ALTER TABLE leads ADD COLUMN IF NOT EXISTS revenue_room TEXT`,
   `ALTER TABLE leads ADD COLUMN IF NOT EXISTS tindak_lanjut TEXT`,
   `ALTER TABLE leads ADD COLUMN IF NOT EXISTS tanggal_tindak_lanjut TEXT`,
+  `ALTER TABLE leads ADD COLUMN IF NOT EXISTS lead_type TEXT`,
   `CREATE TABLE IF NOT EXISTS sales_target (
     sales_name TEXT PRIMARY KEY, target_revenue TEXT, target_activity_day TEXT )`,
   `ALTER TABLE aktivitas ADD COLUMN IF NOT EXISTS tujuan TEXT`,
