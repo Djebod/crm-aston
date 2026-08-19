@@ -50,11 +50,20 @@ const GEO_KOSONG = () => ({
   id: "", geoNo: "", nomor: "", kodeSales: "", issuedDate: new Date().toISOString().slice(0, 10),
   eventTitle: "", company: "", contactPerson: "", address: "", phone: "", email: "",
   salesPerson: "", checkIn: "", checkOut: "", noRoom: "", guarantee: "YES",
-  rooms: [{ type: "Superior", checkIn: "", checkOut: "", totalRoom: "", day: "", price: "" }],
-  dpAmount: "", dpDate: "", breakdown: "", remark: "",
+  rooms: [{ type: "Superior", checkIn: "", checkOut: "", totalRoom: "", day: "", price: "", bfast: "", dinner: "", others: "" }],
+  dpAmount: "", dpDate: "", remark: "",
   notes: { ...DEFAULT_NOTES },
-  preparedBy: "", preparedTitle: "ADOSM", ackFO: "", ackFC: "", approvedBy: "",
+  preparedBy: "", preparedTitle: "Sales Person", salesLeader: "", ackFO: "", ackFC: "", approvedBy: "",
 });
+
+// Jumlah malam (Room Night) dari check in – check out
+function hitungMalam(ci, co) {
+  if (!ci || !co) return 0;
+  const a = new Date(ci), b = new Date(co);
+  if (isNaN(a) || isNaN(b)) return 0;
+  const d = Math.round((b - a) / 86400000);
+  return d > 0 ? d : 0;
+}
 
 function muatHtml2pdf() {
   return new Promise((res, rej) => {
@@ -68,23 +77,35 @@ function muatHtml2pdf() {
 }
 
 function grandTotal(g) {
-  return (g.rooms || []).reduce((t, r) => t + angka(r.totalRoom) * angka(r.day) * angka(r.price), 0);
+  return (g.rooms || []).reduce((t, r) => t + angka(r.totalRoom) * hitungMalam(r.checkIn, r.checkOut) * angka(r.price), 0);
 }
 
 function buildHTML(g, origin) {
   const gt = grandTotal(g);
   const balance = gt - angka(g.dpAmount);
   const roomRows = (g.rooms || []).map((r) => {
-    const tot = angka(r.totalRoom) * angka(r.day) * angka(r.price);
+    const malam = hitungMalam(r.checkIn, r.checkOut);
+    const tot = angka(r.totalRoom) * malam * angka(r.price);
     return `<tr>
       <td>${esc(r.type)}</td><td class="c">${esc(r.checkIn)}</td><td class="c">${esc(r.checkOut)}</td>
-      <td class="c">${fmt(r.totalRoom)}</td><td class="c">${fmt(r.day)}</td><td class="r">${fmt(r.price)}</td><td class="r">${tot.toLocaleString("id-ID")}</td>
+      <td class="c">${fmt(r.totalRoom)}</td><td class="c">${malam}</td><td class="r">${fmt(r.price)}</td><td class="r">${tot.toLocaleString("id-ID")}</td>
     </tr>`;
+  }).join("");
+
+  // Breakdown otomatis per tipe kamar: Lodging = Price − (Breakfast + Dinner + Others)
+  const breakdownRows = (g.rooms || []).filter((r) => r.type && angka(r.price) > 0).map((r) => {
+    const price = angka(r.price), bf = angka(r.bfast), dn = angka(r.dinner), ot = angka(r.others);
+    const lodging = price - bf - dn - ot;
+    const bagian = [`Lodging Rp ${lodging.toLocaleString("id-ID")}`];
+    if (bf) bagian.push(`Breakfast Rp ${bf.toLocaleString("id-ID")}`);
+    if (dn) bagian.push(`Dinner Rp ${dn.toLocaleString("id-ID")}`);
+    if (ot) bagian.push(`Others Rp ${ot.toLocaleString("id-ID")}`);
+    return `<div><b>${esc(r.type)}</b> (Rp ${price.toLocaleString("id-ID")}): ${bagian.join(" · ")}</div>`;
   }).join("");
 
   return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:9px;color:#111;width:100%;">
   <div style="border:1.5px solid #111;">
-    <div style="text-align:center;padding:8px;"><img src="${origin}/aston-logo.png" style="height:42px" onerror="this.style.display='none'"/></div>
+    <div style="text-align:center;padding:8px;"><img src="${origin}/aston-logo.png" style="height:42px;display:block;margin:0 auto;" onerror="this.style.display='none'"/></div>
     <div style="text-align:center;font-weight:bold;font-size:12px;border-top:1px solid #111;border-bottom:1px solid #111;padding:4px;background:#dbe5f1;">GROUP EVENT ORDER (GEO)</div>
     <div style="text-align:center;font-weight:bold;border-bottom:1px solid #111;padding:3px;background:#eef2f8;">GEO NO : ${esc(g.geoNo)}</div>
 
@@ -120,7 +141,7 @@ function buildHTML(g, origin) {
           <table style="width:100%;border-collapse:collapse;">
             <tr style="background:#eef2f8;">
               <th style="${TH}">Room Type</th><th style="${TH}">Check In</th><th style="${TH}">Check Out</th>
-              <th style="${TH}">Total Room</th><th style="${TH}">Day</th><th style="${TH}">Price</th><th style="${TH}">Total</th>
+              <th style="${TH}">Total Room</th><th style="${TH}">Night</th><th style="${TH}">Price</th><th style="${TH}">Total</th>
             </tr>
             ${roomRows}
             <tr><td colspan="6" style="${TDB};text-align:right;font-weight:bold;">GRAND TOTAL (Rp)</td><td style="${TDB};text-align:right;font-weight:bold;background:#fdf6e9;">${gt.toLocaleString("id-ID")}</td></tr>
@@ -128,7 +149,7 @@ function buildHTML(g, origin) {
             <tr><td colspan="6" style="${TDB};text-align:right;font-weight:bold;">BALANCE (Rp)</td><td style="${TDB};text-align:right;font-weight:bold;">${balance.toLocaleString("id-ID")}</td></tr>
           </table>
           <div style="border-top:1px solid #111;padding:3px;"><b>REMARK :</b> ${esc(g.remark)}</div>
-          <div style="border-top:1px solid #111;padding:3px;"><b>Breakdown :</b><br>${esc(g.breakdown)}</div>
+          <div style="border-top:1px solid #111;padding:3px;"><b>Breakdown :</b><br>${breakdownRows || "-"}</div>
         </td>
         <td style="width:40%;vertical-align:top;padding:0;">
           ${notaBox("FRONT OFFICE", g.notes.fo)}
@@ -143,11 +164,12 @@ function buildHTML(g, origin) {
 
     <table style="width:100%;border-collapse:collapse;border-top:1px solid #111;text-align:center;">
       <tr style="background:#eef2f8;font-weight:bold;">
-        <td style="${TDB}">Prepared by,</td><td style="${TDB}" colspan="2">Acknowledged by,</td><td style="${TDB}">Approved by,</td>
+        <td style="${TDB}">Prepared by,</td><td style="${TDB}" colspan="3">Acknowledged by,</td><td style="${TDB}">Approved by,</td>
       </tr>
-      <tr style="height:46px;"><td style="${TDB}"></td><td style="${TDB}"></td><td style="${TDB}"></td><td style="${TDB}"></td></tr>
+      <tr style="height:46px;"><td style="${TDB}"></td><td style="${TDB}"></td><td style="${TDB}"></td><td style="${TDB}"></td><td style="${TDB}"></td></tr>
       <tr style="font-weight:bold;">
-        <td style="${TDB}">${esc(g.preparedBy)}<div style="font-weight:normal">${esc(g.preparedTitle)}</div></td>
+        <td style="${TDB}">${esc(g.preparedBy)}<div style="font-weight:normal">Sales Person</div></td>
+        <td style="${TDB}">${esc(g.salesLeader)}<div style="font-weight:normal">Sales Leader</div></td>
         <td style="${TDB}">${esc(g.ackFO)}<div style="font-weight:normal">FOM</div></td>
         <td style="${TDB}">${esc(g.ackFC)}<div style="font-weight:normal">FC</div></td>
         <td style="${TDB}">${esc(g.approvedBy)}<div style="font-weight:normal">General Manager</div></td>
@@ -178,6 +200,7 @@ export default function GeoPage() {
   const [g, setG] = useState(GEO_KOSONG());
   const [saving, setSaving] = useState(false);
   const [pdfBusy, setPdfBusy] = useState("");
+  const [karyawan, setKaryawan] = useState([]);
 
   useEffect(() => {
     const raw = typeof window !== "undefined" ? localStorage.getItem("crm_user") : null;
@@ -191,6 +214,10 @@ export default function GeoPage() {
       const r = await fetch("/api/geo", { cache: "no-store" }).then((x) => x.json());
       if (r.status === "ok") setList(r.data || []);
     } catch (e) {} finally { setLoading(false); }
+    try {
+      const k = await fetch("/api/karyawan", { cache: "no-store" }).then((x) => x.json());
+      if (k.status === "ok") setKaryawan(k.data || []);
+    } catch (e) {}
   }, []);
   useEffect(() => { if (user) ambil(); }, [user, ambil]);
 
@@ -371,7 +398,7 @@ export default function GeoPage() {
                     <input type="date" className={inp + " !py-1.5 text-xs col-span-2"} value={r.checkIn} onChange={(e) => setRoom(i, "checkIn", e.target.value)} />
                     <input type="date" className={inp + " !py-1.5 text-xs col-span-2"} value={r.checkOut} onChange={(e) => setRoom(i, "checkOut", e.target.value)} />
                     <input className={inp + " !py-1.5 text-xs col-span-1"} placeholder="Rm" inputMode="numeric" value={r.totalRoom} onChange={(e) => setRoom(i, "totalRoom", e.target.value.replace(/[^\d]/g, ""))} />
-                    <input className={inp + " !py-1.5 text-xs col-span-1"} placeholder="Day" inputMode="numeric" value={r.day} onChange={(e) => setRoom(i, "day", e.target.value.replace(/[^\d]/g, ""))} />
+                    <input className={inp + " !py-1.5 text-xs col-span-1 bg-slate-100 text-center"} title="Room Night = otomatis dari Check In/Out" value={hitungMalam(r.checkIn, r.checkOut)} readOnly />
                     <input className={inp + " !py-1.5 text-xs col-span-2"} placeholder="Price" inputMode="numeric" value={r.price ? fmt(r.price) : ""} onChange={(e) => setRoom(i, "price", e.target.value.replace(/[^\d]/g, ""))} />
                     <button onClick={() => delRoom(i)} className="text-rose-600 col-span-1 text-xs">✕</button>
                   </div>
@@ -386,7 +413,26 @@ export default function GeoPage() {
             </div>
             <div className="text-sm text-slate-600">Balance: <b>Rp {(gt - angka(g.dpAmount)).toLocaleString("id-ID")}</b></div>
 
-            <Field label="Breakdown"><textarea className={inp + " h-16 resize-none"} value={g.breakdown} onChange={(e) => set("breakdown", e.target.value)} placeholder="Superior 958.000 · Lodging 764.400 · Breakfast 193.600" /></Field>
+            <div className="border border-slate-200 rounded-lg p-3">
+              <div className="text-xs font-semibold text-slate-500 mb-2">BREAKDOWN HARGA KAMAR (Lodging dihitung otomatis)</div>
+              <div className="space-y-2">
+                {g.rooms.filter((r) => r.type).map((r, i) => {
+                  const idx = g.rooms.indexOf(r);
+                  const price = angka(r.price), lodging = price - angka(r.bfast) - angka(r.dinner) - angka(r.others);
+                  return (
+                    <div key={idx} className="text-xs">
+                      <div className="font-semibold text-[#12263a]">{r.type} — Rp {price.toLocaleString("id-ID")}</div>
+                      <div className="grid grid-cols-3 gap-1 mt-1">
+                        <input className={inp + " !py-1.5 text-xs"} placeholder="Breakfast" inputMode="numeric" value={r.bfast ? fmt(r.bfast) : ""} onChange={(e) => setRoom(idx, "bfast", e.target.value.replace(/[^\d]/g, ""))} />
+                        <input className={inp + " !py-1.5 text-xs"} placeholder="Dinner" inputMode="numeric" value={r.dinner ? fmt(r.dinner) : ""} onChange={(e) => setRoom(idx, "dinner", e.target.value.replace(/[^\d]/g, ""))} />
+                        <input className={inp + " !py-1.5 text-xs"} placeholder="Others" inputMode="numeric" value={r.others ? fmt(r.others) : ""} onChange={(e) => setRoom(idx, "others", e.target.value.replace(/[^\d]/g, ""))} />
+                      </div>
+                      <div className="text-slate-500 mt-1">Lodging (otomatis): <b className="text-[#12263a]">Rp {lodging.toLocaleString("id-ID")}</b></div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
             <Field label="Remark"><input className={inp} value={g.remark} onChange={(e) => set("remark", e.target.value)} /></Field>
 
             <div className="border border-slate-200 rounded-lg p-3 space-y-2">
@@ -403,8 +449,18 @@ export default function GeoPage() {
 
             <div className="border border-slate-200 rounded-lg p-3 grid grid-cols-2 gap-2">
               <div className="col-span-2 text-xs font-semibold text-slate-500">TANDA TANGAN</div>
-              <Field label="Prepared by (nama)"><input className={inp} value={g.preparedBy} onChange={(e) => set("preparedBy", e.target.value)} /></Field>
-              <Field label="Jabatan"><input className={inp} value={g.preparedTitle} onChange={(e) => set("preparedTitle", e.target.value)} /></Field>
+              <Field label="Prepared by — Sales Person">
+                <select className={inp} value={g.preparedBy} onChange={(e) => set("preparedBy", e.target.value)}>
+                  <option value="">— pilih —</option>
+                  {karyawan.map((k) => <option key={k.Nama} value={k.Nama}>{k.Nama}{k.Kode ? " (" + k.Kode + ")" : ""}</option>)}
+                </select>
+              </Field>
+              <Field label="Sales Leader">
+                <select className={inp} value={g.salesLeader} onChange={(e) => set("salesLeader", e.target.value)}>
+                  <option value="">— pilih —</option>
+                  {karyawan.map((k) => <option key={k.Nama} value={k.Nama}>{k.Nama}{k.Kode ? " (" + k.Kode + ")" : ""}</option>)}
+                </select>
+              </Field>
               <Field label="Acknowledged - FOM"><input className={inp} value={g.ackFO} onChange={(e) => set("ackFO", e.target.value)} /></Field>
               <Field label="Acknowledged - FC"><input className={inp} value={g.ackFC} onChange={(e) => set("ackFC", e.target.value)} /></Field>
               <Field label="Approved - GM"><input className={inp} value={g.approvedBy} onChange={(e) => set("approvedBy", e.target.value)} /></Field>
