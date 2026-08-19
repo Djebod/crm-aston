@@ -22,9 +22,28 @@ const SEGMENTS = [
 ];
 
 // pilihan untuk form leads
-const JENIS_EVENT = ["Wedding", "Meeting / Rapat", "Gathering", "Ulang Tahun", "Menginap / Kamar", "Lainnya"];
+const JENIS_EVENT = ["Wedding", "Meeting / Rapat", "Gathering", "Ulang Tahun", "Lainnya"];
 const SUMBER = ["Sales Call", "Site Inspection", "Telemarketing", "Referral", "Walk-in", "Lainnya"];
 const STATUS = ["Tentative", "Definite", "Cancel"];
+
+const RUANGAN = [
+  { name: "Diamond 12", cap: { theater: 120, class: 63, round: 60, ushape: 48, hollow: 36 } },
+  { name: "Diamond 3", cap: { theater: 50, class: 21, round: 30, ushape: 39, hollow: 24 } },
+  { name: "Diamond 5", cap: { theater: 50, class: 21, round: 30, ushape: 39, hollow: 24 } },
+  { name: "Diamond 6", cap: { theater: 140, class: 90, round: 80, ushape: 66, hollow: 48 } },
+  { name: "Diamond 7", cap: { theater: 140, class: 90, round: 80, ushape: 66, hollow: 48 } },
+  { name: "Crystal", cap: { theater: 80, class: 30, round: 50, ushape: 30, hollow: 30 } },
+  { name: "Emerald", cap: { theater: 120, class: 60, round: 60, ushape: 48, hollow: 36 } },
+  { name: "Iron", cap: { theater: 24, class: 18, round: 20, ushape: 27, hollow: 18 } },
+  { name: "Wood", cap: { theater: 40, class: 27, round: 30, ushape: 27, hollow: 18 } },
+  { name: "Onyx", cap: { theater: 250, class: 180, round: 200, ushape: 150, hollow: 54 } },
+  { name: "Shapier Ballroom", cap: { theater: 1445, class: 504, round: 720, ushape: 345, hollow: 345 } },
+];
+const SETUP_MEETING = [
+  { key: "theater", label: "Theater" }, { key: "class", label: "Class Room" },
+  { key: "round", label: "Round Table" }, { key: "ushape", label: "U Shape" }, { key: "hollow", label: "Hollow Square" },
+];
+const keMenit = (hhmm) => { const m = String(hhmm || "").match(/^(\d{1,2}):(\d{2})/); return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : null; };
 
 const SEG_STYLE = "bg-slate-100 text-slate-700";
 const ACT_STYLE = {
@@ -46,8 +65,9 @@ const FORM_KOSONG = {
 };
 
 const LEAD_KOSONG = {
-  nama: "", instansi: "", nohp: "", email: "", jenisEvent: "Wedding", tanggalEvent: "",
+  leadType: "MICE", nama: "", instansi: "", nohp: "", email: "", jenisEvent: "Wedding", tanggalEvent: "",
   jumlahPax: "", estimasiNilai: "", perluKamar: false, jumlahKamar: "", revenueRoom: "",
+  pesanMeeting: false, meetRoom: "", meetSetup: "theater", meetMulai: "08:00", meetSelesai: "17:00",
   sumber: "Sales Call", status: "Tentative", pic: "", catatan: "",
   alasanCancel: "",
 };
@@ -101,7 +121,27 @@ export default function AktivitasPage() {
   const [modalForm, setModalForm] = useState(false);
   const [form, setForm] = useState(FORM_KOSONG);
   const [lead, setLead] = useState(LEAD_KOSONG);
+  const [bookings, setBookings] = useState([]);
   const [menyimpan, setMenyimpan] = useState(false);
+
+  const meetCek = useMemo(() => {
+    if (lead.leadType !== "MICE" || !lead.pesanMeeting || !lead.meetRoom) return null;
+    const r = RUANGAN.find((x) => x.name === lead.meetRoom);
+    const kap = r ? r.cap[lead.meetSetup] : 0;
+    const pax = Number(String(lead.jumlahPax).replace(/[^\d]/g, "")) || 0;
+    const paxLebih = kap && pax > kap;
+    const s = keMenit(lead.meetMulai), e = keMenit(lead.meetSelesai);
+    let bentrok = null;
+    if (s !== null && e !== null && e > s && lead.tanggalEvent) {
+      bentrok = bookings.find((x) => {
+        if (x.Room !== lead.meetRoom || x.Tanggal !== lead.tanggalEvent || x.Status === "Cancel") return false;
+        const rs = keMenit(x.JamMulai), re = keMenit(x.JamSelesai);
+        if (rs === null || re === null) return false;
+        return !(s >= re + 120 || rs >= e + 120);
+      });
+    }
+    return { kap, paxLebih, bentrok };
+  }, [lead, bookings]);
   const [realisasiPlanId, setRealisasiPlanId] = useState("");
   const [targets, setTargets] = useState([]);
   const isAdmin = user?.role === "admin";
@@ -121,6 +161,7 @@ export default function AktivitasPage() {
     } catch (e) {} finally { setLoading(false); }
     ambilCompanies().then(setCompanies).catch(() => {}); // company di latar belakang (cache)
     fetch("/api/target", { cache: "no-store" }).then((r) => r.json()).then((r) => { if (r.status === "ok") setTargets(r.data || []); }).catch(() => {});
+    fetch("/api/roombooking", { cache: "no-store" }).then((r) => r.json()).then((r) => { if (r.status === "ok") setBookings(r.data || []); }).catch(() => {});
   }, []);
 
   useEffect(() => { if (user) ambil(); }, [user, ambil]);
@@ -207,6 +248,22 @@ export default function AktivitasPage() {
       alert("Status Cancel wajib disertai Alasan Cancel.");
       return;
     }
+    if (form.potensiLead === "Ya" && lead.leadType === "MICE" && lead.pesanMeeting) {
+      if (!lead.meetRoom) { alert("Silakan pilih ruang meeting, atau matikan 'Pesan Ruang Meeting'."); return; }
+      if (keMenit(lead.meetSelesai) <= keMenit(lead.meetMulai)) { alert("Jam selesai meeting harus setelah jam mulai."); return; }
+      const r = RUANGAN.find((x) => x.name === lead.meetRoom);
+      const kap = r ? r.cap[lead.meetSetup] : 0;
+      const pax = Number(String(lead.jumlahPax).replace(/[^\d]/g, "")) || 0;
+      if (kap && pax > kap) { alert(`Kapasitas ${lead.meetRoom} (${SETUP_MEETING.find((s) => s.key === lead.meetSetup)?.label}) hanya ${kap} orang, peserta ${pax}.`); return; }
+      const s = keMenit(lead.meetMulai), e = keMenit(lead.meetSelesai);
+      const bentrok = bookings.find((x) => {
+        if (x.Room !== lead.meetRoom || x.Tanggal !== lead.tanggalEvent || x.Status === "Cancel") return false;
+        const rs = keMenit(x.JamMulai), re = keMenit(x.JamSelesai);
+        if (rs === null || re === null) return false;
+        return !(s >= re + 120 || rs >= e + 120);
+      });
+      if (bentrok) { alert(`Ruang ${lead.meetRoom} pada ${lead.tanggalEvent} sudah terisi ${bentrok.JamMulai}-${bentrok.JamSelesai}. Perlu jeda minimal 2 jam.`); return; }
+    }
     setMenyimpan(true);
     try {
       const compMatch = companies.find((c) => String(c.CompanyName).trim().toLowerCase() === form.companyName.trim().toLowerCase());
@@ -227,10 +284,11 @@ export default function AktivitasPage() {
             action: "addLead",
             ...lead,
             nohp: normalizeWA(lead.nohp),
+            jenisEvent: lead.leadType === "Room" ? "Room Only" : lead.jenisEvent,
             estimasiNilai: Number(String(lead.estimasiNilai).replace(/[^\d]/g, "")) || 0,
-            perluKamar: lead.perluKamar ? "Ya" : "Tidak",
-            jumlahKamar: lead.perluKamar ? (Number(String(lead.jumlahKamar).replace(/[^\d]/g, "")) || 0) : 0,
-            revenueRoom: lead.perluKamar ? (Number(String(lead.revenueRoom).replace(/[^\d]/g, "")) || 0) : 0,
+            perluKamar: (lead.leadType === "Room" || lead.perluKamar) ? "Ya" : "Tidak",
+            jumlahKamar: (lead.leadType === "Room" || lead.perluKamar) ? (Number(String(lead.jumlahKamar).replace(/[^\d]/g, "")) || 0) : 0,
+            revenueRoom: (lead.leadType === "Room" || lead.perluKamar) ? (Number(String(lead.revenueRoom).replace(/[^\d]/g, "")) || 0) : 0,
             alasanCancel: lead.status === "Cancel" ? lead.alasanCancel.trim() : "",
             oleh: form.salesName || user?.nama || user?.email || "",
           }),
@@ -470,30 +528,83 @@ export default function AktivitasPage() {
             <div className="mt-4 pt-4 border-t border-slate-200">
               <h3 className="font-semibold text-[#12263a] mb-3">Form Leads</h3>
               <div className="grid sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <div className="text-sm font-medium text-slate-700 mb-1">Tipe Lead</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[["MICE", "MICE Lead (Event)"], ["Room", "Room Lead (Kamar)"]].map(([t, label]) => (
+                      <button key={t} type="button" onClick={() => setLead({ ...lead, leadType: t })}
+                        className={"rounded-lg border px-3 py-2.5 text-sm font-semibold transition " + (lead.leadType === t ? "border-[#12263a] bg-[#12263a] text-white" : "border-slate-300 text-slate-600 hover:bg-slate-50")}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <Field label="Nama Prospek *"><input className={inp} value={lead.nama} onChange={(e) => setLead({ ...lead, nama: e.target.value })} /></Field>
                 <Field label="Instansi / Perusahaan"><input className={inp} value={lead.instansi} onChange={(e) => setLead({ ...lead, instansi: e.target.value })} /></Field>
                 <Field label="No. HP / WA *"><input className={inp} value={lead.nohp} onChange={(e) => setLead({ ...lead, nohp: e.target.value })} /></Field>
                 <Field label="Email"><input className={inp} value={lead.email} onChange={(e) => setLead({ ...lead, email: e.target.value })} /></Field>
-                <Field label="Jenis Event">
-                  <select className={inp} value={lead.jenisEvent} onChange={(e) => setLead({ ...lead, jenisEvent: e.target.value })}>
-                    {JENIS_EVENT.map((x) => <option key={x}>{x}</option>)}
-                  </select>
-                </Field>
-                <Field label="Tanggal Event"><input type="date" min={new Date().toISOString().slice(0, 10)} className={inp} value={lead.tanggalEvent} onChange={(e) => setLead({ ...lead, tanggalEvent: e.target.value })} /></Field>
+                {lead.leadType === "MICE" && (
+                  <Field label="Jenis Event">
+                    <select className={inp} value={lead.jenisEvent} onChange={(e) => setLead({ ...lead, jenisEvent: e.target.value })}>
+                      {JENIS_EVENT.map((x) => <option key={x}>{x}</option>)}
+                    </select>
+                  </Field>
+                )}
+                <Field label={lead.leadType === "Room" ? "Tanggal Check-in" : "Tanggal Event"}><input type="date" min={new Date().toISOString().slice(0, 10)} className={inp} value={lead.tanggalEvent} onChange={(e) => setLead({ ...lead, tanggalEvent: e.target.value })} /></Field>
                 <Field label="Jumlah Tamu / Pax"><input className={inp} inputMode="numeric" value={lead.jumlahPax} onChange={(e) => setLead({ ...lead, jumlahPax: e.target.value })} /></Field>
-                <Field label="Estimasi Revenue Pax (Rp)">
+                <Field label={lead.leadType === "Room" ? "Estimasi Revenue Pax / Add-on (Rp)" : "Estimasi Revenue Pax (Rp)"}>
                   <input className={inp} inputMode="numeric"
                     value={lead.estimasiNilai ? Number(String(lead.estimasiNilai).replace(/[^\d]/g, "")).toLocaleString("id-ID") : ""}
-                    onChange={(e) => setLead({ ...lead, estimasiNilai: e.target.value.replace(/[^\d]/g, "") })} placeholder="mis. 25.000.000" />
+                    onChange={(e) => setLead({ ...lead, estimasiNilai: e.target.value.replace(/[^\d]/g, "") })} placeholder={lead.leadType === "Room" ? "mis. sarapan tambahan 2.000.000" : "mis. 25.000.000"} />
                 </Field>
+
+                {/* MICE: pesan ruang meeting langsung */}
+                {lead.leadType === "MICE" && (
+                  <div className="sm:col-span-2 rounded-lg border border-slate-200 p-3">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input type="checkbox" checked={lead.pesanMeeting} onChange={(e) => setLead({ ...lead, pesanMeeting: e.target.checked })} className="w-4 h-4 accent-[#12263a]" />
+                      <span className="text-sm font-medium text-slate-700">Pesan Ruang Meeting sekarang (langsung buat booking)</span>
+                    </label>
+                    {lead.pesanMeeting && (
+                      <div className="mt-3 space-y-3">
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          <Field label="Ruang Meeting">
+                            <select className={inp} value={lead.meetRoom} onChange={(e) => setLead({ ...lead, meetRoom: e.target.value })}>
+                              <option value="">— pilih ruangan —</option>
+                              {RUANGAN.map((r) => <option key={r.name} value={r.name}>{r.name}</option>)}
+                            </select>
+                          </Field>
+                          <Field label="Setup">
+                            <select className={inp} value={lead.meetSetup} onChange={(e) => setLead({ ...lead, meetSetup: e.target.value })}>
+                              {SETUP_MEETING.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                            </select>
+                          </Field>
+                          <Field label="Jam Mulai"><input type="time" className={inp} value={lead.meetMulai} onChange={(e) => setLead({ ...lead, meetMulai: e.target.value })} /></Field>
+                          <Field label="Jam Selesai"><input type="time" className={inp} value={lead.meetSelesai} onChange={(e) => setLead({ ...lead, meetSelesai: e.target.value })} /></Field>
+                        </div>
+                        {meetCek && (
+                          <div className={"text-sm rounded-md px-3 py-2 " + (meetCek.paxLebih || meetCek.bentrok ? "bg-rose-50 border border-rose-300 text-rose-700" : "bg-slate-50 border border-slate-200 text-slate-600")}>
+                            Kapasitas {lead.meetRoom} ({SETUP_MEETING.find((s) => s.key === lead.meetSetup)?.label}): <b>{meetCek.kap} orang</b>
+                            {meetCek.paxLebih && <div className="font-semibold mt-1">⚠ Peserta melebihi kapasitas — pilih ruangan lebih besar / ubah setup.</div>}
+                            {meetCek.bentrok && <div className="font-semibold mt-1">⚠ Bentrok dengan {meetCek.bentrok.JamMulai}–{meetCek.bentrok.JamSelesai}. Perlu jeda min. 2 jam.</div>}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Arrangement kamar */}
                 <div className="sm:col-span-2 rounded-lg border border-slate-200 p-3">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input type="checkbox" checked={lead.perluKamar} onChange={(e) => setLead({ ...lead, perluKamar: e.target.checked })} className="w-4 h-4 accent-[#12263a]" />
-                    <span className="text-sm font-medium text-slate-700">Perlu arrangement kamar?</span>
-                  </label>
-                  {lead.perluKamar && (
+                  {lead.leadType === "Room" ? (
+                    <span className="text-sm font-semibold text-[#12263a]">Arrangement Kamar</span>
+                  ) : (
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input type="checkbox" checked={lead.perluKamar} onChange={(e) => setLead({ ...lead, perluKamar: e.target.checked })} className="w-4 h-4 accent-[#12263a]" />
+                      <span className="text-sm font-medium text-slate-700">Perlu arrangement kamar?</span>
+                    </label>
+                  )}
+                  {(lead.leadType === "Room" || lead.perluKamar) && (
                     <div className="grid sm:grid-cols-2 gap-3 mt-3">
                       <Field label="Jumlah Kamar">
                         <input className={inp} inputMode="numeric" value={lead.jumlahKamar} onChange={(e) => setLead({ ...lead, jumlahKamar: e.target.value.replace(/[^\d]/g, "") })} placeholder="mis. 20" />
@@ -508,7 +619,7 @@ export default function AktivitasPage() {
                   <div className="mt-3 text-sm bg-[#fdf6e9] border border-[#e7d3a1] rounded-md px-3 py-2 flex justify-between">
                     <span className="text-slate-600">Total Revenue Projection</span>
                     <span className="font-bold text-[#12263a]">
-                      Rp {((Number(String(lead.estimasiNilai).replace(/[^\d]/g, "")) || 0) + (lead.perluKamar ? (Number(String(lead.revenueRoom).replace(/[^\d]/g, "")) || 0) : 0)).toLocaleString("id-ID")}
+                      Rp {((Number(String(lead.estimasiNilai).replace(/[^\d]/g, "")) || 0) + ((lead.leadType === "Room" || lead.perluKamar) ? (Number(String(lead.revenueRoom).replace(/[^\d]/g, "")) || 0) : 0)).toLocaleString("id-ID")}
                     </span>
                   </div>
                 </div>

@@ -586,17 +586,16 @@ export default function Dashboard() {
             <Field label="Jumlah Tamu / Pax">
               <input className={inp} value={form.jumlahPax} onChange={(e) => setForm({ ...form, jumlahPax: e.target.value })} inputMode="numeric" />
             </Field>
-            {form.leadType === "MICE" && (
-              <Field label="Estimasi Revenue Pax (Rp)">
-                <input
-                  className={inp}
-                  value={form.estimasiNilai ? Number(String(form.estimasiNilai).replace(/[^\d]/g, "")).toLocaleString("id-ID") : ""}
-                  onChange={(e) => setForm({ ...form, estimasiNilai: e.target.value.replace(/[^\d]/g, "") })}
-                  placeholder="mis. 25.000.000"
-                  inputMode="numeric"
-                />
-              </Field>
-            )}
+            <Field label={form.leadType === "Room" ? "Estimasi Revenue Pax / Add-on (Rp)" : "Estimasi Revenue Pax (Rp)"}>
+              <input
+                className={inp}
+                value={form.estimasiNilai ? Number(String(form.estimasiNilai).replace(/[^\d]/g, "")).toLocaleString("id-ID") : ""}
+                onChange={(e) => setForm({ ...form, estimasiNilai: e.target.value.replace(/[^\d]/g, "") })}
+                placeholder={form.leadType === "Room" ? "mis. sarapan tambahan 2.000.000" : "mis. 25.000.000"}
+                inputMode="numeric"
+              />
+              {form.leadType === "Room" && <p className="text-xs text-slate-400 mt-1">Opsional — mis. paket sarapan tambahan, extra bed, dsb.</p>}
+            </Field>
 
             {/* MICE: pesan ruang meeting langsung */}
             {form.leadType === "MICE" && (
