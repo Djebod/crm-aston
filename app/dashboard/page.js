@@ -704,12 +704,16 @@ function LeadCard({ lead, onEdit, onStatus, onOffering, onGeo, onConfirm }) {
         <button onClick={onOffering} className="text-xs font-semibold text-white bg-[#c8962c] hover:brightness-95 rounded-md px-3 py-1.5">
           📄 Offering
         </button>
-        <button onClick={onGeo} className="text-xs font-semibold text-[#12263a] border border-[#c8962c] rounded-md px-3 py-1.5 hover:bg-[#fdf6e9]">
-          📋 GEO
-        </button>
-        <button onClick={onConfirm} className="text-xs font-semibold text-[#12263a] border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">
-          📝 Perjanjian
-        </button>
+        {lead.Status === "Definite" && (
+          <>
+            <button onClick={onGeo} className="text-xs font-semibold text-[#12263a] border border-[#c8962c] rounded-md px-3 py-1.5 hover:bg-[#fdf6e9]">
+              📋 GEO
+            </button>
+            <button onClick={onConfirm} className="text-xs font-semibold text-[#12263a] border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">
+              📝 Perjanjian
+            </button>
+          </>
+        )}
         <button onClick={onEdit} className="text-xs font-semibold text-[#12263a] border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">
           Edit
         </button>

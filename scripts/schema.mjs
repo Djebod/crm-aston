@@ -36,6 +36,7 @@ export const STATEMENTS = [
     event_title TEXT, company TEXT, pax TEXT, setup TEXT, pic TEXT,
     status TEXT, catatan TEXT, created_at TEXT, created_by TEXT )`,
   `CREATE INDEX IF NOT EXISTS idx_booking_room_tgl ON room_booking (room, tanggal)`,
+  `ALTER TABLE room_booking ADD COLUMN IF NOT EXISTS lead_id TEXT`,
   `CREATE TABLE IF NOT EXISTS geo (
     id TEXT PRIMARY KEY, geo_no TEXT, event_title TEXT, company TEXT,
     data TEXT, created_at TEXT, created_by TEXT )`,

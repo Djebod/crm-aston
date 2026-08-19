@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 
 const SEL = `SELECT id AS "ID", room AS "Room", tanggal AS "Tanggal", jam_mulai AS "JamMulai", jam_selesai AS "JamSelesai",
   event_title AS "EventTitle", company AS "Company", pax AS "Pax", setup AS "Setup", pic AS "PIC",
-  status AS "Status", catatan AS "Catatan", created_at AS "CreatedAt", created_by AS "CreatedBy" FROM room_booking`;
+  status AS "Status", catatan AS "Catatan", created_at AS "CreatedAt", created_by AS "CreatedBy", lead_id AS "LeadID" FROM room_booking`;
 
 function menit(hhmm) {
   const m = String(hhmm || "").match(/^(\d{1,2}):(\d{2})/);
@@ -15,6 +15,7 @@ function menit(hhmm) {
 
 // Cek bentrok: ruangan sama, tanggal sama, dan jeda < 120 menit (atau overlap)
 async function adaBentrok(b) {
+  if (!b.room) return null;
   const rows = await sql`SELECT id, jam_mulai, jam_selesai FROM room_booking
     WHERE room = ${b.room} AND tanggal = ${b.tanggal} AND status <> ${"Cancel"} AND id <> ${b.id || ""}`;
   const s = menit(b.jamMulai), e = menit(b.jamSelesai);

@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { sql, raw, exec, waktuJakarta } from "@/lib/db";
 
+// event butuh meeting room? true untuk semua kecuali Menginap/Kamar (room-only)
+function perluMeetingRoom(jenis) {
+  const j = String(jenis || "").toLowerCase();
+  if (!j) return true;
+  return !j.includes("menginap");
+}
+
 export const runtime = "nodejs";
 
 async function logStatus(id, nama, lama, baru, alasan, oleh) {
@@ -41,6 +48,15 @@ export async function POST(req) {
         ${b.sumber || ""}, ${status}, ${b.pic || ""}, ${b.catatan || ""}, ${""}, ${now}, ${b.alasanCancel || ""}, ${b.oleh || ""},
         ${b.perluKamar || ""}, ${String(b.jumlahKamar ?? "")}, ${String(b.revenueRoom ?? "")})`;
       await logStatus(id, b.nama || "", "-", status, b.alasanCancel || "", b.oleh || "");
+
+      // Auto-catat booking meeting room (kecuali event Menginap/Kamar) — status ikut lead
+      if (perluMeetingRoom(b.jenisEvent)) {
+        try {
+          const rbId = "RB" + Date.now();
+          await sql`INSERT INTO room_booking (id, room, tanggal, jam_mulai, jam_selesai, event_title, company, pax, setup, pic, status, catatan, created_at, created_by, lead_id)
+            VALUES (${rbId}, ${""}, ${b.tanggalEvent || ""}, ${"08:00"}, ${"17:00"}, ${b.jenisEvent || ""}, ${b.instansi || ""}, ${String(b.jumlahPax ?? "")}, ${""}, ${b.pic || ""}, ${status}, ${"Otomatis dari Lead — tentukan ruangan & jam"}, ${now}, ${b.oleh || ""}, ${id})`;
+        } catch (e) {}
+      }
       return NextResponse.json({ status: "ok", id });
     }
 
@@ -71,6 +87,16 @@ export async function POST(req) {
       if (b.status !== undefined && String(b.status) !== String(old.Status || "")) {
         await logStatus(b.id, b.nama || old.Nama || "", old.Status || "", b.status, b.alasanCancel || "", b.oleh || "");
       }
+
+      // Sinkron ke booking meeting yang tertaut lead ini
+      try {
+        if (b.status !== undefined) await sql`UPDATE room_booking SET status = ${b.status} WHERE lead_id = ${b.id}`;
+        // untuk booking yang belum dijadwalkan (ruangan masih kosong), ikutkan perubahan info dasar
+        if (b.instansi !== undefined) await sql`UPDATE room_booking SET company = ${b.instansi} WHERE lead_id = ${b.id} AND (room = '' OR room IS NULL)`;
+        if (b.tanggalEvent !== undefined) await sql`UPDATE room_booking SET tanggal = ${b.tanggalEvent} WHERE lead_id = ${b.id} AND (room = '' OR room IS NULL)`;
+        if (b.jumlahPax !== undefined) await sql`UPDATE room_booking SET pax = ${String(b.jumlahPax)} WHERE lead_id = ${b.id} AND (room = '' OR room IS NULL)`;
+        if (b.jenisEvent !== undefined) await sql`UPDATE room_booking SET event_title = ${b.jenisEvent} WHERE lead_id = ${b.id} AND (room = '' OR room IS NULL)`;
+      } catch (e) {}
       return NextResponse.json({ status: "ok" });
     }
 
