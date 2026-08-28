@@ -19,7 +19,7 @@ const ROOMS = [
   { name: "Iron", floor: "Eagle", cap: { theater: 24, class: 18, round: 20, ushape: 27, hollow: 18 }, dim: "6,3 × 6 m" },
   { name: "Wood", floor: "Eagle", cap: { theater: 40, class: 27, round: 30, ushape: 27, hollow: 18 }, dim: "8 × 6 m" },
   { name: "Onyx", floor: "1st Floor", cap: { theater: 250, class: 180, round: 200, ushape: 150, hollow: 54 }, dim: "26,5 × 18,6 m" },
-  { name: "Shapier Ballroom", floor: "Lobby Floor", cap: { theater: 1445, class: 504, round: 720, ushape: 345, hollow: 345 }, dim: "35,3 × 48,5 m" },
+  { name: "Sapphire Ballroom", floor: "Lobby Floor", cap: { theater: 1445, class: 504, round: 720, ushape: 345, hollow: 345 }, dim: "35,3 × 48,5 m" },
 ];
 const SETUPS = [
   { key: "theater", label: "Theater" },

@@ -37,7 +37,7 @@ const RUANGAN = [
   { name: "Iron", cap: { theater: 24, class: 18, round: 20, ushape: 27, hollow: 18 } },
   { name: "Wood", cap: { theater: 40, class: 27, round: 30, ushape: 27, hollow: 18 } },
   { name: "Onyx", cap: { theater: 250, class: 180, round: 200, ushape: 150, hollow: 54 } },
-  { name: "Shapier Ballroom", cap: { theater: 1445, class: 504, round: 720, ushape: 345, hollow: 345 } },
+  { name: "Sapphire Ballroom", cap: { theater: 1445, class: 504, round: 720, ushape: 345, hollow: 345 } },
 ];
 const SETUP_MEETING = [
   { key: "theater", label: "Theater" }, { key: "class", label: "Class Room" },

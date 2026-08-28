@@ -10,6 +10,7 @@ const ITEMS = [
   { href: "/geo", label: "GEO", key: "geo" },
   { href: "/roombooking", label: "Meeting Room", key: "roombooking" },
   { href: "/company", label: "Company", key: "company" },
+  { href: "/target", label: "Target", key: "target" },
   { href: "/log", label: "Log", key: "log" },
 ];
 
