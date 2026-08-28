@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Modal, Field, inp } from "@/components/Modal";
 import { unduhPDFdariHTML } from "@/lib/pdf";
 
@@ -13,17 +13,29 @@ const HOTEL = {
   web: "www.AstonCirebon.com",
 };
 
-// Room type, Published, Weekdays, Weekend
-const ROOM_RATES = [
-  ["Superior", 2475000, 928000, 978000],
-  ["Deluxe", 2825000, 1048000, 1098000],
-  ["Junior Executive", 3175000, 1168000, 1218000],
-  ["Executive", 4075000, 1588000, 1638000],
-  ["Suite", 5425000, 2108000, 2158000],
-  ["Presidential Suite", 12625000, 5108000, 5158000],
+// Harga kamar: 4 kategori (Weekday/Weekend)
+const RATE_CATEGORIES = ["Corporate New Account", "Corporate LMA", "Corporate CMA", "Travel Agent"];
+const ROOM_TYPES = ["Superior", "Deluxe", "Junior Executive", "Executive", "Suite", "Presidential Suite"];
+const WD_BASE = [928000, 1048000, 1168000, 1588000, 2108000, 5108000];
+function rateDefault() {
+  const o = {};
+  RATE_CATEGORIES.forEach((c) => { o[c] = ROOM_TYPES.map((t, i) => [t, String(WD_BASE[i]), String(WD_BASE[i] + 50000)]); });
+  return o;
+}
+
+// Paket & harga (bisa diubah). Coffee break 150k, Lunch/Dinner 250k.
+const PAKET = [
+  { nama: "Coffee Break Package", harga: 150000 },
+  { nama: "Lunch Package", harga: 250000 },
+  { nama: "Dinner Package", harga: 250000 },
+  { nama: "Half Day Meeting", harga: 300000 },
+  { nama: "Full Day Meeting", harga: 450000 },
+  { nama: "Fullboard Meeting", harga: 600000 },
+  { nama: "Residential Twin", harga: 1500000 },
+  { nama: "Residential Single", harga: 1800000 },
 ];
 
-const INCLUSIONS = [
+const BENEFIT_DEFAULT = [
   "Sarapan untuk 2 orang",
   "Welcome Drink dan wet towel pada saat kedatangan",
   "Dua botol air mineral setiap hari di dalam kamar",
@@ -97,6 +109,9 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
     clNo: "",
     nomor: "",
     kodeSales: user?.kode || inisial(user?.nama),
+    rateCat: RATE_CATEGORIES[0],
+    rates: rateDefault(),
+    benefit: BENEFIT_DEFAULT.join("\n"),
     tglSurat: hariIni(),
     sapaan: "Bapak/Ibu",
     namaTamu: lead.Nama || "",
@@ -108,7 +123,7 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
     namaAcara: lead.Instansi || lead.JenisEvent || "",
     jumlahPeserta: lead.JumlahPax || "",
     rangkaian: [{ hari: lead.TanggalEvent || "", waktu: "", acara: "", tempat: "", setup: "", jumlah: lead.JumlahPax || "" }],
-    estimasi: [{ deskripsi: "Residential Twin Package", jumlah: "", harga: "1500000" }],
+    estimasi: [{ deskripsi: "Residential Twin", jumlah: "", harga: "1500000" }],
     dpDate: "", pelunasanDate: "", jatuhTempoDate: "",
     prepBy: user?.nama || "", prepTitle: "Asst. DOSM",
     gmNama: "", gmTitle: "General Manager",
@@ -118,16 +133,25 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
   const setRow = (arr, i, k, v) => setG((s) => ({ ...s, [arr]: s[arr].map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
   const addRow = (arr, kosong) => setG((s) => ({ ...s, [arr]: [...s[arr], kosong] }));
   const delRow = (arr, i) => setG((s) => ({ ...s, [arr]: s[arr].filter((_, j) => j !== i) }));
+  const setRate = (i, kol, v) => setG((s) => ({ ...s, rates: { ...s.rates, [s.rateCat]: s.rates[s.rateCat].map((r, j) => (j === i ? [r[0], kol === "wd" ? v : r[1], kol === "we" ? v : r[2]] : r)) } }));
+  const tambahPaket = (nama) => { const p = PAKET.find((x) => x.nama === nama); if (p) setG((s) => ({ ...s, estimasi: [...s.estimasi, { deskripsi: p.nama, jumlah: "", harga: String(p.harga) }] })); };
   const grandTotal = g.estimasi.reduce((t, r) => t + angka(r.jumlah) * angka(r.harga), 0);
   const clNo = buildNoDok("CL", g.nomor, g.tglSurat, g.kodeSales);
 
+  useEffect(() => {
+    const th = new Date(g.tglSurat || hariIni()).getFullYear();
+    fetch(`/api/docnum?kode=CL&tahun=${th}`, { cache: "no-store" })
+      .then((r) => r.json()).then((r) => { if (r.status === "ok" && !g.nomor) set("nomor", String(r.next)); })
+      .catch(() => {});
+  }, []); // eslint-disable-line
+
   function build() {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const rateRows = ROOM_RATES.map((r) =>
-      `<tr><td>${r[0]}</td><td class="c">${rp(r[1])}</td><td class="c">${rp(r[2])}</td><td class="c">${rp(r[3])}</td></tr>`).join("");
-    const inclList = INCLUSIONS.map((x) => `<li>${esc(x)}</li>`).join("");
+    const rateRows = (g.rates[g.rateCat] || []).map((r) =>
+      `<tr><td>${r[0]}</td><td class="c">${rp(r[1])}</td><td class="c">${rp(r[2])}</td></tr>`).join("");
+    const inclList = String(g.benefit || "").split("\n").filter((x) => x.trim()).map((x) => `<li>${esc(x)}</li>`).join("");
     const rangkaianRows = g.rangkaian.map((r) =>
-      `<tr><td>${esc(r.hari)}</td><td>${esc(r.waktu)}</td><td>${esc(r.acara)}</td><td>${esc(r.tempat)}</td><td>${esc(r.setup)}</td><td class="c">${esc(r.jumlah)}</td></tr>`).join("");
+      `<tr><td>${esc(tglID(r.hari))}</td><td>${esc(r.waktu)}</td><td>${esc(r.acara)}</td><td>${esc(r.tempat)}</td><td>${esc(r.setup)}</td><td class="c">${esc(r.jumlah)}</td></tr>`).join("");
     const estRows = g.estimasi.map((r, i) => {
       const tot = angka(r.jumlah) * angka(r.harga);
       return `<tr><td class="c">${i + 1}</td><td>${esc(r.deskripsi)}</td><td class="r">${angka(r.jumlah).toLocaleString("id-ID")}</td><td class="r">${angka(r.harga).toLocaleString("id-ID")}</td><td class="r">${tot.toLocaleString("id-ID")}</td></tr>`;
@@ -141,21 +165,23 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
 <style>
   .doc { font-family: Arial, Helvetica, sans-serif; font-size:11px; color:#111; line-height:1.5; }
   .doc .logo { text-align:center; margin-bottom:10px; }
-  .doc .logo img { height:46px; }
+  .doc .logo img { height:46px; display:block; margin:0 auto; }
   .doc b { color:#000; }
   .doc .sec { font-weight:bold; margin:12px 0 4px; }
   .doc .italb { font-weight:bold; font-style:italic; }
   .doc ul { margin:4px 0 4px 18px; padding:0; }
-  .doc table { width:100%; border-collapse:collapse; margin:8px 0; }
+  .doc p { margin:6px 0; }
+  .doc table { width:100%; border-collapse:collapse; margin:8px 0; page-break-inside:avoid; }
   .doc th, .doc td { border:1px solid #94a3b8; padding:5px 7px; text-align:left; vertical-align:top; font-size:10px; }
   .doc th { background:#f1f5f9; text-align:center; }
   .doc td.c { text-align:center; } .doc td.r { text-align:right; }
-  .doc .rate-title td { text-align:center; font-weight:bold; }
+  .doc .rate-title td { text-align:center; font-weight:bold; background:#eef2f8; }
   .doc .total td { font-weight:bold; background:#fdf6e9; }
-  .doc .pasal { margin:8px 0; }
+  .doc .pasal { margin:8px 0; page-break-inside:avoid; }
   .doc .ptitle { font-weight:bold; }
   .doc .pb { page-break-before: always; }
-  .doc .foot { text-align:center; font-size:8px; color:#666; border-top:1px solid #ddd; padding-top:5px; margin-top:16px; }
+  .doc .sign { page-break-inside:avoid; }
+  .doc .foot { text-align:center; font-size:8px; color:#666; border-top:1px solid #bbb; padding-top:6px; margin-top:28px; }
   .doc .foot .web { color:#2563eb; }
   .doc .sign td { border:0; padding:2px 6px; vertical-align:bottom; }
 </style>
@@ -174,12 +200,12 @@ ${g.noHP ? "<div><b>No HP : " + esc(g.noHP) + "</b></div>" : ""}
 <div class="italb">Salam hangat dari ${HOTEL.nama}.</div>
 <p>Terima kasih telah memilih <b>${HOTEL.nama}</b> sebagai tempat akomodasi <b>${esc(g.instansi || g.namaAcara)}</b>. Melanjutkan percakapan mengenai harga kamar dan paket meeting, bersama ini kami sampaikan konfirmasi acara tersebut:</p>
 
-<div class="sec">1. KAMAR</div>
+<div class="sec">1. KAMAR — ${esc(g.rateCat)}</div>
 <div>Tanggal &nbsp;: ${g.tglKamar ? tglID(g.tglKamar) : "-"}</div>
 <div>Jumlah Kamar &nbsp;: ${angka(g.jumlahKamar) || "-"} Kamar</div>
 <table>
-  <tr class="rate-title"><td colspan="4">${HOTEL.namaCap}</td></tr>
-  <tr><th>ROOM TYPE</th><th>PUBLISHED RATE</th><th>WEEKDAYS RATE</th><th>WEEKEND RATE</th></tr>
+  <tr class="rate-title"><td colspan="3">${HOTEL.namaCap} — ${esc(g.rateCat)}</td></tr>
+  <tr><th>ROOM TYPE</th><th>WEEKDAYS RATE</th><th>WEEKEND RATE</th></tr>
   ${rateRows}
 </table>
 <div class="sec">Harga Kamar Sudah Termasuk:</div>
@@ -230,7 +256,11 @@ ${foot}
   const [busy, setBusy] = useState(false);
   async function unduh() {
     setBusy(true);
-    await unduhPDFdariHTML(build(), "Confirmation-" + (clNo || "letter").replace(/[^\w-]/g, "_") + ".pdf");
+    await unduhPDFdariHTML(build(), "CL-" + (clNo || "letter").replace(/[^\w-]/g, "_") + ".pdf");
+    try {
+      const th = new Date(g.tglSurat || hariIni()).getFullYear();
+      await fetch("/api/docnum", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kode: "CL", tahun: th, nomor: angka(g.nomor) }) });
+    } catch (e) {}
     setBusy(false);
   }
 
@@ -243,6 +273,31 @@ ${foot}
           <Field label="Kode Sales"><input className={inp} value={g.kodeSales} onChange={(e) => set("kodeSales", e.target.value.toUpperCase())} placeholder="AS" /></Field>
           <Field label="No. CL (otomatis)"><input className={inp + " bg-slate-100 font-semibold"} value={clNo} readOnly /></Field>
         </div>
+
+        <div className="border border-slate-200 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500">HARGA KAMAR (Weekday / Weekend)</span>
+            <select className="border border-slate-300 rounded-lg px-2 py-1.5 text-xs bg-white" value={g.rateCat} onChange={(e) => set("rateCat", e.target.value)}>
+              {RATE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <div className="grid grid-cols-12 gap-1 text-[11px] text-slate-400 font-semibold px-1">
+              <span className="col-span-6">Room Type</span><span className="col-span-3 text-center">Weekday</span><span className="col-span-3 text-center">Weekend</span>
+            </div>
+            {(g.rates[g.rateCat] || []).map((r, i) => (
+              <div key={r[0]} className="grid grid-cols-12 gap-1 items-center">
+                <span className="col-span-6 text-xs text-[#12263a]">{r[0]}</span>
+                <input className={inp + " !py-1.5 text-xs col-span-3"} inputMode="numeric" value={r[1] ? angka(r[1]).toLocaleString("id-ID") : ""} onChange={(e) => setRate(i, "wd", e.target.value.replace(/[^\d]/g, ""))} />
+                <input className={inp + " !py-1.5 text-xs col-span-3"} inputMode="numeric" value={r[2] ? angka(r[2]).toLocaleString("id-ID") : ""} onChange={(e) => setRate(i, "we", e.target.value.replace(/[^\d]/g, ""))} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <Field label="Benefit / Harga Kamar Sudah Termasuk (satu benefit per baris)">
+          <textarea className={inp + " h-24 resize-none text-sm"} value={g.benefit} onChange={(e) => set("benefit", e.target.value)} />
+        </Field>
         <div className="border border-slate-200 rounded-lg p-3 grid grid-cols-2 gap-3">
           <div className="col-span-2 text-xs font-semibold text-slate-500">PENERIMA</div>
           <Field label="Nama"><input className={inp} value={g.namaTamu} onChange={(e) => set("namaTamu", e.target.value)} /></Field>
@@ -263,7 +318,7 @@ ${foot}
             <button onClick={() => addRow("rangkaian", { hari: "", waktu: "", acara: "", tempat: "", setup: "", jumlah: "" })} className="text-xs bg-[#12263a] text-white rounded px-2 py-1">+ Baris</button></div>
           {g.rangkaian.map((r, i) => (
             <div key={i} className="grid grid-cols-6 gap-1 mb-1">
-              <input className={inp + " !py-1.5 text-xs"} placeholder="Hari/Tgl" value={r.hari} onChange={(e) => setRow("rangkaian", i, "hari", e.target.value)} />
+              <input type="date" className={inp + " !py-1.5 text-xs"} value={r.hari} onChange={(e) => setRow("rangkaian", i, "hari", e.target.value)} />
               <input className={inp + " !py-1.5 text-xs"} placeholder="Waktu" value={r.waktu} onChange={(e) => setRow("rangkaian", i, "waktu", e.target.value)} />
               <input className={inp + " !py-1.5 text-xs"} placeholder="Acara" value={r.acara} onChange={(e) => setRow("rangkaian", i, "acara", e.target.value)} />
               <input className={inp + " !py-1.5 text-xs"} placeholder="Tempat" value={r.tempat} onChange={(e) => setRow("rangkaian", i, "tempat", e.target.value)} />
@@ -274,8 +329,14 @@ ${foot}
         </div>
 
         <div className="border border-slate-200 rounded-lg p-3">
-          <div className="flex items-center justify-between mb-2"><span className="text-xs font-semibold text-slate-500">ESTIMASI BIAYA</span>
-            <button onClick={() => addRow("estimasi", { deskripsi: "", jumlah: "", harga: "" })} className="text-xs bg-[#12263a] text-white rounded px-2 py-1">+ Baris</button></div>
+          <div className="flex items-center justify-between mb-2 gap-2"><span className="text-xs font-semibold text-slate-500">ESTIMASI BIAYA</span>
+            <div className="flex gap-1">
+              <select className="border border-slate-300 rounded px-2 py-1 text-xs bg-white" value="" onChange={(e) => { if (e.target.value) tambahPaket(e.target.value); e.target.value = ""; }}>
+                <option value="">+ Tambah paket…</option>
+                {PAKET.map((p) => <option key={p.nama} value={p.nama}>{p.nama} — {angka(p.harga).toLocaleString("id-ID")}</option>)}
+              </select>
+              <button onClick={() => addRow("estimasi", { deskripsi: "", jumlah: "", harga: "" })} className="text-xs bg-[#12263a] text-white rounded px-2 py-1">+ Baris</button>
+            </div></div>
           {g.estimasi.map((r, i) => (
             <div key={i} className="grid grid-cols-12 gap-1 mb-1 items-center">
               <input className={inp + " !py-1.5 text-xs col-span-5"} placeholder="Deskripsi" value={r.deskripsi} onChange={(e) => setRow("estimasi", i, "deskripsi", e.target.value)} />

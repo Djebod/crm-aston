@@ -38,6 +38,7 @@ export const STATEMENTS = [
     status TEXT, catatan TEXT, created_at TEXT, created_by TEXT )`,
   `CREATE INDEX IF NOT EXISTS idx_booking_room_tgl ON room_booking (room, tanggal)`,
   `ALTER TABLE room_booking ADD COLUMN IF NOT EXISTS lead_id TEXT`,
+  `CREATE TABLE IF NOT EXISTS doc_counter ( kode TEXT, tahun INT, last INT DEFAULT 0, PRIMARY KEY (kode, tahun) )`,
   `CREATE TABLE IF NOT EXISTS sales_target_bulan (
     sales_name TEXT, tahun INT, bulan INT,
     target_room TEXT, target_banquet TEXT, target_kunjungan TEXT,

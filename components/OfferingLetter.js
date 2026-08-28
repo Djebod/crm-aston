@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Modal, Field, inp } from "@/components/Modal";
+import { unduhPDFdariHTML } from "@/lib/pdf";
 
 // ====== Identitas hotel (ubah bila perlu) ======
 const HOTEL = {
@@ -12,15 +13,15 @@ const HOTEL = {
   web: "www.AstonCirebon.com",
 };
 
-// ====== Harga kamar standar (Published / Corporate) ======
-const ROOM_RATES = [
-  ["Superior", 2475000, 908000],
-  ["Deluxe", 2825000, 1028000],
-  ["Junior Executive", 3175000, 1148000],
-  ["Executive", 4075000, 1568000],
-  ["Suite", 5425000, 2088000],
-  ["Presidential Suite", 12625000, 5088000],
-];
+// ====== Harga kamar: 4 kategori, masing-masing Weekday & Weekend ======
+const RATE_CATEGORIES = ["Corporate New Account", "Corporate LMA", "Corporate CMA", "Travel Agent"];
+const ROOM_TYPES = ["Superior", "Deluxe", "Junior Executive", "Executive", "Suite", "Presidential Suite"];
+const WD_BASE = [908000, 1028000, 1148000, 1568000, 2088000, 5088000];
+function rateDefault() {
+  const o = {};
+  RATE_CATEGORIES.forEach((c) => { o[c] = ROOM_TYPES.map((t, i) => [t, String(WD_BASE[i]), String(WD_BASE[i] + 50000)]); });
+  return o;
+}
 
 const INCLUSIONS = [
   "Sarapan untuk 2 orang",
@@ -80,6 +81,8 @@ export default function OfferingLetter({ lead, user, onClose }) {
     noOL: "",
     nomor: "",
     kodeSales: user?.kode || inisial(user?.nama),
+    rateCat: RATE_CATEGORIES[0],
+    rates: rateDefault(),
     tglSurat: hariIni(),
     sapaan: "Bapak/Ibu",
     namaTamu: lead.Nama || "",
@@ -109,6 +112,16 @@ export default function OfferingLetter({ lead, user, onClose }) {
   const setRow = (arr, i, k, v) => setO((s) => ({ ...s, [arr]: s[arr].map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
   const addRow = (arr, kosong) => setO((s) => ({ ...s, [arr]: [...s[arr], kosong] }));
   const delRow = (arr, i) => setO((s) => ({ ...s, [arr]: s[arr].filter((_, j) => j !== i) }));
+  const setRate = (i, kol, v) => setO((s) => ({ ...s, rates: { ...s.rates, [s.rateCat]: s.rates[s.rateCat].map((r, j) => (j === i ? [r[0], kol === "wd" ? v : r[1], kol === "we" ? v : r[2]] : r)) } }));
+  const [busy, setBusy] = useState(false);
+
+  // Nomor OL otomatis (peek dari counter, reset per tahun)
+  useEffect(() => {
+    const th = new Date(o.tglSurat || hariIni()).getFullYear();
+    fetch(`/api/docnum?kode=OL&tahun=${th}`, { cache: "no-store" })
+      .then((r) => r.json()).then((r) => { if (r.status === "ok" && !o.nomor) set("nomor", String(r.next)); })
+      .catch(() => {});
+  }, []); // eslint-disable-line
 
   const grandTotal = o.estimasi.reduce((t, r) => t + angka(r.jumlah) * angka(r.harga), 0);
   const noOL = buildNoDok("OL", o.nomor, o.tglSurat, o.kodeSales);
@@ -118,7 +131,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
     const th = (t) => `<th>${t}</th>`;
     const td = (t, cls = "") => `<td class="${cls}">${t}</td>`;
 
-    const rateRows = ROOM_RATES.map((r) =>
+    const rateRows = (o.rates[o.rateCat] || []).map((r) =>
       `<tr>${td(r[0], "c")}${td(rp(r[1]), "c")}${td(rp(r[2]), "c")}</tr>`).join("");
 
     const inclList = INCLUSIONS.map((x) => `<li>${esc(x)}</li>`).join("");
@@ -126,7 +139,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
     const addonList = ADDON.map((x) => `<li>${esc(x)}</li>`).join("");
 
     const rangkaianRows = o.rangkaian.map((r) =>
-      `<tr>${td(esc(r.hari))}${td(esc(r.waktu))}${td(esc(r.acara))}${td(esc(r.tempat))}${td(esc(r.setup))}${td(esc(r.jumlah), "c")}</tr>`).join("");
+      `<tr>${td(esc(tglID(r.hari)))}${td(esc(r.waktu))}${td(esc(r.acara))}${td(esc(r.tempat))}${td(esc(r.setup))}${td(esc(r.jumlah), "c")}</tr>`).join("");
 
     const estRows = o.estimasi.map((r, i) => {
       const tot = angka(r.jumlah) * angka(r.harga);
@@ -135,37 +148,28 @@ export default function OfferingLetter({ lead, user, onClose }) {
 
     const foot = `<div class="foot">${HOTEL.alamat}<br>${HOTEL.telp} ${HOTEL.email}<br><span class="web">${HOTEL.web}</span></div>`;
 
-    const html = `<!doctype html><html lang="id"><head><meta charset="utf-8">
-<title>Offering Letter - ${esc(o.namaTamu)}</title>
-<style>
-  @page { margin: 22mm 18mm; }
-  * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color:#1f2937; margin:0; font-size:12px; line-height:1.55; }
-  .logo { text-align:center; margin-bottom:14px; }
-  .logo img { height:52px; }
-  b { color:#111; }
-  .to b { display:block; }
-  .sec { font-weight:bold; margin:14px 0 4px; }
-  .italb { font-weight:bold; font-style:italic; }
-  ul { margin:4px 0 4px 18px; padding:0; }
-  li { margin:2px 0; }
-  table { width:100%; border-collapse:collapse; margin:8px 0; }
-  th, td { border:1px solid #94a3b8; padding:6px 8px; text-align:left; vertical-align:top; }
-  th { background:#f1f5f9; text-align:center; font-size:11px; }
-  td.c, th.c { text-align:center; }
-  td.r { text-align:right; }
-  .rate-title td { text-align:center; font-weight:bold; background:#fff; }
-  .total td { font-weight:bold; background:#fdf6e9; }
-  .pb { page-break-before: always; }
-  .foot { text-align:center; font-size:9px; color:#555; margin-top:26px; border-top:1px solid #ddd; padding-top:6px; }
-  .foot .web { color:#2563eb; }
-  .btnbar { position:fixed; top:10px; right:10px; }
-  .btnbar button { background:#12263a; color:#fff; border:0; padding:10px 16px; border-radius:8px; cursor:pointer; font-size:13px; }
-  @media print { .btnbar { display:none; } }
-  .hl { background:#fff3a3; }
-</style></head>
-<body>
-  <div class="btnbar"><button onclick="window.print()">🖨️ Cetak / Simpan PDF</button></div>
+    const html = `<div class="doc"><style>
+  .doc { font-family: Arial, Helvetica, sans-serif; color:#1f2937; font-size:12px; line-height:1.55; }
+  .doc * { box-sizing: border-box; }
+  .doc .logo { text-align:center; margin-bottom:14px; }
+  .doc .logo img { height:52px; display:block; margin:0 auto; }
+  .doc b { color:#111; }
+  .doc .to b { display:block; }
+  .doc .sec { font-weight:bold; margin:14px 0 4px; }
+  .doc .italb { font-weight:bold; font-style:italic; }
+  .doc ul { margin:4px 0 4px 18px; padding:0; }
+  .doc li { margin:2px 0; }
+  .doc table { width:100%; border-collapse:collapse; margin:8px 0; page-break-inside:avoid; }
+  .doc th, .doc td { border:1px solid #94a3b8; padding:6px 8px; text-align:left; vertical-align:top; }
+  .doc th { background:#f1f5f9; text-align:center; font-size:11px; }
+  .doc td.c, .doc th.c { text-align:center; }
+  .doc td.r { text-align:right; }
+  .doc .rate-title td { text-align:center; font-weight:bold; background:#eef2f8; }
+  .doc .total td { font-weight:bold; background:#fdf6e9; }
+  .doc .pb { page-break-before: always; }
+  .doc .foot { text-align:center; font-size:9px; color:#555; margin-top:26px; border-top:1px solid #ddd; padding-top:6px; }
+  .doc .foot .web { color:#2563eb; }
+</style>
 
   <div class="logo"><img src="${origin}/aston-logo.png" onerror="this.style.display='none'"/></div>
 
@@ -189,10 +193,10 @@ export default function OfferingLetter({ lead, user, onClose }) {
   <div>Tanggal &nbsp;: ${o.tglKamar ? tglID(o.tglKamar) : "-"}</div>
   <div>Jumlah Kamar &nbsp;: ${angka(o.jumlahKamar) || "-"} Kamar</div>
 
-  <div class="sec">Harga Kamar</div>
+  <div class="sec">Harga Kamar — ${esc(o.rateCat)}</div>
   <table>
-    <tr class="rate-title"><td colspan="3">${HOTEL.nama.toUpperCase()}</td></tr>
-    <tr>${th("ROOM TYPE")}${th("PUBLISHED RATE")}${th("CORPORATE RATE")}</tr>
+    <tr class="rate-title"><td colspan="3">${HOTEL.nama.toUpperCase()} — ${esc(o.rateCat)}</td></tr>
+    <tr>${th("ROOM TYPE")}${th("WEEKDAYS RATE")}${th("WEEKEND RATE")}</tr>
     ${rateRows}
   </table>
 
@@ -248,14 +252,20 @@ export default function OfferingLetter({ lead, user, onClose }) {
   <div style="margin-top:48px"><b><u>${esc(o.ttdNama) || "-"}</u></b><br>${esc(o.ttdJabatan)}${o.ttdHP ? "<br>" + esc(o.ttdHP) : ""}</div>
 
   ${foot}
-  <script>window.onload=function(){setTimeout(function(){window.focus();},200);};</script>
-</body></html>`;
+</div>`;
+    return html;
+  }
 
-    const w = window.open("", "_blank");
-    if (!w) { alert("Popup diblokir browser. Izinkan popup untuk mencetak."); return; }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
+  async function unduh() {
+    setBusy(true);
+    const namaFile = "OL-" + (noOL || "offering").replace(/[^\w-]/g, "_") + ".pdf";
+    const ok = await unduhPDFdariHTML(cetak(), namaFile);
+    // naikkan counter agar nomor berikutnya lanjut
+    try {
+      const th = new Date(o.tglSurat || hariIni()).getFullYear();
+      await fetch("/api/docnum", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kode: "OL", tahun: th, nomor: angka(o.nomor) }) });
+    } catch (e) {}
+    setBusy(false);
   }
 
   return (
@@ -266,6 +276,28 @@ export default function OfferingLetter({ lead, user, onClose }) {
           <Field label="Tanggal Surat"><input type="date" className={inp} value={o.tglSurat} onChange={(e) => set("tglSurat", e.target.value)} /></Field>
           <Field label="Kode Sales"><input className={inp} value={o.kodeSales} onChange={(e) => set("kodeSales", e.target.value.toUpperCase())} placeholder="AS" /></Field>
           <Field label="No. OL (otomatis)"><input className={inp + " bg-slate-100 font-semibold"} value={noOL} readOnly /></Field>
+        </div>
+
+        <div className="border border-slate-200 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500">HARGA KAMAR (Weekday / Weekend)</span>
+            <select className="border border-slate-300 rounded-lg px-2 py-1.5 text-xs bg-white" value={o.rateCat} onChange={(e) => set("rateCat", e.target.value)}>
+              {RATE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <div className="grid grid-cols-12 gap-1 text-[11px] text-slate-400 font-semibold px-1">
+              <span className="col-span-6">Room Type</span><span className="col-span-3 text-center">Weekday</span><span className="col-span-3 text-center">Weekend</span>
+            </div>
+            {(o.rates[o.rateCat] || []).map((r, i) => (
+              <div key={r[0]} className="grid grid-cols-12 gap-1 items-center">
+                <span className="col-span-6 text-xs text-[#12263a]">{r[0]}</span>
+                <input className={inp + " !py-1.5 text-xs col-span-3"} inputMode="numeric" value={r[1] ? angka(r[1]).toLocaleString("id-ID") : ""} onChange={(e) => setRate(i, "wd", e.target.value.replace(/[^\d]/g, ""))} />
+                <input className={inp + " !py-1.5 text-xs col-span-3"} inputMode="numeric" value={r[2] ? angka(r[2]).toLocaleString("id-ID") : ""} onChange={(e) => setRate(i, "we", e.target.value.replace(/[^\d]/g, ""))} />
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1">Kategori: {RATE_CATEGORIES.join(" · ")}. Harga bisa diubah per kategori.</p>
         </div>
 
         <div className="border border-slate-200 rounded-lg p-3 space-y-3">
@@ -299,7 +331,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
           <div className="space-y-2">
             {o.rangkaian.map((r, i) => (
               <div key={i} className="grid grid-cols-6 gap-1 items-center">
-                <input className={inp + " !py-1.5 text-xs"} placeholder="Hari/Tgl" value={r.hari} onChange={(e) => setRow("rangkaian", i, "hari", e.target.value)} />
+                <input type="date" className={inp + " !py-1.5 text-xs"} value={r.hari} onChange={(e) => setRow("rangkaian", i, "hari", e.target.value)} />
                 <input className={inp + " !py-1.5 text-xs"} placeholder="Waktu" value={r.waktu} onChange={(e) => setRow("rangkaian", i, "waktu", e.target.value)} />
                 <input className={inp + " !py-1.5 text-xs"} placeholder="Acara" value={r.acara} onChange={(e) => setRow("rangkaian", i, "acara", e.target.value)} />
                 <input className={inp + " !py-1.5 text-xs"} placeholder="Tempat" value={r.tempat} onChange={(e) => setRow("rangkaian", i, "tempat", e.target.value)} />
@@ -356,7 +388,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
 
       <div className="flex gap-2 mt-5">
         <button onClick={onClose} className="flex-1 border border-slate-300 rounded-lg py-2.5 font-medium hover:bg-slate-50">Tutup</button>
-        <button onClick={cetak} className="flex-1 bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg py-2.5">🖨️ Cetak / Simpan PDF</button>
+        <button onClick={unduh} disabled={busy} className="flex-1 bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg py-2.5 disabled:opacity-60">{busy ? "Membuat PDF…" : "⬇ Download PDF"}</button>
       </div>
     </Modal>
   );
