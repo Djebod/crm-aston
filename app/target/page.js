@@ -60,6 +60,7 @@ export default function TargetPage() {
   const now = new Date();
   const [tahun, setTahun] = useState(now.getFullYear());
   const [sales, setSales] = useState(ALL);
+  const [bulanFilter, setBulanFilter] = useState(0); // 0 = setahun, 1-12 = bulan tertentu
 
   useEffect(() => {
     const raw = typeof window !== "undefined" ? localStorage.getItem("crm_user") : null;
@@ -136,12 +137,27 @@ export default function TargetPage() {
   const rRevTot = data.rRoom.map((_, i) => data.rRoom[i] + data.rBanq[i]);
   const annTarget = sum(tRevTot), ytdReal = sum(rRevTot);
 
+  // Filter periode: 0 = semua bulan, else index bulan tertentu
+  const idxTampil = bulanFilter ? [bulanFilter - 1] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  const showTotal = bulanFilter === 0;
+  const jum = (arr) => idxTampil.reduce((a, i) => a + arr[i], 0); // total sesuai periode
+  const periodeLabel = bulanFilter ? BULAN_PANJANG[bulanFilter - 1] + " " + tahun : "Tahun " + tahun;
+  const pTargetRev = jum(tRevTot), pRealRev = jum(rRevTot);
+  const pTargetKunj = jum(data.tKunjBulan), pRealKunj = jum(data.rKunj);
+
   async function exportRev() {
-    const rows = BULAN.map((b, i) => ({
+    const rows = idxTampil.map((i) => ({
       Bulan: BULAN_PANJANG[i], "Target Room": data.tRoom[i], "Target Banquet": data.tBanq[i], "Target Total": tRevTot[i],
       "Realisasi Room": data.rRoom[i], "Realisasi Banquet": data.rBanq[i], "Realisasi Total": rRevTot[i], "Pencapaian %": pct(rRevTot[i], tRevTot[i]),
     }));
-    unduhCSV("pencapaian-revenue-" + tahun, rows);
+    unduhCSV("pencapaian-revenue-" + tahun + (bulanFilter ? "-" + BULAN[bulanFilter - 1] : "") + (sales !== ALL ? "-" + sales : ""), rows);
+  }
+  async function exportAct() {
+    const rows = idxTampil.map((i) => ({
+      Bulan: BULAN_PANJANG[i], "Target Harian": data.tKunj[i], "Target Bulan": data.tKunjBulan[i],
+      "Realisasi Kunjungan": data.rKunj[i], "Pencapaian %": pct(data.rKunj[i], data.tKunjBulan[i]),
+    }));
+    unduhCSV("activity-vs-target-" + tahun + (bulanFilter ? "-" + BULAN[bulanFilter - 1] : "") + (sales !== ALL ? "-" + sales : ""), rows);
   }
 
   if (!user) return null;
@@ -167,6 +183,10 @@ export default function TargetPage() {
             {isAdmin && <option value={ALL}>Semua Sales</option>}
             {salesList.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
+          <select value={bulanFilter} onChange={(e) => setBulanFilter(Number(e.target.value))} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
+            <option value={0}>Setahun (semua bulan)</option>
+            {BULAN_PANJANG.map((b, i) => <option key={b} value={i + 1}>{b}</option>)}
+          </select>
         </div>
 
         {loading ? (
@@ -174,11 +194,12 @@ export default function TargetPage() {
         ) : (
           <>
             {/* Ringkasan */}
+            <div className="text-sm text-slate-500 mb-2">Periode: <b className="text-[#12263a]">{periodeLabel}</b>{sales !== ALL ? " · " + sales : ""}</div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-              <Kartu label="Target Tahunan" nilai={rpK(annTarget)} />
-              <Kartu label="Realisasi YTD" nilai={rpK(ytdReal)} emas />
-              <Kartu label="Pencapaian" nilai={pct(ytdReal, annTarget) + "%"} />
-              <Kartu label="Kunjungan YTD" nilai={sum(data.rKunj) + " / " + sum(data.tKunjBulan)} />
+              <Kartu label={bulanFilter ? "Target Bulan" : "Target Tahunan"} nilai={rpK(pTargetRev)} />
+              <Kartu label={bulanFilter ? "Realisasi" : "Realisasi YTD"} nilai={rpK(pRealRev)} emas />
+              <Kartu label="Pencapaian" nilai={pct(pRealRev, pTargetRev) + "%"} />
+              <Kartu label="Kunjungan" nilai={pRealKunj + " / " + pTargetKunj} />
             </div>
 
             {/* Revenue */}
@@ -199,7 +220,8 @@ export default function TargetPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {BULAN.map((b, i) => {
+                    {idxTampil.map((i) => {
+                      const b = BULAN[i];
                       const p = pct(rRevTot[i], tRevTot[i]);
                       return (
                         <tr key={b} className={i === now.getMonth() && Number(tahun) === now.getFullYear() ? "bg-amber-50" : ""}>
@@ -213,15 +235,17 @@ export default function TargetPage() {
                         </tr>
                       );
                     })}
-                    <tr className="bg-[#12263a] text-white font-bold">
-                      <td className="border border-slate-600 p-2">TAHUNAN</td>
-                      <td className="border border-slate-600 p-2 text-right">{rpK(sum(data.tRoom))}</td>
-                      <td className="border border-slate-600 p-2 text-right">{rpK(sum(data.tBanq))}</td>
-                      <td className="border border-slate-600 p-2 text-right">{rpK(sum(data.rRoom))}</td>
-                      <td className="border border-slate-600 p-2 text-right">{rpK(sum(data.rBanq))}</td>
-                      <td className="border border-slate-600 p-2 text-right">{rpK(ytdReal)}</td>
-                      <td className="border border-slate-600 p-2 text-center">{pct(ytdReal, annTarget)}%</td>
-                    </tr>
+                    {showTotal && (
+                      <tr className="bg-[#12263a] text-white font-bold">
+                        <td className="border border-slate-600 p-2">TAHUNAN</td>
+                        <td className="border border-slate-600 p-2 text-right">{rpK(sum(data.tRoom))}</td>
+                        <td className="border border-slate-600 p-2 text-right">{rpK(sum(data.tBanq))}</td>
+                        <td className="border border-slate-600 p-2 text-right">{rpK(sum(data.rRoom))}</td>
+                        <td className="border border-slate-600 p-2 text-right">{rpK(sum(data.rBanq))}</td>
+                        <td className="border border-slate-600 p-2 text-right">{rpK(ytdReal)}</td>
+                        <td className="border border-slate-600 p-2 text-center">{pct(ytdReal, annTarget)}%</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -229,7 +253,10 @@ export default function TargetPage() {
 
             {/* Activity vs target kunjungan */}
             <div className="bg-white rounded-2xl border border-slate-200 p-4">
-              <h2 className="font-bold text-[#12263a] mb-3">Activity Record vs Target Kunjungan</h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-bold text-[#12263a]">Activity Record vs Target Kunjungan</h2>
+                <button onClick={exportAct} className="text-xs font-semibold border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">Export CSV</button>
+              </div>
               <BarBulan target={data.tKunjBulan} real={data.rKunj} format={(n) => String(Math.round(n))} />
               <div className="overflow-x-auto mt-4">
                 <table className="w-full text-xs border-collapse min-w-[420px]">
@@ -243,7 +270,8 @@ export default function TargetPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {BULAN.map((b, i) => {
+                    {idxTampil.map((i) => {
+                      const b = BULAN[i];
                       const p = pct(data.rKunj[i], data.tKunjBulan[i]);
                       return (
                         <tr key={b} className={i === now.getMonth() && Number(tahun) === now.getFullYear() ? "bg-amber-50" : ""}>
@@ -255,13 +283,15 @@ export default function TargetPage() {
                         </tr>
                       );
                     })}
-                    <tr className="bg-[#12263a] text-white font-bold">
-                      <td className="border border-slate-600 p-2">TAHUNAN</td>
-                      <td className="border border-slate-600 p-2 text-center">-</td>
-                      <td className="border border-slate-600 p-2 text-center">{sum(data.tKunjBulan)}</td>
-                      <td className="border border-slate-600 p-2 text-center">{sum(data.rKunj)}</td>
-                      <td className="border border-slate-600 p-2 text-center">{pct(sum(data.rKunj), sum(data.tKunjBulan))}%</td>
-                    </tr>
+                    {showTotal && (
+                      <tr className="bg-[#12263a] text-white font-bold">
+                        <td className="border border-slate-600 p-2">TAHUNAN</td>
+                        <td className="border border-slate-600 p-2 text-center">-</td>
+                        <td className="border border-slate-600 p-2 text-center">{sum(data.tKunjBulan)}</td>
+                        <td className="border border-slate-600 p-2 text-center">{sum(data.rKunj)}</td>
+                        <td className="border border-slate-600 p-2 text-center">{pct(sum(data.rKunj), sum(data.tKunjBulan))}%</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

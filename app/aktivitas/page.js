@@ -122,6 +122,7 @@ export default function AktivitasPage() {
   const [form, setForm] = useState(FORM_KOSONG);
   const [lead, setLead] = useState(LEAD_KOSONG);
   const [bookings, setBookings] = useState([]);
+  const [karyawan, setKaryawan] = useState([]);
   const [menyimpan, setMenyimpan] = useState(false);
 
   const meetCek = useMemo(() => {
@@ -162,6 +163,7 @@ export default function AktivitasPage() {
     ambilCompanies().then(setCompanies).catch(() => {}); // company di latar belakang (cache)
     fetch("/api/target", { cache: "no-store" }).then((r) => r.json()).then((r) => { if (r.status === "ok") setTargets(r.data || []); }).catch(() => {});
     fetch("/api/roombooking", { cache: "no-store" }).then((r) => r.json()).then((r) => { if (r.status === "ok") setBookings(r.data || []); }).catch(() => {});
+    fetch("/api/karyawan", { cache: "no-store" }).then((r) => r.json()).then((r) => { if (r.status === "ok") setKaryawan(r.data || []); }).catch(() => {});
   }, []);
 
   useEffect(() => { if (user) ambil(); }, [user, ambil]);
@@ -462,7 +464,13 @@ export default function AktivitasPage() {
           <div className="grid sm:grid-cols-2 gap-3">
             <Field label="Tanggal (terkunci hari ini)"><input type="date" className={inp + " bg-slate-100 text-slate-500"} value={form.date} readOnly title="Tanggal aktivitas selalu hari berjalan" /></Field>
             <Field label="Jam"><input type="time" className={inp} value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} /></Field>
-            <Field label="Sales Name"><input className={inp} value={form.salesName} onChange={(e) => setForm({ ...form, salesName: e.target.value })} /></Field>
+            <Field label="Sales Name">
+              <select className={inp} value={form.salesName} onChange={(e) => setForm({ ...form, salesName: e.target.value })}>
+                <option value="">— pilih sales —</option>
+                {form.salesName && !karyawan.some((k) => k.Nama === form.salesName) && <option value={form.salesName}>{form.salesName}</option>}
+                {karyawan.map((k) => <option key={k.Nama} value={k.Nama}>{k.Nama}</option>)}
+              </select>
+            </Field>
             <Field label="Company Name">
               <CompanyPicker value={form.companyName} companies={companies} onChange={isiCompany} />
               <p className="text-xs text-slate-400 mt-1">Boleh dikosongkan (kunjungan perorangan). Ketik untuk mencari.</p>
@@ -633,7 +641,13 @@ export default function AktivitasPage() {
                     {STATUS.map((x) => <option key={x}>{x}</option>)}
                   </select>
                 </Field>
-                <Field label="PIC (penanggung jawab)"><input className={inp} value={lead.pic} onChange={(e) => setLead({ ...lead, pic: e.target.value })} /></Field>
+                <Field label="PIC (penanggung jawab)">
+                  <select className={inp} value={lead.pic} onChange={(e) => setLead({ ...lead, pic: e.target.value })}>
+                    <option value="">— pilih sales —</option>
+                    {lead.pic && !karyawan.some((k) => k.Nama === lead.pic) && <option value={lead.pic}>{lead.pic}</option>}
+                    {karyawan.map((k) => <option key={k.Nama} value={k.Nama}>{k.Nama}</option>)}
+                  </select>
+                </Field>
                 {lead.status === "Cancel" && (
                   <div className="sm:col-span-2">
                     <Field label="Alasan Cancel *">

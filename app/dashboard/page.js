@@ -85,6 +85,7 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [leads, setLeads] = useState([]);
   const [bookings, setBookings] = useState([]);
+  const [karyawan, setKaryawan] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cari, setCari] = useState("");
   const [filterStatus, setFilterStatus] = useState("Semua");
@@ -142,6 +143,10 @@ export default function Dashboard() {
     try {
       const rb = await fetch("/api/roombooking", { cache: "no-store" }).then((x) => x.json());
       if (rb.status === "ok") setBookings(rb.data || []);
+    } catch (e) {}
+    try {
+      const k = await fetch("/api/karyawan", { cache: "no-store" }).then((x) => x.json());
+      if (k.status === "ok") setKaryawan(k.data || []);
     } catch (e) {}
   }, []);
 
@@ -693,7 +698,11 @@ export default function Dashboard() {
               </select>
             </Field>
             <Field label="PIC (penanggung jawab)">
-              <input className={inp} value={form.pic} onChange={(e) => setForm({ ...form, pic: e.target.value })} />
+              <select className={inp} value={form.pic} onChange={(e) => setForm({ ...form, pic: e.target.value })}>
+                <option value="">— pilih sales —</option>
+                {form.pic && !karyawan.some((k) => k.Nama === form.pic) && <option value={form.pic}>{form.pic}</option>}
+                {karyawan.map((k) => <option key={k.Nama} value={k.Nama}>{k.Nama}</option>)}
+              </select>
             </Field>
             {form.status === "Cancel" && (
               <div className="sm:col-span-2">

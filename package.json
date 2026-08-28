@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "init-db": "node scripts/init-neon.mjs",
-    "migrate": "node scripts/migrate-neon.mjs"
+    "migrate": "node scripts/migrate-neon.mjs",
+    "fix-nama": "node scripts/perbaiki-nama.mjs"
   },
   "dependencies": {
     "next": "14.2.5",
