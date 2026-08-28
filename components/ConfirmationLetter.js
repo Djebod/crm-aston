@@ -212,7 +212,7 @@ ${g.noHP ? "<div><b>No HP : " + esc(g.noHP) + "</b></div>" : ""}
 <ul>${inclList}</ul>
 <p>Penggunaan Extra Bed dikenakan biaya Rp 400.000 per malam sudah termasuk sarapan. Penambahan sarapan di luar paket kamar dikenakan biaya Rp 180.000 per orang.</p>
 
-<div class="sec pb">2. KEBUTUHAN ACARA</div>
+<div class="sec">2. KEBUTUHAN ACARA</div>
 <div>Nama Acara &nbsp;: <b>${esc(g.namaAcara) || "-"}</b></div>
 <div>Jumlah Peserta &nbsp;: ${angka(g.jumlahPeserta) ? angka(g.jumlahPeserta) + " Orang" : "-"}</div>
 <div class="sec">Rangkaian Acara:</div>
@@ -229,7 +229,6 @@ ${g.noHP ? "<div><b>No HP : " + esc(g.noHP) + "</b></div>" : ""}
 </table>
 <p><i><b>Catatan: Harga tersebut di atas sudah termasuk 21% pajak &amp; pelayanan dan hotel tidak memberikan komisi.</b></i></p>
 
-<div class="pb"></div>
 ${pasalRows}
 
 <table class="sign" style="margin-top:20px">

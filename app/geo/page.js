@@ -305,17 +305,25 @@ export default function GeoPage() {
     try {
       await muatHtml2pdf();
       const cont = document.createElement("div");
+      cont.style.position = "fixed";
+      cont.style.top = "0";
+      cont.style.left = "0";
+      cont.style.zIndex = "-1";
       cont.style.width = "200mm";
+      cont.style.background = "#fff";
       cont.style.padding = "0";
       cont.innerHTML = html;
       document.body.appendChild(cont);
+      const prevScroll = window.scrollY;
+      window.scrollTo(0, 0);
       await window.html2pdf().set({
         margin: 5, filename: "GEO-" + (data.geoNo || "dokumen").replace(/[^\w-]/g, "_") + ".pdf",
         image: { type: "jpeg", quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true },
+        html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0, windowWidth: cont.scrollWidth },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
       }).from(cont).save();
       document.body.removeChild(cont);
+      window.scrollTo(0, prevScroll);
     } catch (e) {
       const w = window.open("", "_blank");
       if (w) { w.document.open(); w.document.write("<html><head><title>GEO</title></head><body>" + html + "<scr" + "ipt>window.onload=function(){window.print()}</scr" + "ipt></body></html>"); w.document.close(); }
