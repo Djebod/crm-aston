@@ -141,6 +141,8 @@ export default function OfferingLetter({ lead, user, onClose }) {
     const rangkaianRows = o.rangkaian.map((r) =>
       `<tr>${td(esc(tglID(r.hari)))}${td(esc(r.waktu))}${td(esc(r.acara))}${td(esc(r.tempat))}${td(esc(r.setup))}${td(esc(r.jumlah), "c")}</tr>`).join("");
 
+    const galeri = (a, b, c) => `<div class="galeri"><img src="${origin}/img/${a}"/><img src="${origin}/img/${b}"/><img src="${origin}/img/${c}"/></div>`;
+
     const estRows = o.estimasi.map((r, i) => {
       const tot = angka(r.jumlah) * angka(r.harga);
       return `<tr>${td(i + 1, "c")}${td(esc(r.deskripsi))}${td(angka(r.jumlah).toLocaleString("id-ID"), "r")}${td(angka(r.harga).toLocaleString("id-ID"), "r")}${td(tot.toLocaleString("id-ID"), "r")}</tr>`;
@@ -169,6 +171,10 @@ export default function OfferingLetter({ lead, user, onClose }) {
   .doc .pb { page-break-before: always; }
   .doc .foot { text-align:center; font-size:9px; color:#555; margin-top:26px; border-top:1px solid #ddd; padding-top:6px; }
   .doc .foot .web { color:#2563eb; }
+  .doc .galeri { margin:6px 0 2px; page-break-inside:avoid; font-size:0; }
+  .doc .galeri img { width:32.5%; margin-right:1.25%; border-radius:6px; border:1px solid #e2e8f0; vertical-align:top; }
+  .doc .galeri img:last-child { margin-right:0; }
+  .doc .subcap { font-size:10px; color:#64748b; margin:2px 0 8px; }
 </style>
 
   <div class="logo"><img src="${origin}/aston-logo.png" onerror="this.style.display='none'"/></div>
@@ -230,10 +236,17 @@ export default function OfferingLetter({ lead, user, onClose }) {
   <div class="sec">ADD ON</div>
   <ul>${addonList}</ul>
 
-  <div class="sec">OSMOSIS MUSIC &amp; EATERY</div>
-  <div>Jam Operasional : 17.00 – 02.00 WIB (Senin-Sabtu) · Live Music setiap hari 20.00-02.00 · WA +62 817-720-100</div>
+  <div class="sec pb">OSMOSIS MUSIC &amp; EATERY</div>
+  <div class="subcap">Jam Operasional : 17.00 – 02.00 WIB (Senin-Sabtu) · Live Music setiap hari 20.00-02.00 · WA +62 817-720-100</div>
+  ${galeri("osmosis-1.jpg", "osmosis-2.jpg", "osmosis-3.jpg")}
+
   <div class="sec">EAGLE GOLF DRIVING RANGE</div>
-  <div>Jam buka 07.00 - 22.00 WIB · Reguler Rp 130.000 nett/100 bola · Add 50 bola Rp 70.000 · Sewa stick Rp 50.000/stick</div>
+  <div class="subcap">Jam buka 07.00 - 22.00 WIB · Reguler Rp 130.000 nett/100 bola · Add 50 bola Rp 70.000 · Sewa stick Rp 50.000/stick</div>
+  ${galeri("eagle-1.jpg", "eagle-2.jpg", "eagle-3.jpg")}
+
+  <div class="sec">FUN GAMES &amp; TEAM BUILDING</div>
+  <div class="subcap">Aneka permainan seru untuk gathering &amp; outbound di area taman &amp; lapangan hotel — cocok untuk employee gathering, family day, dan team building.</div>
+  ${galeri("fungames-1.jpg", "fungames-2.jpg", "fungames-3.jpg")}
 
   <p style="margin-top:10px"><i><b>Catatan: Harga tersebut di atas sudah termasuk 21% pajak &amp; pelayanan dan hotel tidak memberikan komisi.</b></i></p>
 
