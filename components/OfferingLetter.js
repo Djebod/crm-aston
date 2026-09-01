@@ -141,46 +141,54 @@ export default function OfferingLetter({ lead, user, onClose }) {
     const rangkaianRows = o.rangkaian.map((r) =>
       `<tr>${td(esc(tglID(r.hari)))}${td(esc(r.waktu))}${td(esc(r.acara))}${td(esc(r.tempat))}${td(esc(r.setup))}${td(esc(r.jumlah), "c")}</tr>`).join("");
 
-    const galeri = (a, b, c) => `<div class="galeri"><img src="${origin}/img/${a}"/><img src="${origin}/img/${b}"/><img src="${origin}/img/${c}"/></div>`;
+    const galeri = (a, b, c) => `<table class="galeri"><tr><td><img src="${origin}/img/${a}"/></td><td><img src="${origin}/img/${b}"/></td><td><img src="${origin}/img/${c}"/></td></tr></table>`;
 
     const estRows = o.estimasi.map((r, i) => {
       const tot = angka(r.jumlah) * angka(r.harga);
       return `<tr>${td(i + 1, "c")}${td(esc(r.deskripsi))}${td(angka(r.jumlah).toLocaleString("id-ID"), "r")}${td(angka(r.harga).toLocaleString("id-ID"), "r")}${td(tot.toLocaleString("id-ID"), "r")}</tr>`;
     }).join("");
 
-    const foot = `<div class="foot">${HOTEL.alamat}<br>${HOTEL.telp} ${HOTEL.email}<br><span class="web">${HOTEL.web}</span></div>`;
+    const foot = `<div class="foot">${HOTEL.nama.toUpperCase()} &nbsp;·&nbsp; ${HOTEL.telp} &nbsp;·&nbsp; <span class="web">${HOTEL.web}</span></div>`;
 
     const html = `<div class="doc"><style>
-  .doc { font-family: Arial, Helvetica, sans-serif; color:#1f2937; font-size:12px; line-height:1.55; }
+  .doc { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; color:#26303b; font-size:12px; line-height:1.55; }
   .doc * { box-sizing: border-box; }
-  .doc .logo { text-align:center; margin-bottom:14px; }
-  .doc .logo img { height:52px; display:block; margin:0 auto; }
+  .doc .kop { border-top:5px solid #12263a; border-bottom:2px solid #c8962c; padding:12px 0 10px; text-align:center; margin-bottom:14px; }
+  .doc .kop img { height:52px; display:block; margin:0 auto 6px; }
+  .doc .kop .hname { font-size:14px; font-weight:bold; color:#12263a; letter-spacing:1px; }
+  .doc .kop .haddr { font-size:9px; color:#64748b; margin-top:2px; }
   .doc b { color:#111; }
   .doc .to b { display:block; }
-  .doc .sec { font-weight:bold; margin:14px 0 4px; }
-  .doc .italb { font-weight:bold; font-style:italic; }
+  .doc .metabar { display:flex; justify-content:space-between; font-size:11px; color:#12263a; border-left:3px solid #c8962c; padding-left:8px; margin-bottom:6px; }
+  .doc .sec { font-weight:bold; color:#12263a; margin:15px 0 5px; padding:4px 0 4px 9px; border-left:4px solid #c8962c; background:#f3f6fb; text-transform:uppercase; font-size:11.5px; letter-spacing:.4px; }
+  .doc .italb { font-weight:bold; font-style:italic; color:#12263a; }
   .doc ul { margin:4px 0 4px 18px; padding:0; }
   .doc li { margin:2px 0; }
   .doc table { width:100%; border-collapse:collapse; margin:8px 0; page-break-inside:avoid; }
-  .doc th, .doc td { border:1px solid #94a3b8; padding:6px 8px; text-align:left; vertical-align:top; }
-  .doc th { background:#f1f5f9; text-align:center; font-size:11px; }
+  .doc th, .doc td { border:1px solid #cbd5e1; padding:6px 8px; text-align:left; vertical-align:top; }
+  .doc th { background:#12263a; color:#fff; text-align:center; font-size:11px; letter-spacing:.3px; }
   .doc td.c, .doc th.c { text-align:center; }
   .doc td.r { text-align:right; }
-  .doc .rate-title td { text-align:center; font-weight:bold; background:#eef2f8; }
+  .doc .rate-title td { text-align:center; font-weight:bold; background:#c8962c; color:#fff; border-color:#c8962c; }
   .doc .total td { font-weight:bold; background:#fdf6e9; }
   .doc .pb { page-break-before: always; }
-  .doc .foot { text-align:center; font-size:9px; color:#555; margin-top:26px; border-top:1px solid #ddd; padding-top:6px; }
-  .doc .foot .web { color:#2563eb; }
-  .doc .galeri { margin:6px 0 2px; page-break-inside:avoid; font-size:0; }
-  .doc .galeri img { width:32.5%; margin-right:1.25%; border-radius:6px; border:1px solid #e2e8f0; vertical-align:top; }
-  .doc .galeri img:last-child { margin-right:0; }
-  .doc .subcap { font-size:10px; color:#64748b; margin:2px 0 8px; }
+  .doc .foot { text-align:center; font-size:9px; color:#fff; margin-top:26px; background:#12263a; padding:8px 6px; border-top:3px solid #c8962c; }
+  .doc .foot .web { color:#e7c877; }
+  .doc .galeri { width:100%; margin:6px 0 4px; page-break-inside:avoid; table-layout:fixed; border-collapse:collapse; }
+  .doc .galeri td { width:33.33%; border:0; padding:0 3px; vertical-align:top; }
+  .doc .galeri td:first-child { padding-left:0; }
+  .doc .galeri td:last-child { padding-right:0; }
+  .doc .galeri img { width:100%; height:auto; display:block; border-radius:6px; border:1px solid #e2e8f0; }
+  .doc .subcap { font-size:10px; color:#64748b; margin:2px 0 6px; }
 </style>
 
-  <div class="logo"><img src="${origin}/aston-logo.png" onerror="this.style.display='none'"/></div>
+  <div class="kop">
+    <img src="${origin}/aston-logo.png" onerror="this.style.display='none'"/>
+    <div class="hname">${HOTEL.nama.toUpperCase()}</div>
+    <div class="haddr">${HOTEL.alamat} · ${HOTEL.telp} · ${HOTEL.email}</div>
+  </div>
 
-  <div><b>Cirebon, ${tglID(o.tglSurat)}</b></div>
-  <div><b>NO OL : ${esc(noOL)}</b></div>
+  <div class="metabar"><span><b>Cirebon, ${tglID(o.tglSurat)}</b></span><span><b>NO OL : ${esc(noOL)}</b></span></div>
   <br>
   <div class="to">
     <b>${esc(o.namaTamu) || "-"}</b>
