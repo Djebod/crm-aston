@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Modal, Field, inp } from "@/components/Modal";
 import { unduhPDFdariHTML } from "@/lib/pdf";
+import { RATE_CATEGORIES, rateDefault } from "@/lib/rates";
 
 const HOTEL = {
   nama: "Aston Cirebon Hotel & Convention Center",
@@ -13,15 +14,7 @@ const HOTEL = {
   web: "www.AstonCirebon.com",
 };
 
-// Harga kamar: 4 kategori (Weekday/Weekend)
-const RATE_CATEGORIES = ["Corporate New Account", "Corporate LMA", "Corporate CMA", "Travel Agent"];
-const ROOM_TYPES = ["Superior", "Deluxe", "Junior Executive", "Executive", "Suite", "Presidential Suite"];
-const WD_BASE = [928000, 1048000, 1168000, 1588000, 2108000, 5108000];
-function rateDefault() {
-  const o = {};
-  RATE_CATEGORIES.forEach((c) => { o[c] = ROOM_TYPES.map((t, i) => [t, String(WD_BASE[i]), String(WD_BASE[i] + 50000)]); });
-  return o;
-}
+
 
 // Paket & harga (bisa diubah). Coffee break 150k, Lunch/Dinner 250k.
 const PAKET = [
@@ -159,7 +152,6 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
     const pasalRows = pasalList(g).map((p, i) =>
       `<div class="pasal"><div class="ptitle">${i + 3}. ${p[0]}</div><div class="pbody">${p[1]}</div></div>`).join("");
 
-    const foot = `<div class="foot">${HOTEL.alamat}<br>${HOTEL.telp} ${HOTEL.email} · <span class="web">${HOTEL.web}</span></div>`;
 
     return `<div class="doc">
 <style>
@@ -247,15 +239,13 @@ ${pasalRows}
   <tr><td>Tanggal</td><td>: ______________________</td></tr>
   <tr><td>Tanda Tangan</td><td>: ______________________</td></tr>
 </table>
-
-${foot}
 </div>`;
   }
 
   const [busy, setBusy] = useState(false);
   async function unduh() {
     setBusy(true);
-    await unduhPDFdariHTML(build(), "CL-" + (clNo || "letter").replace(/[^\w-]/g, "_") + ".pdf");
+    await unduhPDFdariHTML(build(), "CL-" + (clNo || "letter").replace(/[^\w-]/g, "_") + ".pdf", HOTEL.alamat + " · " + HOTEL.telp + " · " + HOTEL.web);
     try {
       const th = new Date(g.tglSurat || hariIni()).getFullYear();
       await fetch("/api/docnum", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kode: "CL", tahun: th, nomor: angka(g.nomor) }) });

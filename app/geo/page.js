@@ -53,7 +53,13 @@ const GEO_KOSONG = () => ({
   rooms: [{ type: "Superior", checkIn: "", checkOut: "", totalRoom: "", day: "", price: "", bfast: "", dinner: "", others: "" }],
   dpAmount: "", dpDate: "", remark: "",
   notes: { ...DEFAULT_NOTES },
-  preparedBy: "", preparedTitle: "Sales Person", salesLeader: "", ackFO: "", ackFC: "", approvedBy: "",
+  ttd: [
+    { nama: "", jabatan: "Sales Person" },
+    { nama: "", jabatan: "Sales Leader" },
+    { nama: "", jabatan: "Front Office Manager" },
+    { nama: "", jabatan: "Financial Controller" },
+    { nama: "", jabatan: "General Manager" },
+  ],
 });
 
 // Jumlah malam (Room Night) dari check in – check out
@@ -166,13 +172,9 @@ function buildHTML(g, origin) {
       <tr style="background:#eef2f8;font-weight:bold;">
         <td style="${TDB}">Prepared by,</td><td style="${TDB}" colspan="3">Acknowledged by,</td><td style="${TDB}">Approved by,</td>
       </tr>
-      <tr style="height:46px;"><td style="${TDB}"></td><td style="${TDB}"></td><td style="${TDB}"></td><td style="${TDB}"></td><td style="${TDB}"></td></tr>
+      <tr style="height:46px;">${(g.ttd || []).map(() => `<td style="${TDB}"></td>`).join("")}</tr>
       <tr style="font-weight:bold;">
-        <td style="${TDB}">${esc(g.preparedBy)}<div style="font-weight:normal">Sales Person</div></td>
-        <td style="${TDB}">${esc(g.salesLeader)}<div style="font-weight:normal">Sales Leader</div></td>
-        <td style="${TDB}">${esc(g.ackFO)}<div style="font-weight:normal">FOM</div></td>
-        <td style="${TDB}">${esc(g.ackFC)}<div style="font-weight:normal">FC</div></td>
-        <td style="${TDB}">${esc(g.approvedBy)}<div style="font-weight:normal">General Manager</div></td>
+        ${(g.ttd || []).map((t) => `<td style="${TDB}">${esc(t.nama) || "&nbsp;"}<div style="font-weight:normal">${esc(t.jabatan)}</div></td>`).join("")}
       </tr>
     </table>
     <div style="font-style:italic;font-weight:bold;font-size:8px;padding:3px;border-top:1px solid #111;">Distribution: GM, EAM, DOSM, FC, Chief Engineer, EHK, RBM, Chief Sec, HRM, AFOM, Reservation, Sales Admin, Ext. Chef, Outlet Rest.</div>
@@ -231,9 +233,9 @@ export default function GeoPage() {
     try {
       const p = JSON.parse(raw);
       const k = GEO_KOSONG();
-      k.preparedBy = user?.nama || "";
       k.salesPerson = p.salesPerson || user?.nama || "";
-      const merged = { ...k, ...p, notes: { ...DEFAULT_NOTES } };
+      k.ttd[0].nama = p.salesPerson || user?.nama || "";
+      const merged = { ...k, ...p, notes: { ...DEFAULT_NOTES }, ttd: k.ttd };
       merged.nomor = String(nextNomor(list, new Date().getFullYear()));
       merged.kodeSales = user?.kode || inisial(p.salesPerson || user?.nama);
       merged.geoNo = rebuildNo(merged);
@@ -247,7 +249,7 @@ export default function GeoPage() {
   function bukaBaru() {
     const k = GEO_KOSONG();
     k.salesPerson = user?.nama || "";
-    k.preparedBy = user?.nama || "";
+    k.ttd[0].nama = user?.nama || "";
     k.nomor = String(nextNomor(list, new Date().getFullYear()));
     k.kodeSales = user?.kode || inisial(user?.nama);
     k.geoNo = rebuildNo(k);
@@ -272,6 +274,7 @@ export default function GeoPage() {
     return { ...n, geoNo: rebuildNo(n) };
   });
   const setNote = (k, v) => setG((s) => ({ ...s, notes: { ...s.notes, [k]: v } }));
+  const setTtd = (i, k, v) => setG((s) => ({ ...s, ttd: (s.ttd || []).map((t, j) => (j === i ? { ...t, [k]: v } : t)) }));
   const setRoom = (i, k, v) => setG((s) => ({ ...s, rooms: s.rooms.map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
   const addRoom = () => setG((s) => ({ ...s, rooms: [...s.rooms, { type: "", checkIn: "", checkOut: "", totalRoom: "", day: "", price: "" }] }));
   const delRoom = (i) => setG((s) => ({ ...s, rooms: s.rooms.filter((_, j) => j !== i) }));
@@ -451,23 +454,20 @@ export default function GeoPage() {
               <Field label="Sign Board"><input className={inp} value={g.notes.sign} onChange={(e) => setNote("sign", e.target.value)} /></Field>
             </div>
 
-            <div className="border border-slate-200 rounded-lg p-3 grid grid-cols-2 gap-2">
-              <div className="col-span-2 text-xs font-semibold text-slate-500">TANDA TANGAN</div>
-              <Field label="Prepared by — Sales Person">
-                <select className={inp} value={g.preparedBy} onChange={(e) => set("preparedBy", e.target.value)}>
-                  <option value="">— pilih —</option>
-                  {karyawan.map((k) => <option key={k.Nama} value={k.Nama}>{k.Nama}{k.Kode ? " (" + k.Kode + ")" : ""}</option>)}
-                </select>
-              </Field>
-              <Field label="Sales Leader">
-                <select className={inp} value={g.salesLeader} onChange={(e) => set("salesLeader", e.target.value)}>
-                  <option value="">— pilih —</option>
-                  {karyawan.map((k) => <option key={k.Nama} value={k.Nama}>{k.Nama}{k.Kode ? " (" + k.Kode + ")" : ""}</option>)}
-                </select>
-              </Field>
-              <Field label="Acknowledged - FOM"><input className={inp} value={g.ackFO} onChange={(e) => set("ackFO", e.target.value)} /></Field>
-              <Field label="Acknowledged - FC"><input className={inp} value={g.ackFC} onChange={(e) => set("ackFC", e.target.value)} /></Field>
-              <Field label="Approved - GM"><input className={inp} value={g.approvedBy} onChange={(e) => set("approvedBy", e.target.value)} /></Field>
+            <div className="border border-slate-200 rounded-lg p-3">
+              <div className="text-xs font-semibold text-slate-500 mb-2">TANDA TANGAN (nama &amp; jabatan bisa disesuaikan)</div>
+              <div className="space-y-2">
+                {(g.ttd || []).map((t, i) => (
+                  <div key={i} className="grid grid-cols-2 gap-2 items-center">
+                    <select className={inp + " text-sm"} value={t.nama} onChange={(e) => setTtd(i, "nama", e.target.value)}>
+                      <option value="">— pilih nama —</option>
+                      {t.nama && !karyawan.some((k) => k.Nama === t.nama) && <option value={t.nama}>{t.nama}</option>}
+                      {karyawan.map((k) => <option key={k.Nama} value={k.Nama}>{k.Nama}{k.Kode ? " (" + k.Kode + ")" : ""}</option>)}
+                    </select>
+                    <input className={inp + " text-sm"} value={t.jabatan} onChange={(e) => setTtd(i, "jabatan", e.target.value)} placeholder="Jabatan" />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 

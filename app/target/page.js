@@ -124,8 +124,8 @@ export default function TargetPage() {
     });
     akt.forEach((a) => {
       if (sales !== ALL && a.SalesName !== sales) return;
-      if (tahunDari(a.Tanggal) !== Number(tahun)) return;
-      const m = bulanDari(a.Tanggal); if (m === null) return;
+      if (tahunDari(a.Date) !== Number(tahun)) return;
+      const m = bulanDari(a.Date); if (m === null) return;
       rKunj[m] += 1;
     });
     const tKunjBulan = tKunj.map((d, i) => d * hariKerja(Number(tahun), i + 1));

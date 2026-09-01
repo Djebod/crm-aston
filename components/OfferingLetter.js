@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Modal, Field, inp } from "@/components/Modal";
 import { unduhPDFdariHTML } from "@/lib/pdf";
+import { RATE_CATEGORIES, rateDefault } from "@/lib/rates";
 
 // ====== Identitas hotel (ubah bila perlu) ======
 const HOTEL = {
@@ -13,15 +14,7 @@ const HOTEL = {
   web: "www.AstonCirebon.com",
 };
 
-// ====== Harga kamar: 4 kategori, masing-masing Weekday & Weekend ======
-const RATE_CATEGORIES = ["Corporate New Account", "Corporate LMA", "Corporate CMA", "Travel Agent"];
-const ROOM_TYPES = ["Superior", "Deluxe", "Junior Executive", "Executive", "Suite", "Presidential Suite"];
-const WD_BASE = [908000, 1028000, 1148000, 1568000, 2088000, 5088000];
-function rateDefault() {
-  const o = {};
-  RATE_CATEGORIES.forEach((c) => { o[c] = ROOM_TYPES.map((t, i) => [t, String(WD_BASE[i]), String(WD_BASE[i] + 50000)]); });
-  return o;
-}
+
 
 const INCLUSIONS = [
   "Sarapan untuk 2 orang",
@@ -45,6 +38,18 @@ const RES_INCLUDES = [
   "1 kali makan malam di ballroom",
   "1 kali Coffee Break",
   "1 kali Amazing Race",
+];
+
+const RES_BENEFIT = "Superior Room\nPenggunaan ruang Meeting selama 12 jam\nLCD Projector (2000 lumens) dan Layar (2 m x 1,5 m)\nAudio Sound System\n2 Microphone\nMeeting Stationary: 1 Flip Chart 3 warna Spidol, Notepad dan Pensil\nAir Putih dan permen\n2 kali sarapan\n1 kali makan siang\n1 kali makan malam di ballroom\n1 kali Coffee Break\n1 kali Amazing Race";
+
+const PACKAGES = [
+  { nama: "Coffee Break Package", harga: 150000, benefit: "1x Coffee Break (snack + minuman)\nRuang meeting\nStandard sound system" },
+  { nama: "Meals Package", harga: 250000, benefit: "1x Makan (Lunch/Dinner) prasmanan\nRuang meeting\nAir mineral" },
+  { nama: "Half Day Meeting", harga: 300000, benefit: "Ruang meeting (4 jam)\n1x Coffee Break\n1x Makan\nLCD Projector & layar\nSound system & 2 microphone\nMeeting stationary\nAir mineral & permen" },
+  { nama: "Full Day Meeting", harga: 450000, benefit: "Ruang meeting (8 jam)\n2x Coffee Break\n1x Makan\nLCD Projector & layar\nSound system & 2 microphone\nMeeting stationary\nAir mineral & permen" },
+  { nama: "Fullboard Meeting", harga: 600000, benefit: "Menginap 1 malam (twin share) + sarapan\nRuang meeting\n2x Coffee Break\n3x Makan\nLCD Projector & layar\nSound system & 2 microphone\nMeeting stationary" },
+  { nama: "Residential Twin Package", harga: 1500000, benefit: "Special Price 3 Hari 2 Malam (Twin/Triple Share)\n" + RES_BENEFIT },
+  { nama: "Residential Single Package", harga: 2300000, benefit: "Special Price 3 Hari 2 Malam (Single Share)\n" + RES_BENEFIT },
 ];
 
 const ADDON = [
@@ -104,11 +109,15 @@ export default function OfferingLetter({ lead, user, onClose }) {
     estimasi: [{ deskripsi: "Residential Twin Package", jumlah: "", harga: "1500000" }],
     konfirmasiTgl: "",
     ttdNama: user?.nama || "",
-    ttdJabatan: "Sales & Marketing",
+    ttdJabatan: "Sales Person",
+    paket: PACKAGES[5].nama,
+    paketHarga: String(PACKAGES[5].harga),
+    paketBenefit: PACKAGES[5].benefit,
     ttdHP: "",
   });
 
   const set = (k, v) => setO((s) => ({ ...s, [k]: v }));
+  const pilihPaket = (nama) => { const p = PACKAGES.find((x) => x.nama === nama); setO((s) => ({ ...s, paket: nama, paketHarga: p ? String(p.harga) : s.paketHarga, paketBenefit: p ? p.benefit : s.paketBenefit })); };
   const setRow = (arr, i, k, v) => setO((s) => ({ ...s, [arr]: s[arr].map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
   const addRow = (arr, kosong) => setO((s) => ({ ...s, [arr]: [...s[arr], kosong] }));
   const delRow = (arr, i) => setO((s) => ({ ...s, [arr]: s[arr].filter((_, j) => j !== i) }));
@@ -137,6 +146,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
     const inclList = INCLUSIONS.map((x) => `<li>${esc(x)}</li>`).join("");
     const resList = RES_INCLUDES.map((x) => `<li>${esc(x)}</li>`).join("");
     const addonList = ADDON.map((x) => `<li>${esc(x)}</li>`).join("");
+    const paketBenefitList = String(o.paketBenefit || "").split("\n").filter((x) => x.trim()).map((x) => `<li>${esc(x)}</li>`).join("");
 
     const rangkaianRows = o.rangkaian.map((r) =>
       `<tr>${td(esc(tglID(r.hari)))}${td(esc(r.waktu))}${td(esc(r.acara))}${td(esc(r.tempat))}${td(esc(r.setup))}${td(esc(r.jumlah), "c")}</tr>`).join("");
@@ -148,32 +158,34 @@ export default function OfferingLetter({ lead, user, onClose }) {
       return `<tr>${td(i + 1, "c")}${td(esc(r.deskripsi))}${td(angka(r.jumlah).toLocaleString("id-ID"), "r")}${td(angka(r.harga).toLocaleString("id-ID"), "r")}${td(tot.toLocaleString("id-ID"), "r")}</tr>`;
     }).join("");
 
-    const foot = `<div class="foot">${HOTEL.nama.toUpperCase()} &nbsp;·&nbsp; ${HOTEL.telp} &nbsp;·&nbsp; <span class="web">${HOTEL.web}</span></div>`;
+
 
     const html = `<div class="doc"><style>
   .doc { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; color:#26303b; font-size:12px; line-height:1.55; }
   .doc * { box-sizing: border-box; }
-  .doc .kop { border-top:5px solid #12263a; border-bottom:2px solid #c8962c; padding:12px 0 10px; text-align:center; margin-bottom:14px; }
+  .doc .kop { border-top:5px solid #12263a; border-bottom:2px solid #cbd5e1; padding:12px 0 10px; text-align:center; margin-bottom:14px; }
   .doc .kop img { height:52px; display:block; margin:0 auto 6px; }
   .doc .kop .hname { font-size:14px; font-weight:bold; color:#12263a; letter-spacing:1px; }
   .doc .kop .haddr { font-size:9px; color:#64748b; margin-top:2px; }
   .doc b { color:#111; }
   .doc .to b { display:block; }
-  .doc .metabar { display:flex; justify-content:space-between; font-size:11px; color:#12263a; border-left:3px solid #c8962c; padding-left:8px; margin-bottom:6px; }
-  .doc .sec { font-weight:bold; color:#12263a; margin:15px 0 5px; padding:4px 0 4px 9px; border-left:4px solid #c8962c; background:#f3f6fb; text-transform:uppercase; font-size:11.5px; letter-spacing:.4px; }
+  .doc .metabar { width:100%; border-collapse:collapse; margin-bottom:8px; font-size:11px; }
+  .doc .metabar td { border:0; padding:4px 8px; color:#12263a; font-weight:bold; }
+  .doc .metabar td:first-child { border-left:3px solid #12263a; }
+  .doc .sec { font-weight:bold; color:#12263a; margin:15px 0 5px; padding:4px 0 4px 9px; border-left:4px solid #334155; background:#f1f5f9; text-transform:uppercase; font-size:11.5px; letter-spacing:.4px; }
   .doc .italb { font-weight:bold; font-style:italic; color:#12263a; }
   .doc ul { margin:4px 0 4px 18px; padding:0; }
   .doc li { margin:2px 0; }
   .doc table { width:100%; border-collapse:collapse; margin:8px 0; page-break-inside:avoid; }
   .doc th, .doc td { border:1px solid #cbd5e1; padding:6px 8px; text-align:left; vertical-align:top; }
-  .doc th { background:#12263a; color:#fff; text-align:center; font-size:11px; letter-spacing:.3px; }
+  .doc th { background:#475569; color:#fff; text-align:center; font-size:11px; letter-spacing:.3px; }
   .doc td.c, .doc th.c { text-align:center; }
   .doc td.r { text-align:right; }
-  .doc .rate-title td { text-align:center; font-weight:bold; background:#c8962c; color:#fff; border-color:#c8962c; }
-  .doc .total td { font-weight:bold; background:#fdf6e9; }
+  .doc .rate-title td { text-align:center; font-weight:bold; background:#12263a; color:#fff; border-color:#12263a; }
+  .doc .total td { font-weight:bold; background:#eef2f7; }
   .doc .pb { page-break-before: always; }
-  .doc .foot { text-align:center; font-size:9px; color:#fff; margin-top:26px; background:#12263a; padding:8px 6px; border-top:3px solid #c8962c; }
-  .doc .foot .web { color:#e7c877; }
+  .doc .foot { text-align:center; font-size:9px; color:#fff; margin-top:26px; background:#12263a; padding:8px 6px; border-top:3px solid #cbd5e1; }
+  .doc .foot .web { color:#cbd5e1; }
   .doc .galeri { width:100%; margin:6px 0 4px; page-break-inside:avoid; table-layout:fixed; border-collapse:collapse; }
   .doc .galeri td { width:33.33%; border:0; padding:0 3px; vertical-align:top; }
   .doc .galeri td:first-child { padding-left:0; }
@@ -188,7 +200,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
     <div class="haddr">${HOTEL.alamat} · ${HOTEL.telp} · ${HOTEL.email}</div>
   </div>
 
-  <div class="metabar"><span><b>Cirebon, ${tglID(o.tglSurat)}</b></span><span><b>NO OL : ${esc(noOL)}</b></span></div>
+  <table class="metabar"><tr><td>Cirebon, ${tglID(o.tglSurat)}</td><td class="r">NO OL : ${esc(noOL)}</td></tr></table>
   <br>
   <div class="to">
     <b>${esc(o.namaTamu) || "-"}</b>
@@ -230,17 +242,10 @@ export default function OfferingLetter({ lead, user, onClose }) {
   </table>
   <p><i>*Catatan: Pemblokiran ruang acara dapat berubah sesuai kebijakan hotel, selama tetap memenuhi persyaratan minimum pelaksanaan acara.</i></p>
 
-  <div class="sec pb">RESIDENTIAL PACKAGE</div>
-  <div><b>Special Price 3 Hari 2 Malam</b></div>
-  <div><b>Twin/ Triple Share : ${rp(o.resTwin)} Nett/Orang</b></div>
-  <div><b>Single Share : ${rp(o.resSingle)} Nett/Orang</b></div>
-  <div style="margin-top:4px">Termasuk:</div>
-  <ul>${resList}</ul>
-  <div class="sec">Additional :</div>
-  <div>Coffee Break : ${rp(o.addCoffee)}</div>
-  <div>Lunch : ${rp(o.addLunch)}</div>
-  <div>Dinner : ${rp(o.addDinner)}</div>
-  <div>Band : ${rp(o.addBand)}</div>
+  <div class="sec pb">PAKET</div>
+  <div><b>${esc(o.paket)}</b> &nbsp;—&nbsp; <b>${rp(o.paketHarga)} Nett/Orang</b></div>
+  <div style="margin-top:4px">Benefit termasuk:</div>
+  <ul>${paketBenefitList}</ul>
   <div class="sec">ADD ON</div>
   <ul>${addonList}</ul>
 
@@ -272,7 +277,6 @@ export default function OfferingLetter({ lead, user, onClose }) {
   <div style="margin-top:8px">Hormat Kami,<br>${HOTEL.nama}</div>
   <div style="margin-top:48px"><b><u>${esc(o.ttdNama) || "-"}</u></b><br>${esc(o.ttdJabatan)}${o.ttdHP ? "<br>" + esc(o.ttdHP) : ""}</div>
 
-  ${foot}
 </div>`;
     return html;
   }
@@ -280,7 +284,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
   async function unduh() {
     setBusy(true);
     const namaFile = "OL-" + (noOL || "offering").replace(/[^\w-]/g, "_") + ".pdf";
-    const ok = await unduhPDFdariHTML(cetak(), namaFile);
+    const ok = await unduhPDFdariHTML(cetak(), namaFile, HOTEL.alamat + " · " + HOTEL.telp + " · " + HOTEL.web);
     // naikkan counter agar nomor berikutnya lanjut
     try {
       const th = new Date(o.tglSurat || hariIni()).getFullYear();
@@ -366,14 +370,20 @@ export default function OfferingLetter({ lead, user, onClose }) {
           </div>
         </div>
 
-        {/* Harga paket */}
-        <div className="border border-slate-200 rounded-lg p-3">
-          <div className="text-xs font-semibold text-slate-500 mb-2">HARGA PAKET (opsional, tampil di surat)</div>
+        {/* Paket (dropdown → harga & benefit auto, tetap bisa diedit) */}
+        <div className="border border-slate-200 rounded-lg p-3 space-y-2">
+          <div className="text-xs font-semibold text-slate-500">PAKET (benefit mengikuti harga paket)</div>
           <div className="grid grid-cols-3 gap-2">
-            <Field label="Twin/Triple (Rp)"><input className={inp} inputMode="numeric" value={o.resTwin} onChange={(e) => set("resTwin", e.target.value.replace(/[^\d]/g, ""))} /></Field>
-            <Field label="Single (Rp)"><input className={inp} inputMode="numeric" value={o.resSingle} onChange={(e) => set("resSingle", e.target.value.replace(/[^\d]/g, ""))} /></Field>
-            <Field label="Lunch (Rp)"><input className={inp} inputMode="numeric" value={o.addLunch} onChange={(e) => set("addLunch", e.target.value.replace(/[^\d]/g, ""))} /></Field>
+            <div className="col-span-2">
+              <Field label="Pilih Paket">
+                <select className={inp} value={o.paket} onChange={(e) => pilihPaket(e.target.value)}>
+                  {PACKAGES.map((p) => <option key={p.nama} value={p.nama}>{p.nama}</option>)}
+                </select>
+              </Field>
+            </div>
+            <Field label="Harga (Rp)"><input className={inp} inputMode="numeric" value={o.paketHarga ? angka(o.paketHarga).toLocaleString("id-ID") : ""} onChange={(e) => set("paketHarga", e.target.value.replace(/[^\d]/g, ""))} /></Field>
           </div>
+          <Field label="Benefit (satu per baris, bisa diedit)"><textarea className={inp + " h-32 resize-none text-sm"} value={o.paketBenefit} onChange={(e) => set("paketBenefit", e.target.value)} /></Field>
         </div>
 
         {/* Estimasi biaya */}
