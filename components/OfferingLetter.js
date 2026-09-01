@@ -52,6 +52,21 @@ const PACKAGES = [
   { nama: "Residential Single Package", harga: 2300000, benefit: "Special Price 3 Hari 2 Malam (Single Share)\n" + RES_BENEFIT },
 ];
 
+// ====== Wedding Package (4 venue × Gold/Platinum) ======
+const W_GOLD = "1 Suite Room 1 malam (honeymoon decoration)\n2 Superior Room 1 malam\nBuffet 13 pilihan menu\nFood Testing 6 orang\nRomantic Dinner\nAkad Nikah 30 pax include Food\nGiant Welcome Banner\nFree Meeting Room 1x Meeting Coordination\nFree Parkir (10 kendaraan)";
+const W_PLAT = "1 Presidential Suite 1 malam (honeymoon decoration)\n2 Superior Room 1 malam\nBuffet 16 pilihan menu\n2 Food Stalls (25% of each)\n1 Beverage Stall (50% of each)\nFood Testing 6 orang\nRomantic Dinner\nAkad Nikah 30 pax include Food\nGiant Welcome Banner\nFree Meeting Room 1x Meeting Coordination\nFree Parkir (10 kendaraan)\nFree Royal Carriage";
+const WEDDING_PACKAGES = [
+  { venue: "Backyard", tier: "Gold", harga: 28900000, persons: 100, add: 225000, benefit: W_GOLD },
+  { venue: "Backyard", tier: "Platinum", harga: 35500000, persons: 100, add: 265000, benefit: W_PLAT },
+  { venue: "Onyx Room", tier: "Gold", harga: 49900000, persons: 200, add: 225000, benefit: W_GOLD + "\nLCD dan Screen\nFree VIP/Transit Room" },
+  { venue: "Onyx Room", tier: "Platinum", harga: 66500000, persons: 200, add: 265000, benefit: W_PLAT + "\nVideotron 6 m x 2.5 m\nFree VIP/Transit Room" },
+  { venue: "Nana Land", tier: "Gold", harga: 92900000, persons: 400, add: 225000, benefit: W_GOLD + "\nLCD dan Screen" },
+  { venue: "Nana Land", tier: "Platinum", harga: 109500000, persons: 400, add: 265000, benefit: W_PLAT + "\nLCD & Screen" },
+  { venue: "Sapphire Grand Ballroom", tier: "Gold", harga: 125900000, persons: 500, add: 225000, benefit: W_GOLD + "\nVideotron 8 m x 4 m\nFree VIP/Transit Room\nFree Royal Carriage" },
+  { venue: "Sapphire Grand Ballroom", tier: "Platinum", harga: 144500000, persons: 500, add: 265000, benefit: W_PLAT + "\nVideotron 8 m x 4 m\nFree VIP/Transit Room" },
+];
+const wLabel = (w) => w.venue + " — " + w.tier;
+
 const ADDON = [
   "Mic Rp 300.000,-/mic",
   "Screen Projector Rp 1.500.000,-",
@@ -85,6 +100,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
   const [o, setO] = useState({
     noOL: "",
     nomor: "",
+    jenisOL: "Meeting",
     kodeSales: user?.kode || inisial(user?.nama),
     rateCat: RATE_CATEGORIES[0],
     rates: rateDefault(),
@@ -110,30 +126,37 @@ export default function OfferingLetter({ lead, user, onClose }) {
     konfirmasiTgl: "",
     ttdNama: user?.nama || "",
     ttdJabatan: "Sales Person",
-    paket: PACKAGES[5].nama,
-    paketHarga: String(PACKAGES[5].harga),
-    paketBenefit: PACKAGES[5].benefit,
+    pakets: [{ nama: PACKAGES[5].nama, harga: String(PACKAGES[5].harga), benefit: PACKAGES[5].benefit }],
+    weddings: [{ key: wLabel(WEDDING_PACKAGES[6]), harga: String(WEDDING_PACKAGES[6].harga), persons: String(WEDDING_PACKAGES[6].persons), add: String(WEDDING_PACKAGES[6].add), benefit: WEDDING_PACKAGES[6].benefit }],
     ttdHP: "",
   });
 
+  const kodeDok = o.jenisOL === "Wedding" ? "OLW" : "OL";
   const set = (k, v) => setO((s) => ({ ...s, [k]: v }));
-  const pilihPaket = (nama) => { const p = PACKAGES.find((x) => x.nama === nama); setO((s) => ({ ...s, paket: nama, paketHarga: p ? String(p.harga) : s.paketHarga, paketBenefit: p ? p.benefit : s.paketBenefit })); };
+  const pilihPaket = (i, nama) => { const p = PACKAGES.find((x) => x.nama === nama); setO((s) => ({ ...s, pakets: s.pakets.map((r, j) => (j === i ? { nama, harga: p ? String(p.harga) : r.harga, benefit: p ? p.benefit : r.benefit } : r)) })); };
+  const setPaket = (i, k, v) => setO((s) => ({ ...s, pakets: s.pakets.map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
+  const addPaket = () => setO((s) => ({ ...s, pakets: [...s.pakets, { nama: PACKAGES[0].nama, harga: String(PACKAGES[0].harga), benefit: PACKAGES[0].benefit }] }));
+  const delPaket = (i) => setO((s) => ({ ...s, pakets: s.pakets.filter((_, j) => j !== i) }));
+  const pilihWedding = (i, key) => { const w = WEDDING_PACKAGES.find((x) => wLabel(x) === key); setO((s) => ({ ...s, weddings: s.weddings.map((r, j) => (j === i ? { key, harga: w ? String(w.harga) : r.harga, persons: w ? String(w.persons) : r.persons, add: w ? String(w.add) : r.add, benefit: w ? w.benefit : r.benefit } : r)) })); };
+  const setWed = (i, k, v) => setO((s) => ({ ...s, weddings: s.weddings.map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
+  const addWed = () => setO((s) => ({ ...s, weddings: [...s.weddings, { key: wLabel(WEDDING_PACKAGES[0]), harga: String(WEDDING_PACKAGES[0].harga), persons: String(WEDDING_PACKAGES[0].persons), add: String(WEDDING_PACKAGES[0].add), benefit: WEDDING_PACKAGES[0].benefit }] }));
+  const delWed = (i) => setO((s) => ({ ...s, weddings: s.weddings.filter((_, j) => j !== i) }));
   const setRow = (arr, i, k, v) => setO((s) => ({ ...s, [arr]: s[arr].map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
   const addRow = (arr, kosong) => setO((s) => ({ ...s, [arr]: [...s[arr], kosong] }));
   const delRow = (arr, i) => setO((s) => ({ ...s, [arr]: s[arr].filter((_, j) => j !== i) }));
   const setRate = (i, kol, v) => setO((s) => ({ ...s, rates: { ...s.rates, [s.rateCat]: s.rates[s.rateCat].map((r, j) => (j === i ? [r[0], kol === "wd" ? v : r[1], kol === "we" ? v : r[2]] : r)) } }));
   const [busy, setBusy] = useState(false);
 
-  // Nomor OL otomatis (peek dari counter, reset per tahun)
+  // Nomor otomatis mengikuti jenis (OL untuk Meeting, OLW untuk Wedding), reset per tahun
   useEffect(() => {
     const th = new Date(o.tglSurat || hariIni()).getFullYear();
-    fetch(`/api/docnum?kode=OL&tahun=${th}`, { cache: "no-store" })
-      .then((r) => r.json()).then((r) => { if (r.status === "ok" && !o.nomor) set("nomor", String(r.next)); })
+    fetch(`/api/docnum?kode=${kodeDok}&tahun=${th}`, { cache: "no-store" })
+      .then((r) => r.json()).then((r) => { if (r.status === "ok") set("nomor", String(r.next)); })
       .catch(() => {});
-  }, []); // eslint-disable-line
+  }, [o.jenisOL]); // eslint-disable-line
 
   const grandTotal = o.estimasi.reduce((t, r) => t + angka(r.jumlah) * angka(r.harga), 0);
-  const noOL = buildNoDok("OL", o.nomor, o.tglSurat, o.kodeSales);
+  const noOL = buildNoDok(kodeDok, o.nomor, o.tglSurat, o.kodeSales);
 
   function cetak() {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -146,7 +169,20 @@ export default function OfferingLetter({ lead, user, onClose }) {
     const inclList = INCLUSIONS.map((x) => `<li>${esc(x)}</li>`).join("");
     const resList = RES_INCLUDES.map((x) => `<li>${esc(x)}</li>`).join("");
     const addonList = ADDON.map((x) => `<li>${esc(x)}</li>`).join("");
-    const paketBenefitList = String(o.paketBenefit || "").split("\n").filter((x) => x.trim()).map((x) => `<li>${esc(x)}</li>`).join("");
+    const paketBlok = (o.pakets || []).map((p) => {
+      const li = String(p.benefit || "").split("\n").filter((x) => x.trim()).map((x) => `<li>${esc(x)}</li>`).join("");
+      return `<div style="margin-top:6px"><b>${esc(p.nama)}</b> &nbsp;—&nbsp; <b>${rp(p.harga)} Nett/Orang</b></div><ul>${li}</ul>`;
+    }).join("");
+    const weddingBlok = (o.weddings || []).map((w) => {
+      const li = String(w.benefit || "").split("\n").filter((x) => x.trim()).map((x) => `<li>${esc(x)}</li>`).join("");
+      return `<div class="sec">WEDDING PACKAGE — ${esc(w.key)}</div>
+      <div><b>Harga: ${rp(w.harga)} Nett</b> untuk <b>${esc(w.persons)} Orang</b></div>
+      <div>Penambahan pesanan: <b>${rp(w.add)} Nett/Orang</b></div>
+      <div style="margin-top:2px">Benefit termasuk:</div><ul>${li}</ul>`;
+    }).join("");
+    const paketSection = o.jenisOL === "Wedding"
+      ? `<div class="sec pb">PILIHAN WEDDING PACKAGE</div>${weddingBlok}`
+      : `<div class="sec pb">PAKET</div>${paketBlok}`;
 
     const rangkaianRows = o.rangkaian.map((r) =>
       `<tr>${td(esc(tglID(r.hari)))}${td(esc(r.waktu))}${td(esc(r.acara))}${td(esc(r.tempat))}${td(esc(r.setup))}${td(esc(r.jumlah), "c")}</tr>`).join("");
@@ -242,10 +278,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
   </table>
   <p><i>*Catatan: Pemblokiran ruang acara dapat berubah sesuai kebijakan hotel, selama tetap memenuhi persyaratan minimum pelaksanaan acara.</i></p>
 
-  <div class="sec pb">PAKET</div>
-  <div><b>${esc(o.paket)}</b> &nbsp;—&nbsp; <b>${rp(o.paketHarga)} Nett/Orang</b></div>
-  <div style="margin-top:4px">Benefit termasuk:</div>
-  <ul>${paketBenefitList}</ul>
+  ${paketSection}
   <div class="sec">ADD ON</div>
   <ul>${addonList}</ul>
 
@@ -288,7 +321,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
     // naikkan counter agar nomor berikutnya lanjut
     try {
       const th = new Date(o.tglSurat || hariIni()).getFullYear();
-      await fetch("/api/docnum", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kode: "OL", tahun: th, nomor: angka(o.nomor) }) });
+      await fetch("/api/docnum", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kode: kodeDok, tahun: th, nomor: angka(o.nomor) }) });
     } catch (e) {}
     setBusy(false);
   }
@@ -296,6 +329,18 @@ export default function OfferingLetter({ lead, user, onClose }) {
   return (
     <Modal title="Buat Offering Letter" onClose={onClose}>
       <div className="space-y-3">
+        <div>
+          <div className="text-sm font-medium text-slate-700 mb-1">Jenis Offering</div>
+          <div className="grid grid-cols-2 gap-2">
+            {["Meeting", "Wedding"].map((t) => (
+              <button key={t} type="button" onClick={() => set("jenisOL", t)}
+                className={"rounded-lg border px-3 py-2.5 text-sm font-semibold transition " + (o.jenisOL === t ? "border-[#12263a] bg-[#12263a] text-white" : "border-slate-300 text-slate-600 hover:bg-slate-50")}>
+                {t === "Meeting" ? "Meeting / Kamar" : "Wedding"}
+              </button>
+            ))}
+          </div>
+          {o.jenisOL === "Wedding" && <p className="text-xs text-slate-400 mt-1">Nomor otomatis memakai seri terpisah (OLW).</p>}
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Nomor"><input className={inp} inputMode="numeric" value={o.nomor} onChange={(e) => set("nomor", e.target.value.replace(/[^\d]/g, ""))} placeholder="124" /></Field>
           <Field label="Tanggal Surat"><input type="date" className={inp} value={o.tglSurat} onChange={(e) => set("tglSurat", e.target.value)} /></Field>
@@ -370,21 +415,56 @@ export default function OfferingLetter({ lead, user, onClose }) {
           </div>
         </div>
 
-        {/* Paket (dropdown → harga & benefit auto, tetap bisa diedit) */}
-        <div className="border border-slate-200 rounded-lg p-3 space-y-2">
-          <div className="text-xs font-semibold text-slate-500">PAKET (benefit mengikuti harga paket)</div>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="col-span-2">
-              <Field label="Pilih Paket">
-                <select className={inp} value={o.paket} onChange={(e) => pilihPaket(e.target.value)}>
-                  {PACKAGES.map((p) => <option key={p.nama} value={p.nama}>{p.nama}</option>)}
-                </select>
-              </Field>
-            </div>
-            <Field label="Harga (Rp)"><input className={inp} inputMode="numeric" value={o.paketHarga ? angka(o.paketHarga).toLocaleString("id-ID") : ""} onChange={(e) => set("paketHarga", e.target.value.replace(/[^\d]/g, ""))} /></Field>
+        {/* Paket (bisa lebih dari satu; benefit & harga mengikuti paket, tetap bisa diedit) */}
+        {o.jenisOL === "Meeting" ? (
+        <div className="border border-slate-200 rounded-lg p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500">PAKET (bisa lebih dari satu)</span>
+            <button onClick={addPaket} className="text-xs bg-[#12263a] text-white rounded px-2 py-1">+ Tambah Paket</button>
           </div>
-          <Field label="Benefit (satu per baris, bisa diedit)"><textarea className={inp + " h-32 resize-none text-sm"} value={o.paketBenefit} onChange={(e) => set("paketBenefit", e.target.value)} /></Field>
+          {o.pakets.map((p, i) => (
+            <div key={i} className="border border-slate-100 rounded-lg p-2 space-y-2 bg-slate-50/40">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2">
+                  <Field label={"Paket " + (i + 1)}>
+                    <select className={inp} value={p.nama} onChange={(e) => pilihPaket(i, e.target.value)}>
+                      {PACKAGES.map((x) => <option key={x.nama} value={x.nama}>{x.nama}</option>)}
+                    </select>
+                  </Field>
+                </div>
+                <Field label="Harga (Rp)"><input className={inp} inputMode="numeric" value={p.harga ? angka(p.harga).toLocaleString("id-ID") : ""} onChange={(e) => setPaket(i, "harga", e.target.value.replace(/[^\d]/g, ""))} /></Field>
+              </div>
+              <Field label="Benefit (satu per baris, bisa diedit)"><textarea className={inp + " h-28 resize-none text-sm"} value={p.benefit} onChange={(e) => setPaket(i, "benefit", e.target.value)} /></Field>
+              {o.pakets.length > 1 && <button onClick={() => delPaket(i)} className="text-xs text-rose-600 font-semibold">✕ Hapus paket ini</button>}
+            </div>
+          ))}
         </div>
+        ) : (
+        <div className="border border-slate-200 rounded-lg p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500">WEDDING PACKAGE (bisa lebih dari satu)</span>
+            <button onClick={addWed} className="text-xs bg-[#12263a] text-white rounded px-2 py-1">+ Tambah Paket</button>
+          </div>
+          {o.weddings.map((w, i) => (
+            <div key={i} className="border border-slate-100 rounded-lg p-2 space-y-2 bg-slate-50/40">
+              <div className="grid grid-cols-6 gap-2">
+                <div className="col-span-3">
+                  <Field label={"Venue & Tier " + (i + 1)}>
+                    <select className={inp} value={w.key} onChange={(e) => pilihWedding(i, e.target.value)}>
+                      {WEDDING_PACKAGES.map((x) => <option key={wLabel(x)} value={wLabel(x)}>{wLabel(x)}</option>)}
+                    </select>
+                  </Field>
+                </div>
+                <Field label="Harga (Rp)"><input className={inp} inputMode="numeric" value={w.harga ? angka(w.harga).toLocaleString("id-ID") : ""} onChange={(e) => setWed(i, "harga", e.target.value.replace(/[^\d]/g, ""))} /></Field>
+                <Field label="Orang"><input className={inp} inputMode="numeric" value={w.persons} onChange={(e) => setWed(i, "persons", e.target.value.replace(/[^\d]/g, ""))} /></Field>
+                <Field label="Add/Org"><input className={inp} inputMode="numeric" value={w.add ? angka(w.add).toLocaleString("id-ID") : ""} onChange={(e) => setWed(i, "add", e.target.value.replace(/[^\d]/g, ""))} /></Field>
+              </div>
+              <Field label="Benefit (satu per baris, bisa diedit)"><textarea className={inp + " h-32 resize-none text-sm"} value={w.benefit} onChange={(e) => setWed(i, "benefit", e.target.value)} /></Field>
+              {o.weddings.length > 1 && <button onClick={() => delWed(i)} className="text-xs text-rose-600 font-semibold">✕ Hapus paket ini</button>}
+            </div>
+          ))}
+        </div>
+        )}
 
         {/* Estimasi biaya */}
         <div className="border border-slate-200 rounded-lg p-3">

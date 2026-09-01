@@ -16,9 +16,9 @@ const rpK = (n) => { n = angka(n); return n >= 1e9 ? "Rp " + (n / 1e9).toFixed(1
 const pct = (r, t) => (angka(t) > 0 ? Math.round((angka(r) / angka(t)) * 100) : 0);
 const bulanDari = (tgl) => { const d = new Date(tgl); return isNaN(d) ? null : d.getMonth(); };
 const tahunDari = (tgl) => { const d = new Date(tgl); return isNaN(d) ? null : d.getFullYear(); };
-function hariKerja(tahun, bulan1) { // Senin–Sabtu
+function hariKerja(tahun, bulan1) { // Senin–Jumat
   let n = 0; const hari = new Date(tahun, bulan1, 0).getDate();
-  for (let d = 1; d <= hari; d++) { const w = new Date(tahun, bulan1 - 1, d).getDay(); if (w !== 0) n++; }
+  for (let d = 1; d <= hari; d++) { const w = new Date(tahun, bulan1 - 1, d).getDay(); if (w !== 0 && w !== 6) n++; }
   return n;
 }
 
@@ -295,7 +295,7 @@ export default function TargetPage() {
                   </tbody>
                 </table>
               </div>
-              <p className="text-xs text-slate-400 mt-2">Target bulan = target kunjungan harian × jumlah hari kerja (Senin–Sabtu).</p>
+              <p className="text-xs text-slate-400 mt-2">Target bulan = target kunjungan harian × jumlah hari kerja (Senin–Jumat).</p>
             </div>
           </>
         )}
