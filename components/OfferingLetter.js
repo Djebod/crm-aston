@@ -189,6 +189,12 @@ export default function OfferingLetter({ lead, user, onClose }) {
 
     const galeri = (a, b, c) => `<table class="galeri"><tr><td><img src="${origin}/img/${a}"/></td><td><img src="${origin}/img/${b}"/></td><td><img src="${origin}/img/${c}"/></td></tr></table>`;
 
+    const galeriWedding = o.jenisOL === "Wedding"
+      ? `<div class="sec pb">VENUE &amp; DEKORASI WEDDING</div>
+  <div class="subcap">Pilihan venue wedding ${HOTEL.nama} — Backyard, Onyx, Nana Land &amp; Sapphire Ballroom.</div>
+  ${galeri("wedding-1.jpg", "wedding-2.jpg", "wedding-3.jpg")}`
+      : "";
+
     const estRows = o.estimasi.map((r, i) => {
       const tot = angka(r.jumlah) * angka(r.harga);
       return `<tr>${td(i + 1, "c")}${td(esc(r.deskripsi))}${td(angka(r.jumlah).toLocaleString("id-ID"), "r")}${td(angka(r.harga).toLocaleString("id-ID"), "r")}${td(tot.toLocaleString("id-ID"), "r")}</tr>`;
@@ -266,6 +272,8 @@ export default function OfferingLetter({ lead, user, onClose }) {
   <ul>${inclList}</ul>
   <div class="sec">Kebijakan Extra Bed dan Anak Dibawah Umur</div>
   <p>Penggunaan Extra Bed dikenakan biaya Rp 400.000 per malam sudah termasuk sarapan. Gratis sarapan untuk usia di bawah 5 tahun dan dikenakan Rp 100.000 untuk usia di bawah 12 tahun. Penambahan sarapan di luar paket kamar dikenakan biaya Rp 180.000 per orang.</p>
+
+  ${galeriWedding}
 
   <div class="sec">1. KEBUTUHAN ACARA</div>
   <div>Nama Acara &nbsp;: <b>${esc(o.namaAcara) || "-"}</b></div>
