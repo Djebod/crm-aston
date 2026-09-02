@@ -195,6 +195,12 @@ export default function OfferingLetter({ lead, user, onClose }) {
   ${galeri("wedding-1.jpg", "wedding-2.jpg", "wedding-3.jpg")}`
       : "";
 
+    const galeriFunGames = o.jenisOL === "Wedding"
+      ? ""
+      : `<div class="sec">FUN GAMES &amp; TEAM BUILDING</div>
+  <div class="subcap">Aneka permainan seru untuk gathering &amp; outbound di area taman &amp; lapangan hotel — cocok untuk employee gathering, family day, dan team building.</div>
+  ${galeri("fungames-1.jpg", "fungames-2.jpg", "fungames-3.jpg")}`;
+
     const estRows = o.estimasi.map((r, i) => {
       const tot = angka(r.jumlah) * angka(r.harga);
       return `<tr>${td(i + 1, "c")}${td(esc(r.deskripsi))}${td(angka(r.jumlah).toLocaleString("id-ID"), "r")}${td(angka(r.harga).toLocaleString("id-ID"), "r")}${td(tot.toLocaleString("id-ID"), "r")}</tr>`;
@@ -275,7 +281,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
 
   ${galeriWedding}
 
-  <div class="sec">1. KEBUTUHAN ACARA</div>
+  <div class="sec">KEBUTUHAN ACARA</div>
   <div>Nama Acara &nbsp;: <b>${esc(o.namaAcara) || "-"}</b></div>
   <div>Jumlah Peserta &nbsp;: ${angka(o.jumlahPeserta) ? "Est " + angka(o.jumlahPeserta) + " pax" : "-"}</div>
 
@@ -298,9 +304,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
   <div class="subcap">Jam buka 07.00 - 22.00 WIB · Reguler Rp 130.000 nett/100 bola · Add 50 bola Rp 70.000 · Sewa stick Rp 50.000/stick</div>
   ${galeri("eagle-1.jpg", "eagle-2.jpg", "eagle-3.jpg")}
 
-  <div class="sec">FUN GAMES &amp; TEAM BUILDING</div>
-  <div class="subcap">Aneka permainan seru untuk gathering &amp; outbound di area taman &amp; lapangan hotel — cocok untuk employee gathering, family day, dan team building.</div>
-  ${galeri("fungames-1.jpg", "fungames-2.jpg", "fungames-3.jpg")}
+  ${galeriFunGames}
 
   <p style="margin-top:10px"><i><b>Catatan: Harga tersebut di atas sudah termasuk 21% pajak &amp; pelayanan dan hotel tidak memberikan komisi.</b></i></p>
 
