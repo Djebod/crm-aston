@@ -7,6 +7,7 @@ import Header from "@/components/Header";
 import Pager from "@/components/Pager";
 import DateRange, { dalamRentang } from "@/components/DateRange";
 import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
+import { bisaLihatSemua, milikSaya } from "@/lib/akses";
 
 const PER_HAL = 25;
 
@@ -45,6 +46,7 @@ export default function TindakLanjutPage() {
   const [draft, setDraft] = useState({}); // id -> {tindak, tgl}
   const [saving, setSaving] = useState("");
   const [page, setPage] = useState(1);
+  const lihatSemua = bisaLihatSemua(user); // admin & leader (ADOSM/Sales Leader)
 
   useEffect(() => {
     const raw = typeof window !== "undefined" ? localStorage.getItem("crm_user") : null;
@@ -69,15 +71,22 @@ export default function TindakLanjutPage() {
     return Array.from(s).sort();
   }, [leads]);
 
+  // Sales hanya melihat lead miliknya sendiri; admin & leader melihat semua.
+  const milikUser = useCallback(
+    (l) => lihatSemua || milikSaya(user, l.PIC) || (!l.PIC && milikSaya(user, l.UpdatedBy)),
+    [lihatSemua, user]
+  );
+
   const tampil = useMemo(() => {
     const q = cari.toLowerCase().trim();
     return leads
+      .filter(milikUser)
       .filter((l) => (l.Status || "Tentative") === "Tentative")
       .filter((l) => (!fSales ? true : l.PIC === fSales))
       .filter((l) => dalamRentang(l.TanggalTindakLanjut || l.UpdatedAt, dari, sampai))
       .filter((l) => !q || [l.Nama, l.Instansi, l.NoHP, l.PIC, l.TindakLanjut].join(" ").toLowerCase().includes(q))
       .sort((a, b) => String(a.TanggalTindakLanjut || "9999").localeCompare(String(b.TanggalTindakLanjut || "9999")));
-  }, [leads, cari, fSales, dari, sampai]);
+  }, [leads, cari, fSales, dari, sampai, milikUser]);
 
   useEffect(() => { setPage(1); }, [cari, fSales, dari, sampai]);
   const totalHal = Math.max(1, Math.ceil(tampil.length / PER_HAL));
@@ -126,10 +135,12 @@ export default function TindakLanjutPage() {
 
         <div className="flex flex-col sm:flex-row gap-2 mb-4">
           <input value={cari} onChange={(e) => setCari(e.target.value)} placeholder="Cari nama, instansi, PIC…" className="flex-1 border border-slate-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#c8962c]" />
-          <select value={fSales} onChange={(e) => setFSales(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
-            <option value="">Semua Sales</option>
-            {salesOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+          {lihatSemua && (
+            <select value={fSales} onChange={(e) => setFSales(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
+              <option value="">Semua Sales</option>
+              {salesOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
           <DateRange dari={dari} sampai={sampai} setDari={setDari} setSampai={setSampai} />
         </div>
 

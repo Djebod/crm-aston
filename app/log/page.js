@@ -7,6 +7,7 @@ import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
 import Pager from "@/components/Pager";
 import DateRange, { dalamRentang } from "@/components/DateRange";
 import Header from "@/components/Header";
+import { bisaLihatSemua, milikSaya } from "@/lib/akses";
 
 const PER_HAL = 25;
 
@@ -48,12 +49,15 @@ export default function LogPage() {
 
   function logout() { localStorage.removeItem("crm_user"); router.replace("/"); }
 
+  const lihatSemua = bisaLihatSemua(user); // admin & leader (ADOSM/Sales Leader)
+
   const tampil = useMemo(() => {
     const q = cari.toLowerCase().trim();
     return list
+      .filter((x) => lihatSemua || milikSaya(user, x.Oleh))
       .filter((x) => dalamRentang(x.Waktu, dari, sampai))
       .filter((x) => !q || [x.Nama, x.Oleh, x.StatusLama, x.StatusBaru, x.AlasanCancel].join(" ").toLowerCase().includes(q));
-  }, [list, cari, dari, sampai]);
+  }, [list, cari, dari, sampai, lihatSemua, user]);
 
   const [page, setPage] = useState(1);
   useEffect(() => { setPage(1); }, [cari, dari, sampai]);

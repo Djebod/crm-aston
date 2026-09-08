@@ -97,6 +97,22 @@ function buildNoDok(code, nomor, tgl, kode) {
   return `${code}/${nomor || "___"}/${dd}/${mm}/${yy}/SM/ACHCC/${String(kode || "").toUpperCase()}`;
 }
 
+// Jabatan otomatis saat nama dipilih dari daftar karyawan
+const JABATAN_ROLE = { marketing: "Sales Person", leader: "Sales Leader", admin: "Asst. DOSM" };
+
+// Dropdown nama karyawan (anti salah ketik). Nama lama yang tidak ada di daftar tetap dipertahankan.
+function PilihNama({ karyawan, value, onPilih }) {
+  return (
+    <select className={inp} value={value || ""} onChange={(e) => onPilih(e.target.value)}>
+      <option value="">— pilih nama —</option>
+      {value && !karyawan.some((k) => k.Nama === value) && <option value={value}>{value}</option>}
+      {karyawan.map((k) => (
+        <option key={k.Nama} value={k.Nama}>{k.Nama}{k.Kode ? " (" + k.Kode + ")" : ""}</option>
+      ))}
+    </select>
+  );
+}
+
 export default function ConfirmationLetter({ lead, user, onClose }) {
   const [g, setG] = useState({
     clNo: "",
@@ -118,9 +134,26 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
     rangkaian: [{ hari: lead.TanggalEvent || "", waktu: "", acara: "", tempat: "", setup: "", jumlah: lead.JumlahPax || "" }],
     estimasi: [{ deskripsi: "Residential Twin", jumlah: "", harga: "1500000" }],
     dpDate: "", pelunasanDate: "", jatuhTempoDate: "",
-    prepBy: user?.nama || "", prepTitle: "Asst. DOSM",
+    prepBy: user?.nama || "", prepTitle: "Sales Person",
+    leaderNama: "", leaderTitle: "Sales Leader",
     gmNama: "", gmTitle: "General Manager",
   });
+
+  // Daftar karyawan aktif — untuk dropdown tanda tangan (anti salah ketik + autofill jabatan)
+  const [karyawan, setKaryawan] = useState([]);
+  useEffect(() => {
+    fetch("/api/karyawan", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((r) => { if (r.status === "ok") setKaryawan(r.data || []); })
+      .catch(() => {});
+  }, []);
+
+  // Pilih nama dari dropdown -> nama & jabatan terisi otomatis (jabatan tetap bisa diedit)
+  function pilihTtd(namaKey, titleKey, nama, jabatanTetap) {
+    const k = karyawan.find((x) => x.Nama === nama);
+    const jab = jabatanTetap || JABATAN_ROLE[String(k?.Role || "").toLowerCase()] || "";
+    setG((s) => ({ ...s, [namaKey]: nama, [titleKey]: nama && jab ? jab : s[titleKey] }));
+  }
 
   const set = (k, v) => setG((s) => ({ ...s, [k]: v }));
   const setRow = (arr, i, k, v) => setG((s) => ({ ...s, [arr]: s[arr].map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
@@ -227,9 +260,13 @@ ${pasalRows}
   <tr><td>Ditandatangani untuk <b>${HOTEL.nama}</b></td></tr>
 </table>
 <table class="sign">
-  <tr><td width="50%">Prepared by,</td><td width="50%">Acknowledge,</td></tr>
-  <tr style="height:48px"><td></td><td></td></tr>
-  <tr><td><b><u>${esc(g.prepBy) || "-"}</u></b><br>${esc(g.prepTitle)}</td><td><b><u>${esc(g.gmNama) || "-"}</u></b><br>${esc(g.gmTitle)}</td></tr>
+  <tr><td width="33%">Prepared by,</td><td width="33%">Acknowledge by,</td><td width="34%">Approved by,</td></tr>
+  <tr style="height:48px"><td></td><td></td><td></td></tr>
+  <tr>
+    <td><b><u>${esc(g.prepBy) || "-"}</u></b><br>${esc(g.prepTitle)}</td>
+    <td><b><u>${esc(g.leaderNama) || "-"}</u></b><br>${esc(g.leaderTitle)}</td>
+    <td><b><u>${esc(g.gmNama) || "-"}</u></b><br>${esc(g.gmTitle)}</td>
+  </tr>
 </table>
 <br>
 <div>Ditandatangani untuk <b>${esc(g.instansi || g.namaAcara)}</b></div>
@@ -345,10 +382,21 @@ ${pasalRows}
         </div>
 
         <div className="border border-slate-200 rounded-lg p-3 grid grid-cols-2 gap-3">
-          <div className="col-span-2 text-xs font-semibold text-slate-500">TANDA TANGAN</div>
-          <Field label="Prepared by (nama)"><input className={inp} value={g.prepBy} onChange={(e) => set("prepBy", e.target.value)} /></Field>
+          <div className="col-span-2 text-xs font-semibold text-slate-500">TANDA TANGAN (pilih nama &rarr; jabatan terisi otomatis)</div>
+
+          <Field label="Prepared by — Sales">
+            <PilihNama karyawan={karyawan} value={g.prepBy} onPilih={(n) => pilihTtd("prepBy", "prepTitle", n)} />
+          </Field>
           <Field label="Jabatan"><input className={inp} value={g.prepTitle} onChange={(e) => set("prepTitle", e.target.value)} /></Field>
-          <Field label="General Manager (nama)"><input className={inp} value={g.gmNama} onChange={(e) => set("gmNama", e.target.value)} /></Field>
+
+          <Field label="Acknowledge by — Sales Leader">
+            <PilihNama karyawan={karyawan} value={g.leaderNama} onPilih={(n) => pilihTtd("leaderNama", "leaderTitle", n, "Sales Leader")} />
+          </Field>
+          <Field label="Jabatan"><input className={inp} value={g.leaderTitle} onChange={(e) => set("leaderTitle", e.target.value)} /></Field>
+
+          <Field label="Approved by — General Manager">
+            <PilihNama karyawan={karyawan} value={g.gmNama} onPilih={(n) => pilihTtd("gmNama", "gmTitle", n, "General Manager")} />
+          </Field>
           <Field label="Jabatan GM"><input className={inp} value={g.gmTitle} onChange={(e) => set("gmTitle", e.target.value)} /></Field>
         </div>
       </div>

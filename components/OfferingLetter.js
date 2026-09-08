@@ -5,6 +5,9 @@ import { Modal, Field, inp } from "@/components/Modal";
 import { unduhPDFdariHTML } from "@/lib/pdf";
 import { RATE_CATEGORIES, rateDefault } from "@/lib/rates";
 
+// Jabatan otomatis saat nama penandatangan dipilih
+const JABATAN_ROLE = { marketing: "Sales Person", leader: "Sales Leader", admin: "Asst. DOSM" };
+
 // ====== Identitas hotel (ubah bila perlu) ======
 const HOTEL = {
   nama: "Aston Cirebon Hotel & Convention Center",
@@ -131,6 +134,20 @@ export default function OfferingLetter({ lead, user, onClose }) {
     ttdHP: "",
   });
 
+  // Daftar karyawan aktif — dropdown penandatangan (anti salah ketik + jabatan otomatis)
+  const [karyawan, setKaryawan] = useState([]);
+  useEffect(() => {
+    fetch("/api/karyawan", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((r) => { if (r.status === "ok") setKaryawan(r.data || []); })
+      .catch(() => {});
+  }, []);
+  function pilihTtdNama(nama) {
+    const k = karyawan.find((x) => x.Nama === nama);
+    const jab = JABATAN_ROLE[String(k?.Role || "").toLowerCase()] || "";
+    setO((s) => ({ ...s, ttdNama: nama, ttdJabatan: nama && jab ? jab : s.ttdJabatan }));
+  }
+
   const kodeDok = o.jenisOL === "Wedding" ? "OLW" : "OL";
   const set = (k, v) => setO((s) => ({ ...s, [k]: v }));
   const pilihPaket = (i, nama) => { const p = PACKAGES.find((x) => x.nama === nama); setO((s) => ({ ...s, pakets: s.pakets.map((r, j) => (j === i ? { nama, harga: p ? String(p.harga) : r.harga, benefit: p ? p.benefit : r.benefit } : r)) })); };
@@ -191,7 +208,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
 
     const galeriWedding = o.jenisOL === "Wedding"
       ? `<div class="sec pb">VENUE &amp; DEKORASI WEDDING</div>
-  <div class="subcap">Pilihan venue wedding ${HOTEL.nama} — Backyard, Onyx, Nana Land &amp; Sapphire Ballroom.</div>
+  <div class="subcap">Pilihan venue wedding ${HOTEL.nama} — Backyard, Onyx, Nana Land &amp; Sapphire Grand Ballroom.</div>
   ${galeri("wedding-1.jpg", "wedding-2.jpg", "wedding-3.jpg")}`
       : "";
 
@@ -503,7 +520,13 @@ export default function OfferingLetter({ lead, user, onClose }) {
         <div className="grid grid-cols-2 gap-3">
           <Field label="Konfirmasi sebelum"><input type="date" className={inp} value={o.konfirmasiTgl} onChange={(e) => set("konfirmasiTgl", e.target.value)} /></Field>
           <div />
-          <Field label="Nama Penandatangan"><input className={inp} value={o.ttdNama} onChange={(e) => set("ttdNama", e.target.value)} /></Field>
+          <Field label="Nama Penandatangan">
+            <select className={inp} value={o.ttdNama || ""} onChange={(e) => pilihTtdNama(e.target.value)}>
+              <option value="">— pilih nama —</option>
+              {o.ttdNama && !karyawan.some((k) => k.Nama === o.ttdNama) && <option value={o.ttdNama}>{o.ttdNama}</option>}
+              {karyawan.map((k) => <option key={k.Nama} value={k.Nama}>{k.Nama}{k.Kode ? " (" + k.Kode + ")" : ""}</option>)}
+            </select>
+          </Field>
           <Field label="Jabatan"><input className={inp} value={o.ttdJabatan} onChange={(e) => set("ttdJabatan", e.target.value)} /></Field>
           <Field label="No HP Penandatangan"><input className={inp} value={o.ttdHP} onChange={(e) => set("ttdHP", e.target.value)} /></Field>
         </div>

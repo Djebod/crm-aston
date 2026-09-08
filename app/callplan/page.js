@@ -12,6 +12,7 @@ import Header from "@/components/Header";
 import DateRange, { dalamRentang } from "@/components/DateRange";
 import { normalizeWA } from "@/lib/phone";
 import { ambilCompanies } from "@/lib/companiesCache";
+import { bisaLihatSemua } from "@/lib/akses";
 
 const PER_HAL = 25;
 const STATUS_HEX = { Plan: "#f59e0b", Realisasi: "#10b981", Batal: "#f43f5e" };
@@ -61,18 +62,18 @@ export default function CallPlanPage() {
     return Array.from(s);
   }, [list]);
 
-  const isAdmin = user?.role === "admin";
+  const lihatSemua = bisaLihatSemua(user); // admin & leader (ADOSM/Sales Leader)
   const tampil = useMemo(() => {
     const q = cari.toLowerCase().trim();
     const namaU = String(user?.nama || "").toLowerCase();
     const emailU = String(user?.email || "").toLowerCase();
     return list
-      .filter((x) => isAdmin || String(x.SalesName || "").toLowerCase() === namaU || String(x.CreatedBy || "").toLowerCase() === namaU || String(x.CreatedBy || "").toLowerCase() === emailU)
+      .filter((x) => lihatSemua || String(x.SalesName || "").toLowerCase() === namaU || String(x.CreatedBy || "").toLowerCase() === namaU || String(x.CreatedBy || "").toLowerCase() === emailU)
       .filter((x) => (!fSales ? true : x.SalesName === fSales))
       .filter((x) => (!fStatus ? true : x.Status === fStatus))
       .filter((x) => dalamRentang(x.TanggalRencana, dari, sampai))
       .filter((x) => !q || [x.CompanyName, x.PICName, x.SalesName, x.Phone, x.Tujuan].join(" ").toLowerCase().includes(q));
-  }, [list, cari, fSales, fStatus, dari, sampai, isAdmin, user]);
+  }, [list, cari, fSales, fStatus, dari, sampai, lihatSemua, user]);
 
   const stat = useMemo(() => {
     let plan = 0, real = 0, batal = 0;
@@ -193,7 +194,7 @@ export default function CallPlanPage() {
         {/* Filter */}
         <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 mb-4">
           <input value={cari} onChange={(e) => setCari(e.target.value)} placeholder="Cari…" className="col-span-2 sm:flex-1 border border-slate-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#c8962c]" />
-          {isAdmin && (
+          {lihatSemua && (
             <select value={fSales} onChange={(e) => setFSales(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
               <option value="">Semua Sales</option>
               {salesOptions.map((s) => <option key={s} value={s}>{s}</option>)}

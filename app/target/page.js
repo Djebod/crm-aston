@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import ProfilSaya from "@/components/ProfilSaya";
 import { Modal, Field, inp } from "@/components/Modal";
 import { unduhCSV } from "@/components/exportUtil";
+import { bisaLihatSemua, isAdmin as cekAdmin } from "@/lib/akses";
 
 const BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
 const BULAN_PANJANG = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
@@ -66,10 +67,11 @@ export default function TargetPage() {
     const raw = typeof window !== "undefined" ? localStorage.getItem("crm_user") : null;
     if (!raw) { router.replace("/"); return; }
     const u = JSON.parse(raw); setUser(u);
-    if (u.role !== "admin") setSales(u.nama || ALL);
+    if (!bisaLihatSemua(u)) setSales(u.nama || ALL);
   }, [router]);
 
-  const isAdmin = user?.role === "admin";
+  const isAdmin = cekAdmin(user);              // hanya admin boleh kelola target
+  const lihatSemua = bisaLihatSemua(user);     // admin & leader boleh lihat semua sales
 
   const ambil = useCallback(async () => {
     setLoading(true);
@@ -179,8 +181,8 @@ export default function TargetPage() {
           <select value={tahun} onChange={(e) => setTahun(Number(e.target.value))} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
             {tahunList.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
-          <select value={sales} onChange={(e) => setSales(e.target.value)} disabled={!isAdmin} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white disabled:bg-slate-100">
-            {isAdmin && <option value={ALL}>Semua Sales</option>}
+          <select value={sales} onChange={(e) => setSales(e.target.value)} disabled={!lihatSemua} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white disabled:bg-slate-100">
+            {lihatSemua && <option value={ALL}>Semua Sales</option>}
             {salesList.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
           <select value={bulanFilter} onChange={(e) => setBulanFilter(Number(e.target.value))} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">

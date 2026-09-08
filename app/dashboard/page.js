@@ -9,6 +9,7 @@ import Pager from "@/components/Pager";
 import Header from "@/components/Header";
 import DateRange, { dalamRentang } from "@/components/DateRange";
 import { normalizeWA, validWA } from "@/lib/phone";
+import { bisaLihatSemua, milikSaya } from "@/lib/akses";
 import OfferingLetter from "@/components/OfferingLetter";
 import ConfirmationLetter from "@/components/ConfirmationLetter";
 
@@ -37,7 +38,7 @@ const RUANGAN = [
   { name: "Iron", cap: { theater: 24, class: 18, round: 20, ushape: 27, hollow: 18 } },
   { name: "Wood", cap: { theater: 40, class: 27, round: 30, ushape: 27, hollow: 18 } },
   { name: "Onyx", cap: { theater: 250, class: 180, round: 200, ushape: 150, hollow: 54 } },
-  { name: "Sapphire Ballroom", cap: { theater: 1445, class: 504, round: 720, ushape: 345, hollow: 345 } },
+  { name: "Sapphire Grand Ballroom", cap: { theater: 1445, class: 504, round: 720, ushape: 345, hollow: 345 } },
 ];
 const SETUP_MEETING = [
   { key: "theater", label: "Theater" }, { key: "class", label: "Class Room" },
@@ -102,6 +103,7 @@ export default function Dashboard() {
   const [confirmLead, setConfirmLead] = useState(null);
   const [targets, setTargets] = useState([]);
   const isAdmin = user?.role === "admin";
+  const lihatSemua = bisaLihatSemua(user); // admin & leader (ADOSM/Sales Leader)
 
   const ambilTargets = useCallback(async () => {
     try {
@@ -225,6 +227,7 @@ export default function Dashboard() {
   const leadsTampil = useMemo(() => {
     const q = cari.toLowerCase().trim();
     return leads
+      .filter((l) => lihatSemua || milikSaya(user, l.PIC) || (!l.PIC && milikSaya(user, l.UpdatedBy)))
       .filter((l) => (filterStatus === "Semua" ? true : (l.Status || "Tentative") === filterStatus))
       .filter((l) => (!fSales ? true : l.PIC === fSales))
       .filter((l) => dalamRentang(l.Tanggal, dari, sampai))
@@ -233,7 +236,7 @@ export default function Dashboard() {
         return [l.Nama, l.Instansi, l.NoHP, l.Email, l.PIC, l.JenisEvent].join(" ").toLowerCase().includes(q);
       })
       .reverse(); // terbaru di atas
-  }, [leads, cari, filterStatus, fSales, dari, sampai]);
+  }, [leads, cari, filterStatus, fSales, dari, sampai, lihatSemua, user]);
 
   const nilaiTotal = (l) =>
     (Number(String(l.EstimasiNilai).replace(/[^\d]/g, "")) || 0) +
@@ -290,9 +293,9 @@ export default function Dashboard() {
       const tY = tgtYTD[s] || 0, aY = achYTD[s] || 0, tB = tgtBln[s] || 0, aB = achBln[s] || 0;
       return { sales: s, target: tY, achieved: aY, persen: tY ? Math.round((aY / tY) * 100) : 0, tBln: tB, aBln: aB, persenBln: tB ? Math.round((aB / tB) * 100) : 0 };
     });
-    if (!isAdmin) arr = arr.filter((r) => r.sales === user?.nama);
+    if (!lihatSemua) arr = arr.filter((r) => r.sales === user?.nama);
     return arr.sort((a, b) => b.achieved - a.achieved);
-  }, [targets, leads, isAdmin, user]);
+  }, [targets, leads, lihatSemua, user]);
 
   const [page, setPage] = useState(1);
   useEffect(() => { setPage(1); }, [cari, filterStatus, fSales, dari, sampai]);
@@ -524,10 +527,12 @@ export default function Dashboard() {
               <option key={s}>{s}</option>
             ))}
           </select>
-          <select value={fSales} onChange={(e) => setFSales(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
-            <option value="">Semua Sales</option>
-            {salesOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+          {lihatSemua && (
+            <select value={fSales} onChange={(e) => setFSales(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
+              <option value="">Semua Sales</option>
+              {salesOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
           <DateRange dari={dari} sampai={sampai} setDari={setDari} setSampai={setSampai} />
           <button onClick={exportCSV} disabled={leadsTampil.length === 0} className="border border-slate-300 text-[#12263a] font-semibold rounded-lg px-3 py-2.5 hover:bg-slate-50 whitespace-nowrap disabled:opacity-50">
             ⬇ Export
@@ -947,7 +952,8 @@ function KelolaTim({ user, onClose }) {
         </Field>
         <Field label="Role">
           <select className={inp} value={role} onChange={(e) => setRole(e.target.value)}>
-            <option value="marketing">marketing</option>
+            <option value="marketing">marketing (sales)</option>
+            <option value="leader">leader (ADOSM / Sales Leader)</option>
             <option value="admin">admin</option>
           </select>
         </Field>
@@ -1043,7 +1049,8 @@ function BarisUser({ u, requester, expanded, onToggle, onSaved }) {
             <Field label="Nama"><input className={inp} value={nama} onChange={(e) => setNama(e.target.value)} /></Field>
             <Field label="Role">
               <select className={inp} value={role} onChange={(e) => setRole(e.target.value)}>
-                <option value="marketing">marketing</option>
+                <option value="marketing">marketing (sales)</option>
+                <option value="leader">leader (ADOSM / Sales Leader)</option>
                 <option value="admin">admin</option>
               </select>
             </Field>

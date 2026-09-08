@@ -52,4 +52,6 @@ export const STATEMENTS = [
     tanggal_realisasi TEXT, hasil TEXT, created_at TEXT, created_by TEXT )`,
   `CREATE INDEX IF NOT EXISTS idx_callplan_sales ON call_plan (sales_name)`,
   `CREATE INDEX IF NOT EXISTS idx_callplan_status ON call_plan (status)`,
+  // Penyeragaman nama ballroom (aman diulang)
+  `UPDATE room_booking SET room = 'Sapphire Grand Ballroom' WHERE room = 'Sapphire Ballroom'`,
 ];

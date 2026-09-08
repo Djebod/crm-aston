@@ -10,6 +10,7 @@ import Pager from "@/components/Pager";
 import DateRange, { dalamRentang } from "@/components/DateRange";
 import { normalizeWA, validWA } from "@/lib/phone";
 import { ambilCompanies } from "@/lib/companiesCache";
+import { bisaLihatSemua, milikSaya } from "@/lib/akses";
 import Header from "@/components/Header";
 
 const PER_HAL = 25;
@@ -37,7 +38,7 @@ const RUANGAN = [
   { name: "Iron", cap: { theater: 24, class: 18, round: 20, ushape: 27, hollow: 18 } },
   { name: "Wood", cap: { theater: 40, class: 27, round: 30, ushape: 27, hollow: 18 } },
   { name: "Onyx", cap: { theater: 250, class: 180, round: 200, ushape: 150, hollow: 54 } },
-  { name: "Sapphire Ballroom", cap: { theater: 1445, class: 504, round: 720, ushape: 345, hollow: 345 } },
+  { name: "Sapphire Grand Ballroom", cap: { theater: 1445, class: 504, round: 720, ushape: 345, hollow: 345 } },
 ];
 const SETUP_MEETING = [
   { key: "theater", label: "Theater" }, { key: "class", label: "Class Room" },
@@ -145,7 +146,7 @@ export default function AktivitasPage() {
   }, [lead, bookings]);
   const [realisasiPlanId, setRealisasiPlanId] = useState("");
   const [targets, setTargets] = useState([]);
-  const isAdmin = user?.role === "admin";
+  const lihatSemua = bisaLihatSemua(user); // admin & leader (ADOSM/Sales Leader) melihat semua sales
   const [modalProfil, setModalProfil] = useState(false);
 
   useEffect(() => {
@@ -346,6 +347,7 @@ export default function AktivitasPage() {
   const tampil = useMemo(() => {
     const q = cari.toLowerCase().trim();
     return list
+      .filter((x) => lihatSemua || milikSaya(user, x.SalesName))
       .filter((x) => (!fActivity ? true : x.Activity === fActivity))
       .filter((x) => (!fSeg ? true : x.Segmentation === fSeg))
       .filter((x) => (!fSales ? true : x.SalesName === fSales))
@@ -355,7 +357,7 @@ export default function AktivitasPage() {
         return [x.CompanyName, x.PICName, x.SalesName, x.PhoneNumber, x.Position].join(" ").toLowerCase().includes(q);
       })
       .reverse();
-  }, [list, cari, fActivity, fSeg, fSales, dari, sampai]);
+  }, [list, cari, fActivity, fSeg, fSales, dari, sampai, lihatSemua, user]);
 
   // chart mengikuti filter
   const chartActivity = useMemo(() => beriWarna(hitungPer(tampil, (x) => x.Activity || "(kosong)")), [tampil]);
@@ -420,10 +422,12 @@ export default function AktivitasPage() {
             <option value="">Market Segment</option>
             {SEGMENTS.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-          <select value={fSales} onChange={(e) => setFSales(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
-            <option value="">By Sales</option>
-            {salesOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+          {lihatSemua && (
+            <select value={fSales} onChange={(e) => setFSales(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
+              <option value="">By Sales</option>
+              {salesOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
           <DateRange className="col-span-2 sm:col-span-1" dari={dari} sampai={sampai} setDari={setDari} setSampai={setSampai} />
         </div>
 
@@ -450,7 +454,7 @@ export default function AktivitasPage() {
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            {paged.map((x) => <ActivityCard key={x.ID} x={x} isAdmin={isAdmin} onSetValid={setValid} />)}
+            {paged.map((x) => <ActivityCard key={x.ID} x={x} isAdmin={lihatSemua} onSetValid={setValid} />)}
           </div>
         )}
         {!loading && tampil.length > 0 && (
