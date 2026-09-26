@@ -4,9 +4,7 @@ import { useState, useEffect } from "react";
 import { Modal, Field, inp } from "@/components/Modal";
 import { unduhPDFdariHTML } from "@/lib/pdf";
 import { RATE_CATEGORIES, rateDefault } from "@/lib/rates";
-
-// Jabatan otomatis saat nama penandatangan dipilih
-const JABATAN_ROLE = { marketing: "Sales Person", leader: "Sales Leader", admin: "Asst. DOSM" };
+import { JABATAN_ROLE, blokTtd } from "@/lib/ttd";
 
 // ====== Identitas hotel (ubah bila perlu) ======
 const HOTEL = {
@@ -128,6 +126,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
     estimasi: [{ deskripsi: "Residential Twin Package", jumlah: "", harga: "1500000" }],
     konfirmasiTgl: "",
     ttdNama: user?.nama || "",
+    ttdImg: "",
     ttdJabatan: "Sales Person",
     pakets: [{ nama: PACKAGES[5].nama, harga: String(PACKAGES[5].harga), benefit: PACKAGES[5].benefit }],
     weddings: [{ key: wLabel(WEDDING_PACKAGES[6]), harga: String(WEDDING_PACKAGES[6].harga), persons: String(WEDDING_PACKAGES[6].persons), add: String(WEDDING_PACKAGES[6].add), benefit: WEDDING_PACKAGES[6].benefit }],
@@ -142,10 +141,26 @@ export default function OfferingLetter({ lead, user, onClose }) {
       .then((r) => { if (r.status === "ok") setKaryawan(r.data || []); })
       .catch(() => {});
   }, []);
+  // Nama sudah terisi lebih dulu (dari user login), jadi TTD-nya dipasang
+  // begitu daftar karyawan selesai dimuat.
+  useEffect(() => {
+    if (!karyawan.length) return;
+    setO((s) => {
+      if (!s.ttdNama || s.ttdImg) return s;
+      const k = karyawan.find((x) => x.Nama === s.ttdNama);
+      return k?.Ttd ? { ...s, ttdImg: k.Ttd } : s;
+    });
+  }, [karyawan]);
+
   function pilihTtdNama(nama) {
     const k = karyawan.find((x) => x.Nama === nama);
     const jab = JABATAN_ROLE[String(k?.Role || "").toLowerCase()] || "";
-    setO((s) => ({ ...s, ttdNama: nama, ttdJabatan: nama && jab ? jab : s.ttdJabatan }));
+    setO((s) => ({
+      ...s,
+      ttdNama: nama,
+      ttdJabatan: nama && jab ? jab : s.ttdJabatan,
+      ttdImg: nama ? (k?.Ttd || "") : "",
+    }));
   }
 
   const kodeDok = o.jenisOL === "Wedding" ? "OLW" : "OL";
@@ -337,7 +352,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
   <p style="margin-top:18px">Apabila terdapat perubahan atau membutuhkan informasi lebih lanjut, silakan menghubungi saya di nomor telepon dan email yang tertera di bawah ini.</p>
   <p>Atas perhatian dan kerjasamanya kami mengucapkan terima kasih.</p>
   <div style="margin-top:8px">Hormat Kami,<br>${HOTEL.nama}</div>
-  <div style="margin-top:48px"><b><u>${esc(o.ttdNama) || "-"}</u></b><br>${esc(o.ttdJabatan)}${o.ttdHP ? "<br>" + esc(o.ttdHP) : ""}</div>
+  ${blokTtd(o.ttdImg, o.ttdNama, o.ttdJabatan, o.ttdHP, esc)}
 
 </div>`;
     return html;

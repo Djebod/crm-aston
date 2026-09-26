@@ -10,6 +10,7 @@ import Header from "@/components/Header";
 import DateRange, { dalamRentang } from "@/components/DateRange";
 import { normalizeWA, validWA } from "@/lib/phone";
 import { bisaLihatSemua, milikSaya } from "@/lib/akses";
+import TandaTanganUpload from "@/components/TandaTanganUpload";
 import OfferingLetter from "@/components/OfferingLetter";
 import ConfirmationLetter from "@/components/ConfirmationLetter";
 
@@ -995,6 +996,7 @@ function BarisUser({ u, requester, expanded, onToggle, onSaved }) {
   const [role, setRole] = useState(u.Role || "marketing");
   const [kode, setKode] = useState(u.Kode || "");
   const [aktif, setAktif] = useState(String(u.Aktif).toLowerCase() !== "false");
+  const [ttd, setTtd] = useState(u.Ttd || "");
   const [pwBaru, setPwBaru] = useState("");
   const [busy, setBusy] = useState(false);
   const [pesan, setPesan] = useState("");
@@ -1060,8 +1062,14 @@ function BarisUser({ u, requester, expanded, onToggle, onSaved }) {
             <input id={"aktif-" + u.Email} type="checkbox" checked={aktif} onChange={(e) => setAktif(e.target.checked)} />
             <label htmlFor={"aktif-" + u.Email} className="text-sm text-slate-700">Akun aktif (boleh login)</label>
           </div>
+          <div className="mt-4 pt-3 border-t border-slate-200">
+            <div className="text-sm font-medium text-slate-700 mb-1">Tanda tangan</div>
+            <p className="text-xs text-slate-500 mb-2">Muncul otomatis di Offering Letter, Confirmation Letter, dan GEO saat nama orang ini dipilih sebagai penandatangan.</p>
+            <TandaTanganUpload value={ttd} onChange={setTtd} />
+          </div>
+
           <button
-            onClick={() => kirim({ nama, role, aktif, kode }, "✓ Perubahan disimpan.")}
+            onClick={() => kirim({ nama, role, aktif, kode, ttd }, "✓ Perubahan disimpan.")}
             disabled={busy}
             className="mt-3 bg-[#12263a] hover:bg-[#0e1f33] text-white text-sm font-semibold rounded-lg py-2 px-4 disabled:opacity-60"
           >

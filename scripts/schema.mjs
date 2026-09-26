@@ -32,6 +32,8 @@ export const STATEMENTS = [
   `ALTER TABLE aktivitas ADD COLUMN IF NOT EXISTS tujuan TEXT`,
   `ALTER TABLE aktivitas ADD COLUMN IF NOT EXISTS valid TEXT`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS kode TEXT`,
+  // Gambar tanda tangan (data URL PNG) untuk dokumen OL / CL / GEO
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS ttd TEXT`,
   `CREATE TABLE IF NOT EXISTS room_booking (
     id TEXT PRIMARY KEY, room TEXT, tanggal TEXT, jam_mulai TEXT, jam_selesai TEXT,
     event_title TEXT, company TEXT, pax TEXT, setup TEXT, pic TEXT,

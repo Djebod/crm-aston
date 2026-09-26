@@ -19,6 +19,21 @@ export async function POST(req) {
       return NextResponse.json({ status: "ok", user: { email: em, nama: body.nama || "", role: rows[0].Role || "marketing" } });
     }
 
+    if (body.action === "updateTtd") {
+      if (!rows.length) return NextResponse.json({ status: "error", message: CATATAN });
+      const ttd = String(body.ttd || "");
+      if (ttd && !ttd.startsWith("data:image/")) return NextResponse.json({ status: "error", message: "Format gambar tidak dikenali." });
+      if (ttd.length > 400000) return NextResponse.json({ status: "error", message: "Gambar tanda tangan terlalu besar." });
+      await sql`UPDATE users SET ttd = ${ttd} WHERE email = ${em}`;
+      return NextResponse.json({ status: "ok" });
+    }
+
+    if (body.action === "getTtd") {
+      if (!rows.length) return NextResponse.json({ status: "error", message: CATATAN });
+      const r = await sql`SELECT ttd AS "Ttd" FROM users WHERE email = ${em}`;
+      return NextResponse.json({ status: "ok", ttd: r[0]?.Ttd || "" });
+    }
+
     if (body.action === "changePassword") {
       if (!rows.length) return NextResponse.json({ status: "error", message: CATATAN });
       if (!bcrypt.compareSync(String(body.currentPassword || ""), rows[0].PasswordHash || "")) {

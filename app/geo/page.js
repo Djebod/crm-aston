@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ProfilSaya from "@/components/ProfilSaya";
 import Header from "@/components/Header";
 import { Modal, Field, inp } from "@/components/Modal";
+import { JABATAN_ROLE } from "@/lib/ttd";
 
 const HOTEL = {
   nama: "ASTON CIREBON HOTEL & CONVENTION CENTER",
@@ -46,11 +47,37 @@ const DEFAULT_NOTES = {
   sign: "None",
 };
 
+// ====== Breakdown harga kamar ======
+// Komponen bisa ditambah/dihapus/diganti namanya. Nilai per tipe kamar
+// disimpan di room.bd = { <id komponen>: "150000" }.
+// Lodging selalu dihitung otomatis = Harga − seluruh komponen.
+const idBaru = () => "k" + Math.random().toString(36).slice(2, 8);
+const KOMPONEN_DEFAULT = () => [
+  { id: "bfast", nama: "Breakfast" },
+  { id: "dinner", nama: "Dinner" },
+  { id: "others", nama: "Others" },
+];
+
+/**
+ * Menyesuaikan data GEO lama (yang masih memakai kolom tetap bfast/dinner/others)
+ * ke bentuk komponen bebas, supaya dokumen lama tetap bisa dibuka & dicetak.
+ */
+function normalisasiGeo(d) {
+  const n = { ...d };
+  if (!Array.isArray(n.komponen) || !n.komponen.length) n.komponen = KOMPONEN_DEFAULT();
+  n.rooms = (n.rooms || []).map((r) => {
+    if (r.bd && typeof r.bd === "object") return r;
+    return { ...r, bd: { bfast: r.bfast || "", dinner: r.dinner || "", others: r.others || "" } };
+  });
+  return n;
+}
+
 const GEO_KOSONG = () => ({
   id: "", geoNo: "", nomor: "", kodeSales: "", issuedDate: new Date().toISOString().slice(0, 10),
   eventTitle: "", company: "", contactPerson: "", address: "", phone: "", email: "",
   salesPerson: "", checkIn: "", checkOut: "", noRoom: "", guarantee: "YES",
-  rooms: [{ type: "Superior", checkIn: "", checkOut: "", totalRoom: "", day: "", price: "", bfast: "", dinner: "", others: "" }],
+  komponen: KOMPONEN_DEFAULT(),
+  rooms: [{ type: "Superior", checkIn: "", checkOut: "", totalRoom: "", day: "", price: "", bd: {} }],
   dpAmount: "", dpDate: "", remark: "",
   notes: { ...DEFAULT_NOTES },
   ttd: [
@@ -98,16 +125,32 @@ function buildHTML(g, origin) {
     </tr>`;
   }).join("");
 
-  // Breakdown otomatis per tipe kamar: Lodging = Price − (Breakfast + Dinner + Others)
-  const breakdownRows = (g.rooms || []).filter((r) => r.type && angka(r.price) > 0).map((r) => {
-    const price = angka(r.price), bf = angka(r.bfast), dn = angka(r.dinner), ot = angka(r.others);
-    const lodging = price - bf - dn - ot;
-    const bagian = [`Lodging Rp ${lodging.toLocaleString("id-ID")}`];
-    if (bf) bagian.push(`Breakfast Rp ${bf.toLocaleString("id-ID")}`);
-    if (dn) bagian.push(`Dinner Rp ${dn.toLocaleString("id-ID")}`);
-    if (ot) bagian.push(`Others Rp ${ot.toLocaleString("id-ID")}`);
-    return `<div><b>${esc(r.type)}</b> (Rp ${price.toLocaleString("id-ID")}): ${bagian.join(" · ")}</div>`;
-  }).join("");
+  // Breakdown per tipe kamar. Kolomnya mengikuti daftar komponen (bisa ditambah sendiri).
+  // Lodging selalu dihitung otomatis = Harga − seluruh komponen.
+  const komp = (g.komponen || []).filter((k) => String(k.nama || "").trim());
+  const kamarBd = (g.rooms || []).filter((r) => r.type && angka(r.price) > 0);
+  const TDBD = "border:1px solid #111;padding:2px 4px;";
+  const breakdownRows = kamarBd.length
+    ? `<table style="width:100%;border-collapse:collapse;font-size:8px;margin-top:2px;">
+        <tr style="background:#eef2f8;font-weight:bold;text-align:center;">
+          <td style="${TDBD}">Room Type</td>
+          <td style="${TDBD}">Lodging</td>
+          ${komp.map((k) => `<td style="${TDBD}">${esc(k.nama)}</td>`).join("")}
+          <td style="${TDBD}">Total</td>
+        </tr>
+        ${kamarBd.map((r) => {
+          const price = angka(r.price);
+          const totalKomp = komp.reduce((t, k) => t + angka((r.bd || {})[k.id]), 0);
+          const lodging = price - totalKomp;
+          return `<tr>
+            <td style="${TDBD}">${esc(r.type)}</td>
+            <td style="${TDBD}text-align:right;">${lodging.toLocaleString("id-ID")}</td>
+            ${komp.map((k) => `<td style="${TDBD}text-align:right;">${angka((r.bd || {})[k.id]).toLocaleString("id-ID")}</td>`).join("")}
+            <td style="${TDBD}text-align:right;font-weight:bold;">${price.toLocaleString("id-ID")}</td>
+          </tr>`;
+        }).join("")}
+      </table>`
+    : "";
 
   return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:9px;color:#111;width:100%;">
   <div style="border:1.5px solid #111;">
@@ -172,7 +215,7 @@ function buildHTML(g, origin) {
       <tr style="background:#eef2f8;font-weight:bold;">
         <td style="${TDB}">Prepared by,</td><td style="${TDB}" colspan="3">Acknowledged by,</td><td style="${TDB}">Approved by,</td>
       </tr>
-      <tr style="height:46px;">${(g.ttd || []).map(() => `<td style="${TDB}"></td>`).join("")}</tr>
+      <tr style="height:46px;">${(g.ttd || []).map((t) => `<td style="${TDB}">${t.img ? `<img src="${t.img}" style="max-height:42px;max-width:110px;display:block;margin:0 auto" />` : ""}</td>`).join("")}</tr>
       <tr style="font-weight:bold;">
         ${(g.ttd || []).map((t) => `<td style="${TDB}">${esc(t.nama) || "&nbsp;"}<div style="font-weight:normal">${esc(t.jabatan)}</div></td>`).join("")}
       </tr>
@@ -235,7 +278,7 @@ export default function GeoPage() {
       const k = GEO_KOSONG();
       k.salesPerson = p.salesPerson || user?.nama || "";
       k.ttd[0].nama = p.salesPerson || user?.nama || "";
-      const merged = { ...k, ...p, notes: { ...DEFAULT_NOTES }, ttd: k.ttd };
+      const merged = normalisasiGeo({ ...k, ...p, notes: { ...DEFAULT_NOTES }, ttd: k.ttd, komponen: k.komponen });
       merged.nomor = String(nextNomor(list, new Date().getFullYear()));
       merged.kodeSales = user?.kode || inisial(p.salesPerson || user?.nama);
       merged.geoNo = rebuildNo(merged);
@@ -243,6 +286,24 @@ export default function GeoPage() {
       setModalForm(true);
     } catch (e) {}
   }, [user, loading, list]);
+
+  // Baris tanda tangan yang namanya sudah terisi (mis. dari user login atau GEO lama)
+  // dipasangi gambarnya begitu daftar karyawan selesai dimuat.
+  useEffect(() => {
+    if (!karyawan.length) return;
+    setG((s) => {
+      if (!s.ttd || !s.ttd.length) return s;
+      let berubah = false;
+      const ttd = s.ttd.map((t) => {
+        if (!t.nama || t.img) return t;
+        const k = karyawan.find((x) => x.Nama === t.nama);
+        if (!k?.Ttd) return t;
+        berubah = true;
+        return { ...t, img: k.Ttd };
+      });
+      return berubah ? { ...s, ttd } : s;
+    });
+  }, [karyawan]);
 
   function logout() { localStorage.removeItem("crm_user"); router.replace("/"); }
 
@@ -259,7 +320,7 @@ export default function GeoPage() {
   function bukaEdit(row) {
     let d = {};
     try { d = JSON.parse(row.Data || "{}"); } catch (e) {}
-    setG({ ...GEO_KOSONG(), ...d, id: row.ID, notes: { ...DEFAULT_NOTES, ...(d.notes || {}) } });
+    setG(normalisasiGeo({ ...GEO_KOSONG(), ...d, id: row.ID, notes: { ...DEFAULT_NOTES, ...(d.notes || {}) } }));
     setModalForm(true);
   }
 
@@ -275,9 +336,37 @@ export default function GeoPage() {
   });
   const setNote = (k, v) => setG((s) => ({ ...s, notes: { ...s.notes, [k]: v } }));
   const setTtd = (i, k, v) => setG((s) => ({ ...s, ttd: (s.ttd || []).map((t, j) => (j === i ? { ...t, [k]: v } : t)) }));
+  // Pilih nama -> gambar tanda tangan ikut terpasang (jabatan tetap bisa diedit manual)
+  const pilihTtdNama = (i, nama) => setG((s) => {
+    const k = karyawan.find((x) => x.Nama === nama);
+    return {
+      ...s,
+      ttd: (s.ttd || []).map((t, j) => (j === i ? { ...t, nama, img: nama ? (k?.Ttd || "") : "" } : t)),
+    };
+  });
   const setRoom = (i, k, v) => setG((s) => ({ ...s, rooms: s.rooms.map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
-  const addRoom = () => setG((s) => ({ ...s, rooms: [...s.rooms, { type: "", checkIn: "", checkOut: "", totalRoom: "", day: "", price: "" }] }));
+  const addRoom = () => setG((s) => ({ ...s, rooms: [...s.rooms, { type: "", checkIn: "", checkOut: "", totalRoom: "", day: "", price: "", bd: {} }] }));
+  // Nilai satu komponen breakdown untuk satu tipe kamar
+  const setBd = (i, kid, v) => setG((s) => ({
+    ...s,
+    rooms: s.rooms.map((r, j) => (j === i ? { ...r, bd: { ...(r.bd || {}), [kid]: v } } : r)),
+  }));
+  const addKomponen = () => setG((s) => ({ ...s, komponen: [...(s.komponen || []), { id: idBaru(), nama: "" }] }));
+  const setKomponen = (i, nama) => setG((s) => ({ ...s, komponen: (s.komponen || []).map((k, j) => (j === i ? { ...k, nama } : k)) }));
+  const delKomponen = (i) => setG((s) => {
+    const k = (s.komponen || [])[i];
+    if (!k) return s;
+    return {
+      ...s,
+      komponen: s.komponen.filter((_, j) => j !== i),
+      rooms: s.rooms.map((r) => { const bd = { ...(r.bd || {}) }; delete bd[k.id]; return { ...r, bd }; }),
+    };
+  });
   const delRoom = (i) => setG((s) => ({ ...s, rooms: s.rooms.filter((_, j) => j !== i) }));
+
+  // Gambar tanda tangan TIDAK ikut disimpan ke database (ukurannya besar).
+  // Saat GEO dibuka lagi, gambarnya diambil ulang dari data karyawan berdasarkan nama.
+  const untukDisimpan = (x) => ({ ...x, ttd: (x.ttd || []).map(({ img, ...t }) => t) });
 
   async function simpan() {
     if (!g.geoNo.trim()) { alert("GEO No wajib diisi."); return; }
@@ -285,7 +374,7 @@ export default function GeoPage() {
     try {
       const res = await fetch("/api/geo", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: g.id ? "updateGeo" : "addGeo", id: g.id, geoNo: g.geoNo, eventTitle: g.eventTitle, company: g.company, data: JSON.stringify(g), oleh: user?.nama || user?.email || "" }),
+        body: JSON.stringify({ action: g.id ? "updateGeo" : "addGeo", id: g.id, geoNo: g.geoNo, eventTitle: g.eventTitle, company: g.company, data: JSON.stringify(untukDisimpan(g)), oleh: user?.nama || user?.email || "" }),
       });
       const d = await res.json();
       if (d.status === "ok") { setModalForm(false); await ambil(); } else alert("Gagal: " + (d.message || ""));
@@ -421,23 +510,63 @@ export default function GeoPage() {
             <div className="text-sm text-slate-600">Balance: <b>Rp {(gt - angka(g.dpAmount)).toLocaleString("id-ID")}</b></div>
 
             <div className="border border-slate-200 rounded-lg p-3">
-              <div className="text-xs font-semibold text-slate-500 mb-2">BREAKDOWN HARGA KAMAR (Lodging dihitung otomatis)</div>
-              <div className="space-y-2">
-                {g.rooms.filter((r) => r.type).map((r, i) => {
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-slate-500">BREAKDOWN HARGA KAMAR</span>
+                <button onClick={addKomponen} className="text-xs bg-[#12263a] text-white rounded px-2 py-1">+ Tambah komponen</button>
+              </div>
+              <p className="text-xs text-slate-400 mb-2">Lodging dihitung otomatis: Harga kamar dikurangi seluruh komponen di bawah.</p>
+
+              {/* Nama komponen — bisa diganti & ditambah sesuai kebutuhan */}
+              <div className="space-y-1 mb-3">
+                {(g.komponen || []).map((k, i) => (
+                  <div key={k.id} className="flex gap-1 items-center">
+                    <input
+                      className={inp + " !py-1.5 text-xs"}
+                      placeholder={"Nama komponen " + (i + 1) + " (mis. Lunch, Coffee Break)"}
+                      value={k.nama}
+                      onChange={(e) => setKomponen(i, e.target.value)}
+                    />
+                    <button onClick={() => delKomponen(i)} title="Hapus komponen ini" className="text-rose-600 text-xs px-2 shrink-0">✕</button>
+                  </div>
+                ))}
+                {(g.komponen || []).length === 0 && (
+                  <p className="text-xs text-slate-400">Belum ada komponen. Seluruh harga kamar dihitung sebagai Lodging.</p>
+                )}
+              </div>
+
+              {/* Nilai per tipe kamar */}
+              <div className="space-y-3">
+                {g.rooms.filter((r) => r.type).map((r) => {
                   const idx = g.rooms.indexOf(r);
-                  const price = angka(r.price), lodging = price - angka(r.bfast) - angka(r.dinner) - angka(r.others);
+                  const price = angka(r.price);
+                  const komp = (g.komponen || []).filter((k) => String(k.nama || "").trim());
+                  const totalKomp = komp.reduce((t, k) => t + angka((r.bd || {})[k.id]), 0);
+                  const lodging = price - totalKomp;
                   return (
                     <div key={idx} className="text-xs">
                       <div className="font-semibold text-[#12263a]">{r.type} — Rp {price.toLocaleString("id-ID")}</div>
-                      <div className="grid grid-cols-3 gap-1 mt-1">
-                        <input className={inp + " !py-1.5 text-xs"} placeholder="Breakfast" inputMode="numeric" value={r.bfast ? fmt(r.bfast) : ""} onChange={(e) => setRoom(idx, "bfast", e.target.value.replace(/[^\d]/g, ""))} />
-                        <input className={inp + " !py-1.5 text-xs"} placeholder="Dinner" inputMode="numeric" value={r.dinner ? fmt(r.dinner) : ""} onChange={(e) => setRoom(idx, "dinner", e.target.value.replace(/[^\d]/g, ""))} />
-                        <input className={inp + " !py-1.5 text-xs"} placeholder="Others" inputMode="numeric" value={r.others ? fmt(r.others) : ""} onChange={(e) => setRoom(idx, "others", e.target.value.replace(/[^\d]/g, ""))} />
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 mt-1">
+                        {komp.map((k) => (
+                          <input
+                            key={k.id}
+                            className={inp + " !py-1.5 text-xs"}
+                            placeholder={k.nama}
+                            inputMode="numeric"
+                            value={(r.bd || {})[k.id] ? fmt((r.bd || {})[k.id]) : ""}
+                            onChange={(e) => setBd(idx, k.id, e.target.value.replace(/[^\d]/g, ""))}
+                          />
+                        ))}
                       </div>
-                      <div className="text-slate-500 mt-1">Lodging (otomatis): <b className="text-[#12263a]">Rp {lodging.toLocaleString("id-ID")}</b></div>
+                      <div className={"mt-1 " + (lodging < 0 ? "text-rose-600 font-semibold" : "text-slate-500")}>
+                        Lodging (otomatis): <b className={lodging < 0 ? "text-rose-600" : "text-[#12263a]"}>Rp {lodging.toLocaleString("id-ID")}</b>
+                        {lodging < 0 && <span> — jumlah komponen melebihi harga kamar</span>}
+                      </div>
                     </div>
                   );
                 })}
+                {g.rooms.filter((r) => r.type).length === 0 && (
+                  <p className="text-xs text-slate-400">Isi Room Type di bagian Room Arrangement dulu.</p>
+                )}
               </div>
             </div>
             <Field label="Remark"><input className={inp} value={g.remark} onChange={(e) => set("remark", e.target.value)} /></Field>
@@ -459,7 +588,7 @@ export default function GeoPage() {
               <div className="space-y-2">
                 {(g.ttd || []).map((t, i) => (
                   <div key={i} className="grid grid-cols-2 gap-2 items-center">
-                    <select className={inp + " text-sm"} value={t.nama} onChange={(e) => setTtd(i, "nama", e.target.value)}>
+                    <select className={inp + " text-sm"} value={t.nama} onChange={(e) => pilihTtdNama(i, e.target.value)}>
                       <option value="">— pilih nama —</option>
                       {t.nama && !karyawan.some((k) => k.Nama === t.nama) && <option value={t.nama}>{t.nama}</option>}
                       {karyawan.map((k) => <option key={k.Nama} value={k.Nama}>{k.Nama}{k.Kode ? " (" + k.Kode + ")" : ""}</option>)}
