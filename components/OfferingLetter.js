@@ -6,6 +6,17 @@ import { unduhPDFdariHTML } from "@/lib/pdf";
 import { RATE_CATEGORIES, rateDefault } from "@/lib/rates";
 import { JABATAN_ROLE, blokTtd } from "@/lib/ttd";
 
+// ====== Jenis Offering Letter ======
+// Graduation memakai aturan yang sama persis dengan Meeting / Kamar
+// (paket meeting, ADD ON, galeri, dan seri nomor OL).
+const JENIS_OL = [
+  { key: "Meeting", label: "Meeting / Kamar" },
+  { key: "Wedding", label: "Wedding" },
+  { key: "Graduation", label: "Graduation" },
+];
+// true untuk semua jenis yang mengikuti aturan Meeting / Kamar
+const gayaMeeting = (jenis) => jenis !== "Wedding";
+
 // ====== Identitas hotel (ubah bila perlu) ======
 const HOTEL = {
   nama: "Aston Cirebon Hotel & Convention Center",
@@ -163,7 +174,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
     }));
   }
 
-  const kodeDok = o.jenisOL === "Wedding" ? "OLW" : "OL";
+  const kodeDok = gayaMeeting(o.jenisOL) ? "OL" : "OLW";
   const set = (k, v) => setO((s) => ({ ...s, [k]: v }));
   const pilihPaket = (i, nama) => { const p = PACKAGES.find((x) => x.nama === nama); setO((s) => ({ ...s, pakets: s.pakets.map((r, j) => (j === i ? { nama, harga: p ? String(p.harga) : r.harga, benefit: p ? p.benefit : r.benefit } : r)) })); };
   const setPaket = (i, k, v) => setO((s) => ({ ...s, pakets: s.pakets.map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
@@ -179,13 +190,15 @@ export default function OfferingLetter({ lead, user, onClose }) {
   const setRate = (i, kol, v) => setO((s) => ({ ...s, rates: { ...s.rates, [s.rateCat]: s.rates[s.rateCat].map((r, j) => (j === i ? [r[0], kol === "wd" ? v : r[1], kol === "we" ? v : r[2]] : r)) } }));
   const [busy, setBusy] = useState(false);
 
-  // Nomor otomatis mengikuti jenis (OL untuk Meeting, OLW untuk Wedding), reset per tahun
+  // Nomor otomatis mengikuti seri dokumen (OL untuk Meeting & Graduation,
+  // OLW untuk Wedding), reset per tahun. Hanya diambil ulang saat serinya berganti,
+  // supaya pindah Meeting <-> Graduation tidak mengubah nomor yang sudah didapat.
   useEffect(() => {
     const th = new Date(o.tglSurat || hariIni()).getFullYear();
     fetch(`/api/docnum?kode=${kodeDok}&tahun=${th}`, { cache: "no-store" })
       .then((r) => r.json()).then((r) => { if (r.status === "ok") set("nomor", String(r.next)); })
       .catch(() => {});
-  }, [o.jenisOL]); // eslint-disable-line
+  }, [kodeDok]); // eslint-disable-line
 
   const grandTotal = o.estimasi.reduce((t, r) => t + angka(r.jumlah) * angka(r.harga), 0);
   const noOL = buildNoDok(kodeDok, o.nomor, o.tglSurat, o.kodeSales);
@@ -212,7 +225,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
       <div>Penambahan pesanan: <b>${rp(w.add)} Nett/Orang</b></div>
       <div style="margin-top:2px">Benefit termasuk:</div><ul>${li}</ul>`;
     }).join("");
-    const paketSection = o.jenisOL === "Wedding"
+    const paketSection = !gayaMeeting(o.jenisOL)
       ? `<div class="sec pb">PILIHAN WEDDING PACKAGE</div>${weddingBlok}`
       : `<div class="sec pb">PAKET</div>${paketBlok}`;
 
@@ -221,13 +234,13 @@ export default function OfferingLetter({ lead, user, onClose }) {
 
     const galeri = (a, b, c) => `<table class="galeri"><tr><td><img src="${origin}/img/${a}"/></td><td><img src="${origin}/img/${b}"/></td><td><img src="${origin}/img/${c}"/></td></tr></table>`;
 
-    const galeriWedding = o.jenisOL === "Wedding"
+    const galeriWedding = !gayaMeeting(o.jenisOL)
       ? `<div class="sec pb">VENUE &amp; DEKORASI WEDDING</div>
   <div class="subcap">Pilihan venue wedding ${HOTEL.nama} — Backyard, Onyx, Nana Land &amp; Sapphire Grand Ballroom.</div>
   ${galeri("wedding-1.jpg", "wedding-2.jpg", "wedding-3.jpg")}`
       : "";
 
-    const galeriFunGames = o.jenisOL === "Wedding"
+    const galeriFunGames = !gayaMeeting(o.jenisOL)
       ? ""
       : `<div class="sec">FUN GAMES &amp; TEAM BUILDING</div>
   <div class="subcap">Aneka permainan seru untuk gathering &amp; outbound di area taman &amp; lapangan hotel — cocok untuk employee gathering, family day, dan team building.</div>
@@ -375,15 +388,21 @@ export default function OfferingLetter({ lead, user, onClose }) {
       <div className="space-y-3">
         <div>
           <div className="text-sm font-medium text-slate-700 mb-1">Jenis Offering</div>
-          <div className="grid grid-cols-2 gap-2">
-            {["Meeting", "Wedding"].map((t) => (
-              <button key={t} type="button" onClick={() => set("jenisOL", t)}
-                className={"rounded-lg border px-3 py-2.5 text-sm font-semibold transition " + (o.jenisOL === t ? "border-[#12263a] bg-[#12263a] text-white" : "border-slate-300 text-slate-600 hover:bg-slate-50")}>
-                {t === "Meeting" ? "Meeting / Kamar" : "Wedding"}
+          <div className="grid grid-cols-3 gap-2">
+            {JENIS_OL.map((t) => (
+              <button key={t.key} type="button" onClick={() => set("jenisOL", t.key)}
+                className={"rounded-lg border px-3 py-2.5 text-sm font-semibold transition " + (o.jenisOL === t.key ? "border-[#12263a] bg-[#12263a] text-white" : "border-slate-300 text-slate-600 hover:bg-slate-50")}>
+                {t.label}
               </button>
             ))}
           </div>
-          {o.jenisOL === "Wedding" && <p className="text-xs text-slate-400 mt-1">Nomor otomatis memakai seri terpisah (OLW).</p>}
+          <p className="text-xs text-slate-400 mt-1">
+            {o.jenisOL === "Wedding"
+              ? "Nomor otomatis memakai seri terpisah (OLW)."
+              : o.jenisOL === "Graduation"
+                ? "Graduation memakai aturan & seri nomor yang sama dengan Meeting / Kamar (OL)."
+                : "Nomor otomatis memakai seri OL."}
+          </p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Nomor"><input className={inp} inputMode="numeric" value={o.nomor} onChange={(e) => set("nomor", e.target.value.replace(/[^\d]/g, ""))} placeholder="124" /></Field>
@@ -460,7 +479,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
         </div>
 
         {/* Paket (bisa lebih dari satu; benefit & harga mengikuti paket, tetap bisa diedit) */}
-        {o.jenisOL === "Meeting" ? (
+        {gayaMeeting(o.jenisOL) ? (
         <div className="border border-slate-200 rounded-lg p-3 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500">PAKET (bisa lebih dari satu)</span>
