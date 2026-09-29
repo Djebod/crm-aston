@@ -16,6 +16,13 @@ const JENIS_OL = [
 ];
 // true untuk semua jenis yang mengikuti aturan Meeting / Kamar
 const gayaMeeting = (jenis) => jenis !== "Wedding";
+// Perihal surat bawaan per jenis
+const PERIHAL = {
+  Meeting: "Penawaran Harga/Meeting dan Kamar",
+  Wedding: "Penawaran Harga Wedding Package",
+  Graduation: "Penawaran Harga Graduation/Wisuda",
+};
+const PERIHAL_BAWAAN = Object.values(PERIHAL);
 
 // ====== Identitas hotel (ubah bila perlu) ======
 const HOTEL = {
@@ -78,6 +85,15 @@ const WEDDING_PACKAGES = [
   { venue: "Sapphire Grand Ballroom", tier: "Platinum", harga: 144500000, persons: 500, add: 265000, benefit: W_PLAT + "\nVideotron 8 m x 4 m\nFree VIP/Transit Room" },
 ];
 const wLabel = (w) => w.venue + " — " + w.tier;
+
+// ====== Graduation Package (mengikuti flyer "Graduation Deals") ======
+const GRADUATION_PACKAGES = [
+  {
+    nama: "Graduation Package",
+    harga: 150000,
+    benefit: "Snack box\nFree 2-hour Final Rehearsal (subject to availability)",
+  },
+];
 
 const ADDON = [
   "Mic Rp 300.000,-/mic",
@@ -176,9 +192,29 @@ export default function OfferingLetter({ lead, user, onClose }) {
 
   const kodeDok = gayaMeeting(o.jenisOL) ? "OL" : "OLW";
   const set = (k, v) => setO((s) => ({ ...s, [k]: v }));
-  const pilihPaket = (i, nama) => { const p = PACKAGES.find((x) => x.nama === nama); setO((s) => ({ ...s, pakets: s.pakets.map((r, j) => (j === i ? { nama, harga: p ? String(p.harga) : r.harga, benefit: p ? p.benefit : r.benefit } : r)) })); };
+  // Katalog paket mengikuti jenis offering: Graduation punya paketnya sendiri.
+  const daftarPaket = o.jenisOL === "Graduation" ? GRADUATION_PACKAGES : PACKAGES;
+  const pilihPaket = (i, nama) => { const p = daftarPaket.find((x) => x.nama === nama); setO((s) => ({ ...s, pakets: s.pakets.map((r, j) => (j === i ? { nama, harga: p ? String(p.harga) : r.harga, benefit: p ? p.benefit : r.benefit } : r)) })); };
   const setPaket = (i, k, v) => setO((s) => ({ ...s, pakets: s.pakets.map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
-  const addPaket = () => setO((s) => ({ ...s, pakets: [...s.pakets, { nama: PACKAGES[0].nama, harga: String(PACKAGES[0].harga), benefit: PACKAGES[0].benefit }] }));
+  const addPaket = () => setO((s) => ({ ...s, pakets: [...s.pakets, { nama: daftarPaket[0].nama, harga: String(daftarPaket[0].harga), benefit: daftarPaket[0].benefit }] }));
+
+  // Berganti jenis offering -> paket & perihal ikut menyesuaikan.
+  // Hanya diganti bila isinya masih bawaan (belum diedit manual).
+  useEffect(() => {
+    setO((s) => {
+      const katalog = s.jenisOL === "Graduation" ? GRADUATION_PACKAGES : PACKAGES;
+      const semuaBawaan = (s.pakets || []).every((r) =>
+        PACKAGES.concat(GRADUATION_PACKAGES).some((x) => x.nama === r.nama && String(x.harga) === String(r.harga))
+      );
+      const sudahCocok = (s.pakets || []).every((r) => katalog.some((x) => x.nama === r.nama));
+      const n = { ...s };
+      if (semuaBawaan && !sudahCocok) {
+        n.pakets = [{ nama: katalog[0].nama, harga: String(katalog[0].harga), benefit: katalog[0].benefit }];
+      }
+      if (PERIHAL_BAWAAN.includes(s.perihal)) n.perihal = PERIHAL[s.jenisOL] || PERIHAL.Meeting;
+      return n;
+    });
+  }, [o.jenisOL]); // eslint-disable-line
   const delPaket = (i) => setO((s) => ({ ...s, pakets: s.pakets.filter((_, j) => j !== i) }));
   const pilihWedding = (i, key) => { const w = WEDDING_PACKAGES.find((x) => wLabel(x) === key); setO((s) => ({ ...s, weddings: s.weddings.map((r, j) => (j === i ? { key, harga: w ? String(w.harga) : r.harga, persons: w ? String(w.persons) : r.persons, add: w ? String(w.add) : r.add, benefit: w ? w.benefit : r.benefit } : r)) })); };
   const setWed = (i, k, v) => setO((s) => ({ ...s, weddings: s.weddings.map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
@@ -225,9 +261,10 @@ export default function OfferingLetter({ lead, user, onClose }) {
       <div>Penambahan pesanan: <b>${rp(w.add)} Nett/Orang</b></div>
       <div style="margin-top:2px">Benefit termasuk:</div><ul>${li}</ul>`;
     }).join("");
+    const judulPaket = o.jenisOL === "Graduation" ? "PAKET GRADUATION" : "PAKET";
     const paketSection = !gayaMeeting(o.jenisOL)
       ? `<div class="sec pb">PILIHAN WEDDING PACKAGE</div>${weddingBlok}`
-      : `<div class="sec pb">PAKET</div>${paketBlok}`;
+      : `<div class="sec pb">${judulPaket}</div>${paketBlok}`;
 
     const rangkaianRows = o.rangkaian.map((r) =>
       `<tr>${td(esc(tglID(r.hari)))}${td(esc(r.waktu))}${td(esc(r.acara))}${td(esc(r.tempat))}${td(esc(r.setup))}${td(esc(r.jumlah), "c")}</tr>`).join("");
@@ -240,7 +277,13 @@ export default function OfferingLetter({ lead, user, onClose }) {
   ${galeri("wedding-1.jpg", "wedding-2.jpg", "wedding-3.jpg")}`
       : "";
 
-    const galeriFunGames = !gayaMeeting(o.jenisOL)
+    const galeriWisuda = o.jenisOL === "Graduation"
+      ? `<div class="sec pb">GRADUATION DI ${HOTEL.nama.toUpperCase()}</div>
+  <div class="subcap">Sapphire Grand Ballroom &amp; area lobby — kapasitas sampai 1.445 orang, lengkap dengan panggung, videotron, dan spot foto wisuda.</div>
+  ${galeri("wisuda-1.jpg", "wisuda-2.jpg", "wisuda-3.jpg")}`
+      : "";
+
+    const galeriFunGames = o.jenisOL !== "Meeting"
       ? ""
       : `<div class="sec">FUN GAMES &amp; TEAM BUILDING</div>
   <div class="subcap">Aneka permainan seru untuk gathering &amp; outbound di area taman &amp; lapangan hotel — cocok untuk employee gathering, family day, dan team building.</div>
@@ -306,7 +349,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
   <div class="italb">Salam hangat dari ${HOTEL.nama}</div>
   <p>Terima kasih atas kesempatan yang telah diberikan kepada kami untuk mengajukan proposal untuk acara
   <b>${esc(o.instansi || o.namaAcara)}</b>. Kami sangat antusias atas peluang bekerja sama dengan ${esc(o.sapaan)} dan berkontribusi terhadap kesuksesan acara ini.</p>
-  <p>Sehubungan dengan permintaan ${esc(o.sapaan)} terkait Kamar dan Paket Pertemuan di hotel kami, dengan ini kami sampaikan penawaran harga spesial sebagai berikut:</p>
+  <p>Sehubungan dengan permintaan ${esc(o.sapaan)} terkait ${o.jenisOL === "Graduation" ? "Kamar dan Paket Wisuda" : o.jenisOL === "Wedding" ? "Kamar dan Wedding Package" : "Kamar dan Paket Pertemuan"} di hotel kami, dengan ini kami sampaikan penawaran harga spesial sebagai berikut:</p>
 
   <div class="sec">KAMAR:</div>
   <div>Tanggal &nbsp;: ${o.tglKamar ? tglID(o.tglKamar) : "-"}</div>
@@ -325,6 +368,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
   <p>Penggunaan Extra Bed dikenakan biaya Rp 400.000 per malam sudah termasuk sarapan. Gratis sarapan untuk usia di bawah 5 tahun dan dikenakan Rp 100.000 untuk usia di bawah 12 tahun. Penambahan sarapan di luar paket kamar dikenakan biaya Rp 180.000 per orang.</p>
 
   ${galeriWedding}
+  ${galeriWisuda}
 
   <div class="sec">KEBUTUHAN ACARA</div>
   <div>Nama Acara &nbsp;: <b>${esc(o.namaAcara) || "-"}</b></div>
@@ -482,7 +526,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
         {gayaMeeting(o.jenisOL) ? (
         <div className="border border-slate-200 rounded-lg p-3 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">PAKET (bisa lebih dari satu)</span>
+            <span className="text-xs font-semibold text-slate-500">{o.jenisOL === "Graduation" ? "PAKET GRADUATION" : "PAKET"} (bisa lebih dari satu)</span>
             <button onClick={addPaket} className="text-xs bg-[#12263a] text-white rounded px-2 py-1">+ Tambah Paket</button>
           </div>
           {o.pakets.map((p, i) => (
@@ -491,7 +535,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
                 <div className="col-span-2">
                   <Field label={"Paket " + (i + 1)}>
                     <select className={inp} value={p.nama} onChange={(e) => pilihPaket(i, e.target.value)}>
-                      {PACKAGES.map((x) => <option key={x.nama} value={x.nama}>{x.nama}</option>)}
+                      {daftarPaket.map((x) => <option key={x.nama} value={x.nama}>{x.nama}</option>)}
                     </select>
                   </Field>
                 </div>

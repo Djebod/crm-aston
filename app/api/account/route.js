@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { sql } from "@/lib/db";
+import { sql, pastikanKolomTtd } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -21,6 +21,7 @@ export async function POST(req) {
 
     if (body.action === "updateTtd") {
       if (!rows.length) return NextResponse.json({ status: "error", message: CATATAN });
+      await pastikanKolomTtd();
       const ttd = String(body.ttd || "");
       if (ttd && !ttd.startsWith("data:image/")) return NextResponse.json({ status: "error", message: "Format gambar tidak dikenali." });
       if (ttd.length > 400000) return NextResponse.json({ status: "error", message: "Gambar tanda tangan terlalu besar." });
@@ -30,6 +31,7 @@ export async function POST(req) {
 
     if (body.action === "getTtd") {
       if (!rows.length) return NextResponse.json({ status: "error", message: CATATAN });
+      await pastikanKolomTtd();
       const r = await sql`SELECT ttd AS "Ttd" FROM users WHERE email = ${em}`;
       return NextResponse.json({ status: "ok", ttd: r[0]?.Ttd || "" });
     }

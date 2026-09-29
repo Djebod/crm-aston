@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { sql } from "@/lib/db";
+import { sql, pastikanKolomTtd } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -19,6 +19,7 @@ export async function GET(req) {
   const requester = req.headers.get("x-user-email");
   if (!(await bolehKelola(requester))) return NextResponse.json({ status: "error", message: "Akses ditolak." }, { status: 403 });
   try {
+    await pastikanKolomTtd();
     const rows = await sql`SELECT email AS "Email", nama AS "Nama", role AS "Role", aktif AS "Aktif", kode AS "Kode", ttd AS "Ttd" FROM users ORDER BY nama ASC`;
     return NextResponse.json({ status: "ok", data: rows });
   } catch (e) { return NextResponse.json({ status: "error", message: e?.message || String(e) }); }
@@ -39,6 +40,7 @@ export async function POST(req) {
       if (body.aktif !== undefined) await sql`UPDATE users SET aktif = ${!!body.aktif} WHERE email = ${em}`;
       if (body.password) await sql`UPDATE users SET password_hash = ${bcrypt.hashSync(String(body.password), 10)} WHERE email = ${em}`;
       if (body.ttd !== undefined) {
+        await pastikanKolomTtd();
         const ttd = String(body.ttd || "");
         if (ttd && !ttd.startsWith("data:image/")) return NextResponse.json({ status: "error", message: "Format gambar tanda tangan tidak dikenali." });
         if (ttd.length > 400000) return NextResponse.json({ status: "error", message: "Gambar tanda tangan terlalu besar." });

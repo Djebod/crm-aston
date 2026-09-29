@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { raw } from "@/lib/db";
+import { raw, pastikanKolomTtd } from "@/lib/db";
 
 export const runtime = "nodejs";
 
 // Daftar nama karyawan (untuk dropdown tanda tangan) — nama, kode, role, gambar TTD.
 export async function GET() {
   try {
+    await pastikanKolomTtd();
     const rows = await raw(
       `SELECT nama AS "Nama", kode AS "Kode", role AS "Role", ttd AS "Ttd" FROM users WHERE aktif = true ORDER BY nama ASC`
     );
