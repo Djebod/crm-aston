@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Modal, Field, inp } from "@/components/Modal";
 import { unduhPDFdariHTML } from "@/lib/pdf";
 import { RATE_CATEGORIES, rateDefault } from "@/lib/rates";
-import { JABATAN_ROLE, blokTtd } from "@/lib/ttd";
+import { JABATAN_ROLE, blokTtd, statusTtd } from "@/lib/ttd";
 
 // ====== Jenis Offering Letter ======
 // Graduation memakai aturan yang sama persis dengan Meeting / Kamar
@@ -604,6 +604,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
               {o.ttdNama && !karyawan.some((k) => k.Nama === o.ttdNama) && <option value={o.ttdNama}>{o.ttdNama}</option>}
               {karyawan.map((k) => <option key={k.Nama} value={k.Nama}>{k.Nama}{k.Kode ? " (" + k.Kode + ")" : ""}</option>)}
             </select>
+            {(() => { const st = statusTtd(o.ttdNama, o.ttdImg, karyawan); return <p className={"text-xs mt-1 " + st.warna}>{st.teks}</p>; })()}
           </Field>
           <Field label="Jabatan"><input className={inp} value={o.ttdJabatan} onChange={(e) => set("ttdJabatan", e.target.value)} /></Field>
           <Field label="No HP Penandatangan"><input className={inp} value={o.ttdHP} onChange={(e) => set("ttdHP", e.target.value)} /></Field>

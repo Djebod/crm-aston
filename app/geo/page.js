@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import ProfilSaya from "@/components/ProfilSaya";
 import Header from "@/components/Header";
 import { Modal, Field, inp } from "@/components/Modal";
-import { JABATAN_ROLE } from "@/lib/ttd";
+import { JABATAN_ROLE, statusTtd } from "@/lib/ttd";
 
 const HOTEL = {
   nama: "ASTON CIREBON HOTEL & CONVENTION CENTER",
@@ -586,16 +586,22 @@ export default function GeoPage() {
             <div className="border border-slate-200 rounded-lg p-3">
               <div className="text-xs font-semibold text-slate-500 mb-2">TANDA TANGAN (nama &amp; jabatan bisa disesuaikan)</div>
               <div className="space-y-2">
-                {(g.ttd || []).map((t, i) => (
-                  <div key={i} className="grid grid-cols-2 gap-2 items-center">
-                    <select className={inp + " text-sm"} value={t.nama} onChange={(e) => pilihTtdNama(i, e.target.value)}>
-                      <option value="">— pilih nama —</option>
-                      {t.nama && !karyawan.some((k) => k.Nama === t.nama) && <option value={t.nama}>{t.nama}</option>}
-                      {karyawan.map((k) => <option key={k.Nama} value={k.Nama}>{k.Nama}{k.Kode ? " (" + k.Kode + ")" : ""}</option>)}
-                    </select>
-                    <input className={inp + " text-sm"} value={t.jabatan} onChange={(e) => setTtd(i, "jabatan", e.target.value)} placeholder="Jabatan" />
-                  </div>
-                ))}
+                {(g.ttd || []).map((t, i) => {
+                  const st = statusTtd(t.nama, t.img, karyawan);
+                  return (
+                    <div key={i}>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <select className={inp + " text-sm"} value={t.nama} onChange={(e) => pilihTtdNama(i, e.target.value)}>
+                          <option value="">— pilih nama —</option>
+                          {t.nama && !karyawan.some((k) => k.Nama === t.nama) && <option value={t.nama}>{t.nama}</option>}
+                          {karyawan.map((k) => <option key={k.Nama} value={k.Nama}>{k.Nama}{k.Kode ? " (" + k.Kode + ")" : ""}</option>)}
+                        </select>
+                        <input className={inp + " text-sm"} value={t.jabatan} onChange={(e) => setTtd(i, "jabatan", e.target.value)} placeholder="Jabatan" />
+                      </div>
+                      {t.nama && <p className={"text-xs mt-0.5 " + st.warna}>{st.teks}</p>}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Modal, Field, inp } from "@/components/Modal";
 import { unduhPDFdariHTML } from "@/lib/pdf";
 import { RATE_CATEGORIES, rateDefault } from "@/lib/rates";
-import { JABATAN_ROLE, blokTtd } from "@/lib/ttd";
+import { JABATAN_ROLE, blokTtd, statusTtd } from "@/lib/ttd";
 
 const HOTEL = {
   nama: "Aston Cirebon Hotel & Convention Center",
@@ -99,15 +99,19 @@ function buildNoDok(code, nomor, tgl, kode) {
 }
 
 // Dropdown nama karyawan (anti salah ketik). Nama lama yang tidak ada di daftar tetap dipertahankan.
-function PilihNama({ karyawan, value, onPilih }) {
+function PilihNama({ karyawan, value, img, onPilih }) {
+  const st = statusTtd(value, img, karyawan);
   return (
-    <select className={inp} value={value || ""} onChange={(e) => onPilih(e.target.value)}>
-      <option value="">— pilih nama —</option>
-      {value && !karyawan.some((k) => k.Nama === value) && <option value={value}>{value}</option>}
-      {karyawan.map((k) => (
-        <option key={k.Nama} value={k.Nama}>{k.Nama}{k.Kode ? " (" + k.Kode + ")" : ""}</option>
-      ))}
-    </select>
+    <>
+      <select className={inp} value={value || ""} onChange={(e) => onPilih(e.target.value)}>
+        <option value="">— pilih nama —</option>
+        {value && !karyawan.some((k) => k.Nama === value) && <option value={value}>{value}</option>}
+        {karyawan.map((k) => (
+          <option key={k.Nama} value={k.Nama}>{k.Nama}{k.Kode ? " (" + k.Kode + ")" : ""}</option>
+        ))}
+      </select>
+      <p className={"text-xs mt-1 " + st.warna}>{st.teks}</p>
+    </>
   );
 }
 
@@ -398,17 +402,17 @@ ${pasalRows}
           <div className="col-span-2 text-xs font-semibold text-slate-500">TANDA TANGAN (pilih nama &rarr; jabatan terisi otomatis)</div>
 
           <Field label="Prepared by — Sales">
-            <PilihNama karyawan={karyawan} value={g.prepBy} onPilih={(n) => pilihTtd("prepBy", "prepTitle", "prepImg", n)} />
+            <PilihNama karyawan={karyawan} value={g.prepBy} img={g.prepImg} onPilih={(n) => pilihTtd("prepBy", "prepTitle", "prepImg", n)} />
           </Field>
           <Field label="Jabatan"><input className={inp} value={g.prepTitle} onChange={(e) => set("prepTitle", e.target.value)} /></Field>
 
           <Field label="Acknowledge by — Sales Leader">
-            <PilihNama karyawan={karyawan} value={g.leaderNama} onPilih={(n) => pilihTtd("leaderNama", "leaderTitle", "leaderImg", n, "Sales Leader")} />
+            <PilihNama karyawan={karyawan} value={g.leaderNama} img={g.leaderImg} onPilih={(n) => pilihTtd("leaderNama", "leaderTitle", "leaderImg", n, "Sales Leader")} />
           </Field>
           <Field label="Jabatan"><input className={inp} value={g.leaderTitle} onChange={(e) => set("leaderTitle", e.target.value)} /></Field>
 
           <Field label="Approved by — General Manager">
-            <PilihNama karyawan={karyawan} value={g.gmNama} onPilih={(n) => pilihTtd("gmNama", "gmTitle", "gmImg", n, "General Manager")} />
+            <PilihNama karyawan={karyawan} value={g.gmNama} img={g.gmImg} onPilih={(n) => pilihTtd("gmNama", "gmTitle", "gmImg", n, "General Manager")} />
           </Field>
           <Field label="Jabatan GM"><input className={inp} value={g.gmTitle} onChange={(e) => set("gmTitle", e.target.value)} /></Field>
         </div>
