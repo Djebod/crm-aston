@@ -3,6 +3,9 @@ import bcrypt from "bcryptjs";
 import { sql, pastikanKolomTtd } from "@/lib/db";
 
 export const runtime = "nodejs";
+// Jangan di-cache saat build: data harus selalu diambil segar dari database.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function isSuperAdmin(email) {
   return String(email || "").toLowerCase().trim() === String(process.env.ADMIN_EMAIL || "").toLowerCase().trim();

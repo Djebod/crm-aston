@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { sql, raw, waktuJakarta } from "@/lib/db";
 
 export const runtime = "nodejs";
+// Jangan di-cache saat build: data harus selalu diambil segar dari database.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const SEL = `SELECT id AS "ID", room AS "Room", tanggal AS "Tanggal", jam_mulai AS "JamMulai", jam_selesai AS "JamSelesai",
   event_title AS "EventTitle", company AS "Company", pax AS "Pax", setup AS "Setup", pic AS "PIC",

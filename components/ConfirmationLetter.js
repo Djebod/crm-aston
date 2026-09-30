@@ -162,16 +162,17 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
     }));
   }
 
-  // Nama "Prepared by" sudah terisi dari user login, jadi gambar TTD-nya
-  // dipasang begitu daftar karyawan selesai dimuat.
+  // Gambar TTD selalu diturunkan dari nama + daftar karyawan, jadi tetap benar
+  // setelah memuat draft tersimpan maupun setelah ganti nama penandatangan.
   useEffect(() => {
     if (!karyawan.length) return;
+    const cari = (nama) => karyawan.find((x) => x.Nama === nama)?.Ttd || "";
     setG((s) => {
-      if (!s.prepBy || s.prepImg) return s;
-      const k = karyawan.find((x) => x.Nama === s.prepBy);
-      return k?.Ttd ? { ...s, prepImg: k.Ttd } : s;
+      const p = cari(s.prepBy), l = cari(s.leaderNama), gm = cari(s.gmNama);
+      if (s.prepImg === p && s.leaderImg === l && s.gmImg === gm) return s;
+      return { ...s, prepImg: p, leaderImg: l, gmImg: gm };
     });
-  }, [karyawan]);
+  }, [karyawan, g.prepBy, g.leaderNama, g.gmNama]);
 
   const set = (k, v) => setG((s) => ({ ...s, [k]: v }));
   const setRow = (arr, i, k, v) => setG((s) => ({ ...s, [arr]: s[arr].map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
@@ -296,6 +297,54 @@ ${pasalRows}
 </div>`;
   }
 
+  // ===== Draft tersimpan (bisa dibuka & diedit lagi) =====
+  const [docId, setDocId] = useState("");
+  const [infoSimpan, setInfoSimpan] = useState("");
+  const [menyimpan, setMenyimpan] = useState(false);
+  const [adaDraft, setAdaDraft] = useState(false);
+
+  useEffect(() => {
+    if (!lead?.ID) return;
+    fetch(`/api/dokumen?leadId=${encodeURIComponent(lead.ID)}&jenis=CL`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((r) => {
+        const row = r.status === "ok" && (r.data || [])[0];
+        if (!row) return;
+        let d = {};
+        try { d = JSON.parse(row.data || "{}"); } catch (e) { return; }
+        setDocId(row.id);
+        setAdaDraft(true);
+        setG((s) => ({ ...s, ...d, prepImg: "", leaderImg: "", gmImg: "" }));
+        setInfoSimpan("Draft tersimpan dimuat (terakhir disimpan " + (row.updated_at || "-") + ").");
+      })
+      .catch(() => {});
+  }, [lead?.ID]); // eslint-disable-line
+
+  async function simpanDraft(diam) {
+    if (!lead?.ID) { setInfoSimpan("Dokumen ini tidak terhubung ke lead, jadi tidak bisa disimpan."); return; }
+    if (!diam) setMenyimpan(true);
+    try {
+      // Gambar TTD tidak ikut disimpan — diambil ulang dari nama saat dibuka.
+      const { prepImg, leaderImg, gmImg, ...bersih } = g;
+      const res = await fetch("/api/dokumen", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "simpan", id: docId, jenis: "CL", noDok: clNo, leadId: lead.ID,
+          judul: g.namaAcara || g.instansi || lead.Nama || "", company: g.instansi || "",
+          data: JSON.stringify(bersih), oleh: user?.nama || user?.email || "",
+        }),
+      });
+      const d = await res.json();
+      if (d.status === "ok") {
+        if (d.id) setDocId(d.id);
+        setAdaDraft(true);
+        setInfoSimpan("✓ Tersimpan. Lain kali dibuka lagi, isinya sudah ada.");
+      } else setInfoSimpan("Gagal menyimpan: " + (d.message || ""));
+    } catch (e) {
+      setInfoSimpan("Tidak bisa terhubung ke server.");
+    } finally { setMenyimpan(false); }
+  }
+
   const [busy, setBusy] = useState(false);
   async function unduh() {
     setBusy(true);
@@ -304,6 +353,7 @@ ${pasalRows}
       const th = new Date(g.tglSurat || hariIni()).getFullYear();
       await fetch("/api/docnum", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kode: "CL", tahun: th, nomor: angka(g.nomor) }) });
     } catch (e) {}
+    await simpanDraft(true); // unduh sekalian menyimpan draft
     setBusy(false);
   }
 
@@ -418,8 +468,12 @@ ${pasalRows}
         </div>
       </div>
 
-      <div className="flex gap-2 mt-5">
-        <button onClick={onClose} className="flex-1 border border-slate-300 rounded-lg py-2.5 font-medium hover:bg-slate-50">Tutup</button>
+      {infoSimpan && <p className="text-xs text-slate-500 mt-4">{infoSimpan}</p>}
+      <div className="flex gap-2 mt-2">
+        <button onClick={onClose} className="border border-slate-300 rounded-lg py-2.5 px-4 font-medium hover:bg-slate-50">Tutup</button>
+        <button onClick={() => simpanDraft(false)} disabled={menyimpan} className="flex-1 border border-[#12263a] text-[#12263a] font-semibold rounded-lg py-2.5 hover:bg-slate-50 disabled:opacity-60">
+          {menyimpan ? "Menyimpan…" : adaDraft ? "💾 Simpan perubahan" : "💾 Simpan"}
+        </button>
         <button onClick={unduh} disabled={busy} className="flex-1 bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg py-2.5 disabled:opacity-60">{busy ? "Membuat PDF…" : "⬇ Download PDF"}</button>
       </div>
     </Modal>

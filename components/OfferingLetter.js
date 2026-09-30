@@ -168,16 +168,16 @@ export default function OfferingLetter({ lead, user, onClose }) {
       .then((r) => { if (r.status === "ok") setKaryawan(r.data || []); })
       .catch(() => {});
   }, []);
-  // Nama sudah terisi lebih dulu (dari user login), jadi TTD-nya dipasang
-  // begitu daftar karyawan selesai dimuat.
+  // Gambar TTD selalu diturunkan dari nama penandatangan + daftar karyawan,
+  // jadi tetap benar setelah memuat draft tersimpan maupun setelah ganti nama.
   useEffect(() => {
     if (!karyawan.length) return;
     setO((s) => {
-      if (!s.ttdNama || s.ttdImg) return s;
       const k = karyawan.find((x) => x.Nama === s.ttdNama);
-      return k?.Ttd ? { ...s, ttdImg: k.Ttd } : s;
+      const img = k?.Ttd || "";
+      return s.ttdImg === img ? s : { ...s, ttdImg: img };
     });
-  }, [karyawan]);
+  }, [karyawan, o.ttdNama]);
 
   function pilihTtdNama(nama) {
     const k = karyawan.find((x) => x.Nama === nama);
@@ -188,6 +188,54 @@ export default function OfferingLetter({ lead, user, onClose }) {
       ttdJabatan: nama && jab ? jab : s.ttdJabatan,
       ttdImg: nama ? (k?.Ttd || "") : "",
     }));
+  }
+
+  // ===== Draft tersimpan (bisa dibuka & diedit lagi) =====
+  const [docId, setDocId] = useState("");
+  const [infoSimpan, setInfoSimpan] = useState("");
+  const [menyimpan, setMenyimpan] = useState(false);
+  const [adaDraft, setAdaDraft] = useState(false);
+
+  useEffect(() => {
+    if (!lead?.ID) return;
+    fetch(`/api/dokumen?leadId=${encodeURIComponent(lead.ID)}&jenis=OL`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((r) => {
+        const row = r.status === "ok" && (r.data || [])[0];
+        if (!row) return;
+        let d = {};
+        try { d = JSON.parse(row.data || "{}"); } catch (e) { return; }
+        setDocId(row.id);
+        setAdaDraft(true);
+        setO((s) => ({ ...s, ...d, ttdImg: "" }));
+        setInfoSimpan("Draft tersimpan dimuat (terakhir disimpan " + (row.updated_at || "-") + ").");
+      })
+      .catch(() => {});
+  }, [lead?.ID]); // eslint-disable-line
+
+  async function simpanDraft(diam) {
+    if (!lead?.ID) { setInfoSimpan("Dokumen ini tidak terhubung ke lead, jadi tidak bisa disimpan."); return; }
+    if (!diam) setMenyimpan(true);
+    try {
+      // Gambar TTD tidak ikut disimpan (ukurannya besar) — diambil ulang dari nama saat dibuka.
+      const { ttdImg, ...bersih } = o;
+      const res = await fetch("/api/dokumen", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "simpan", id: docId, jenis: "OL", noDok: noOL, leadId: lead.ID,
+          judul: o.namaAcara || o.instansi || lead.Nama || "", company: o.instansi || "",
+          data: JSON.stringify(bersih), oleh: user?.nama || user?.email || "",
+        }),
+      });
+      const d = await res.json();
+      if (d.status === "ok") {
+        if (d.id) setDocId(d.id);
+        setAdaDraft(true);
+        setInfoSimpan("✓ Tersimpan. Lain kali dibuka lagi, isinya sudah ada.");
+      } else setInfoSimpan("Gagal menyimpan: " + (d.message || ""));
+    } catch (e) {
+      setInfoSimpan("Tidak bisa terhubung ke server.");
+    } finally { setMenyimpan(false); }
   }
 
   const kodeDok = gayaMeeting(o.jenisOL) ? "OL" : "OLW";
@@ -424,6 +472,7 @@ export default function OfferingLetter({ lead, user, onClose }) {
       const th = new Date(o.tglSurat || hariIni()).getFullYear();
       await fetch("/api/docnum", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kode: kodeDok, tahun: th, nomor: angka(o.nomor) }) });
     } catch (e) {}
+    await simpanDraft(true); // unduh sekalian menyimpan draft
     setBusy(false);
   }
 
@@ -611,8 +660,12 @@ export default function OfferingLetter({ lead, user, onClose }) {
         </div>
       </div>
 
-      <div className="flex gap-2 mt-5">
-        <button onClick={onClose} className="flex-1 border border-slate-300 rounded-lg py-2.5 font-medium hover:bg-slate-50">Tutup</button>
+      {infoSimpan && <p className="text-xs text-slate-500 mt-4">{infoSimpan}</p>}
+      <div className="flex gap-2 mt-2">
+        <button onClick={onClose} className="border border-slate-300 rounded-lg py-2.5 px-4 font-medium hover:bg-slate-50">Tutup</button>
+        <button onClick={() => simpanDraft(false)} disabled={menyimpan} className="flex-1 border border-[#12263a] text-[#12263a] font-semibold rounded-lg py-2.5 hover:bg-slate-50 disabled:opacity-60">
+          {menyimpan ? "Menyimpan…" : adaDraft ? "💾 Simpan perubahan" : "💾 Simpan"}
+        </button>
         <button onClick={unduh} disabled={busy} className="flex-1 bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg py-2.5 disabled:opacity-60">{busy ? "Membuat PDF…" : "⬇ Download PDF"}</button>
       </div>
     </Modal>

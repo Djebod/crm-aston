@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { sql, raw, exec, companyId } from "@/lib/db";
 
 export const runtime = "nodejs";
+// Jangan di-cache saat build: data harus selalu diambil segar dari database.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function ok(extra) { return NextResponse.json({ status: "ok", ...(extra || {}) }); }
 function err(m) { return NextResponse.json({ status: "error", message: m }); }

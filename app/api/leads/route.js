@@ -18,6 +18,9 @@ async function adaBentrokRuang(room, tanggal, mulai, selesai) {
 }
 
 export const runtime = "nodejs";
+// Jangan di-cache saat build: data harus selalu diambil segar dari database.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 async function logStatus(id, nama, lama, baru, alasan, oleh) {
   await sql`INSERT INTO log_status (waktu, lead_id, nama, status_lama, status_baru, alasan_cancel, oleh)

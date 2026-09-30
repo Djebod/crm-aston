@@ -3,6 +3,9 @@ import { sql, raw, companyId } from "@/lib/db";
 import { uploadFotoDrive } from "@/lib/drive";
 
 export const runtime = "nodejs";
+// Jangan di-cache saat build: data harus selalu diambil segar dari database.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 export const maxDuration = 60;
 
 const SEL = `SELECT id AS "ID", tanggal AS "Date", jam AS "Time", sales_name AS "SalesName",

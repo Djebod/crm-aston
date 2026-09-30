@@ -287,23 +287,22 @@ export default function GeoPage() {
     } catch (e) {}
   }, [user, loading, list]);
 
-  // Baris tanda tangan yang namanya sudah terisi (mis. dari user login atau GEO lama)
-  // dipasangi gambarnya begitu daftar karyawan selesai dimuat.
+  // Gambar tanda tangan selalu diturunkan dari nama + daftar karyawan,
+  // jadi tetap benar untuk GEO lama maupun setelah ganti nama.
   useEffect(() => {
     if (!karyawan.length) return;
     setG((s) => {
       if (!s.ttd || !s.ttd.length) return s;
       let berubah = false;
       const ttd = s.ttd.map((t) => {
-        if (!t.nama || t.img) return t;
-        const k = karyawan.find((x) => x.Nama === t.nama);
-        if (!k?.Ttd) return t;
+        const img = karyawan.find((x) => x.Nama === t.nama)?.Ttd || "";
+        if ((t.img || "") === img) return t;
         berubah = true;
-        return { ...t, img: k.Ttd };
+        return { ...t, img };
       });
       return berubah ? { ...s, ttd } : s;
     });
-  }, [karyawan]);
+  }, [karyawan, g.ttd]);
 
   function logout() { localStorage.removeItem("crm_user"); router.replace("/"); }
 
