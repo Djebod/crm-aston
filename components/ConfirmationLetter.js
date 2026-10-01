@@ -38,6 +38,27 @@ const BENEFIT_DEFAULT = [
   "Free Shuttle menuju Mall dan stasiun kereta",
 ];
 
+// ====== Jenis Perjanjian (mengikuti jenis Offering Letter) ======
+const JENIS_CL = [
+  { key: "Meeting", label: "Meeting / Kamar" },
+  { key: "Wedding", label: "Wedding" },
+  { key: "Graduation", label: "Graduation" },
+];
+// Teks yang berbeda per jenis: label perihal & isi kalimat pembuka
+const TEKS_JENIS = {
+  Meeting: { perihal: "Perjanjian", paket: "harga kamar dan paket meeting" },
+  Wedding: { perihal: "Perjanjian Wedding", paket: "harga kamar dan wedding package" },
+  Graduation: { perihal: "Perjanjian Graduation", paket: "harga kamar dan paket graduation/wisuda" },
+};
+
+// Isi Offering Letter tersimpan -> isi Perjanjian (nomor, tanggal & tanda tangan tidak ikut).
+const KOLOM_DARI_OL = ["rateCat", "rates", "sapaan", "namaTamu", "instansi", "kota", "noHP", "tglKamar", "jumlahKamar", "namaAcara", "jumlahPeserta", "rangkaian", "estimasi", "pakets", "weddings"];
+function dariOL(d) {
+  const n = { jenisCL: JENIS_CL.some((j) => j.key === d.jenisOL) ? d.jenisOL : "Meeting" };
+  KOLOM_DARI_OL.forEach((k) => { if (d[k] !== undefined && d[k] !== null) n[k] = d[k]; });
+  return n;
+}
+
 const BANK = { no: "134.050.888.8889", nama: "MULIA PUTRI LESTARI", bank: "Bank Mandiri Cabang Cirebon" };
 
 const rp = (n) => "Rp " + (Number(String(n).replace(/[^\d]/g, "")) || 0).toLocaleString("id-ID") + ",-";
@@ -119,6 +140,9 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
   const [g, setG] = useState({
     clNo: "",
     nomor: "",
+    jenisCL: "Meeting",
+    pakets: [],
+    weddings: [],
     kodeSales: user?.kode || inisial(user?.nama),
     rateCat: RATE_CATEGORIES[0],
     rates: rateDefault(),
@@ -203,6 +227,19 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
     }).join("");
     const pasalRows = pasalList(g).map((p, i) =>
       `<div class="pasal"><div class="ptitle">${i + 3}. ${p[0]}</div><div class="pbody">${p[1]}</div></div>`).join("");
+    const teks = TEKS_JENIS[g.jenisCL] || TEKS_JENIS.Meeting;
+    const liBenefit = (t) => String(t || "").split("\n").filter((x) => x.trim()).map((x) => `<li>${esc(x)}</li>`).join("");
+    // Paket yang disepakati — hanya untuk Wedding & Graduation (isinya dari Offering Letter)
+    const paketSection = g.jenisCL === "Wedding"
+      ? `<div class="sec">WEDDING PACKAGE</div>` + (g.weddings || []).map((w) =>
+        `<div style="margin-top:6px"><b>${esc(w.key)}</b></div>
+<div>Harga: <b>${rp(w.harga)} Nett</b> untuk <b>${esc(w.persons)} Orang</b></div>
+<div>Penambahan pesanan: <b>${rp(w.add)} Nett/Orang</b></div>
+<div>Benefit termasuk:</div><ul>${liBenefit(w.benefit)}</ul>`).join("")
+      : g.jenisCL === "Graduation"
+        ? `<div class="sec">PAKET GRADUATION</div>` + (g.pakets || []).map((p) =>
+          `<div style="margin-top:6px"><b>${esc(p.nama)}</b> &nbsp;—&nbsp; <b>${rp(p.harga)} Nett/Orang</b></div><ul>${liBenefit(p.benefit)}</ul>`).join("")
+        : "";
 
 
     return `<div class="doc">
@@ -239,10 +276,10 @@ ${g.instansi ? "<div><b>" + esc(g.instansi) + "</b></div>" : ""}
 ${g.kota ? "<div><b>" + esc(g.kota) + "</b></div>" : ""}
 ${g.noHP ? "<div><b>No HP : " + esc(g.noHP) + "</b></div>" : ""}
 <br>
-<div class="italb">Perihal: Perjanjian/${esc(g.instansi || g.namaAcara)}/${g.tglKamar ? tglID(g.tglKamar) : ""}</div>
+<div class="italb">Perihal: ${teks.perihal}/${esc(g.instansi || g.namaAcara)}/${g.tglKamar ? tglID(g.tglKamar) : ""}</div>
 <p>Dengan hormat,</p>
 <div class="italb">Salam hangat dari ${HOTEL.nama}.</div>
-<p>Terima kasih telah memilih <b>${HOTEL.nama}</b> sebagai tempat akomodasi <b>${esc(g.instansi || g.namaAcara)}</b>. Melanjutkan percakapan mengenai harga kamar dan paket meeting, bersama ini kami sampaikan konfirmasi acara tersebut:</p>
+<p>Terima kasih telah memilih <b>${HOTEL.nama}</b> sebagai tempat akomodasi <b>${esc(g.instansi || g.namaAcara)}</b>. Melanjutkan percakapan mengenai ${teks.paket}, bersama ini kami sampaikan konfirmasi acara tersebut:</p>
 
 <div class="sec">1. KAMAR — ${esc(g.rateCat)}</div>
 <div>Tanggal &nbsp;: ${g.tglKamar ? tglID(g.tglKamar) : "-"}</div>
@@ -264,6 +301,8 @@ ${g.noHP ? "<div><b>No HP : " + esc(g.noHP) + "</b></div>" : ""}
   <tr><th>Hari/Tanggal</th><th>Waktu</th><th>Acara</th><th>Tempat</th><th>Set up</th><th>Jumlah Peserta</th></tr>
   ${rangkaianRows}
 </table>
+
+${paketSection}
 
 <div class="sec">ESTIMASI BIAYA</div>
 <table>
@@ -309,7 +348,8 @@ ${pasalRows}
       .then((r) => r.json())
       .then((r) => {
         const row = r.status === "ok" && (r.data || [])[0];
-        if (!row) return;
+        // Belum ada draft Perjanjian -> isi awal diambil dari Offering Letter lead ini.
+        if (!row) { ambilDariOL(true); return; }
         let d = {};
         try { d = JSON.parse(row.data || "{}"); } catch (e) { return; }
         setDocId(row.id);
@@ -319,6 +359,22 @@ ${pasalRows}
       })
       .catch(() => {});
   }, [lead?.ID]); // eslint-disable-line
+
+  // Ambil isi Offering Letter tersimpan milik lead ini (jenis, penerima, kamar, rangkaian, paket, estimasi).
+  const [infoOL, setInfoOL] = useState("");
+  async function ambilDariOL(diam) {
+    if (!lead?.ID) { if (!diam) setInfoOL("Dokumen ini tidak terhubung ke lead."); return; }
+    try {
+      const r = await fetch(`/api/dokumen?leadId=${encodeURIComponent(lead.ID)}&jenis=OL`, { cache: "no-store" }).then((x) => x.json());
+      const row = r.status === "ok" && (r.data || [])[0];
+      if (!row) { if (!diam) setInfoOL("Belum ada Offering Letter tersimpan untuk lead ini. Simpan dulu Offering Letter-nya."); return; }
+      const d = JSON.parse(row.data || "{}");
+      setG((s) => ({ ...s, ...dariOL(d) }));
+      setInfoOL("✓ Isi diambil dari Offering Letter " + (row.no_dok || "") + ".");
+    } catch (e) {
+      if (!diam) setInfoOL("Gagal mengambil Offering Letter.");
+    }
+  }
 
   async function simpanDraft(diam) {
     if (!lead?.ID) { setInfoSimpan("Dokumen ini tidak terhubung ke lead, jadi tidak bisa disimpan."); return; }
@@ -360,6 +416,24 @@ ${pasalRows}
   return (
     <Modal title="Buat Confirmation Letter / Perjanjian" onClose={onClose}>
       <div className="space-y-3">
+        <div>
+          <div className="text-sm font-medium text-slate-700 mb-1">Jenis Perjanjian</div>
+          <div className="grid grid-cols-3 gap-2">
+            {JENIS_CL.map((t) => (
+              <button key={t.key} type="button" onClick={() => set("jenisCL", t.key)}
+                className={"rounded-lg border px-3 py-2.5 text-sm font-semibold transition " + (g.jenisCL === t.key ? "border-[#12263a] bg-[#12263a] text-white" : "border-slate-300 text-slate-600 hover:bg-slate-50")}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <button type="button" onClick={() => { if (window.confirm("Isi Perjanjian akan ditimpa dengan isi Offering Letter tersimpan. Lanjutkan?")) ambilDariOL(false); }}
+              className="text-xs font-semibold text-[#12263a] border border-[#c8962c] rounded-md px-3 py-1.5 hover:bg-[#fdf6e9]">
+              ⟳ Ambil isi dari Offering Letter
+            </button>
+            {infoOL && <span className="text-xs text-slate-500">{infoOL}</span>}
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Nomor"><input className={inp} inputMode="numeric" value={g.nomor} onChange={(e) => set("nomor", e.target.value.replace(/[^\d]/g, ""))} placeholder="158" /></Field>
           <Field label="Tanggal Surat"><input type="date" className={inp} value={g.tglSurat} onChange={(e) => set("tglSurat", e.target.value)} /></Field>
@@ -420,6 +494,48 @@ ${pasalRows}
             </div>
           ))}
         </div>
+
+        {/* Paket yang disepakati — isinya dari Offering Letter, tetap bisa diedit */}
+        {g.jenisCL === "Wedding" && (
+        <div className="border border-slate-200 rounded-lg p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500">WEDDING PACKAGE</span>
+            <button onClick={() => addRow("weddings", { key: "", harga: "", persons: "", add: "", benefit: "" })} className="text-xs bg-[#12263a] text-white rounded px-2 py-1">+ Tambah Paket</button>
+          </div>
+          {(g.weddings || []).length === 0 && <p className="text-xs text-slate-400">Belum ada paket. Ambil dari Offering Letter atau tambah manual.</p>}
+          {(g.weddings || []).map((w, i) => (
+            <div key={i} className="border border-slate-100 rounded-lg p-2 space-y-2 bg-slate-50/40">
+              <div className="grid grid-cols-6 gap-2">
+                <div className="col-span-3"><Field label={"Venue & Tier " + (i + 1)}><input className={inp} value={w.key} onChange={(e) => setRow("weddings", i, "key", e.target.value)} placeholder="Sapphire Grand Ballroom — Gold" /></Field></div>
+                <Field label="Harga (Rp)"><input className={inp} inputMode="numeric" value={w.harga ? angka(w.harga).toLocaleString("id-ID") : ""} onChange={(e) => setRow("weddings", i, "harga", e.target.value.replace(/[^\d]/g, ""))} /></Field>
+                <Field label="Orang"><input className={inp} inputMode="numeric" value={w.persons} onChange={(e) => setRow("weddings", i, "persons", e.target.value.replace(/[^\d]/g, ""))} /></Field>
+                <Field label="Add/Org"><input className={inp} inputMode="numeric" value={w.add ? angka(w.add).toLocaleString("id-ID") : ""} onChange={(e) => setRow("weddings", i, "add", e.target.value.replace(/[^\d]/g, ""))} /></Field>
+              </div>
+              <Field label="Benefit (satu per baris, bisa diedit)"><textarea className={inp + " h-32 resize-none text-sm"} value={w.benefit} onChange={(e) => setRow("weddings", i, "benefit", e.target.value)} /></Field>
+              <button onClick={() => delRow("weddings", i)} className="text-xs text-rose-600 font-semibold">✕ Hapus paket ini</button>
+            </div>
+          ))}
+        </div>
+        )}
+        {g.jenisCL === "Graduation" && (
+        <div className="border border-slate-200 rounded-lg p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500">PAKET GRADUATION</span>
+            <button onClick={() => addRow("pakets", { nama: "", harga: "", benefit: "" })} className="text-xs bg-[#12263a] text-white rounded px-2 py-1">+ Tambah Paket</button>
+          </div>
+          {(g.pakets || []).length === 0 && <p className="text-xs text-slate-400">Belum ada paket. Ambil dari Offering Letter atau tambah manual.</p>}
+          {(g.pakets || []).map((p, i) => (
+            <div key={i} className="border border-slate-100 rounded-lg p-2 space-y-2 bg-slate-50/40">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2"><Field label={"Paket " + (i + 1)}><input className={inp} value={p.nama} onChange={(e) => setRow("pakets", i, "nama", e.target.value)} placeholder="Graduation Package" /></Field></div>
+                <Field label="Harga/Orang (Rp)"><input className={inp} inputMode="numeric" value={p.harga ? angka(p.harga).toLocaleString("id-ID") : ""} onChange={(e) => setRow("pakets", i, "harga", e.target.value.replace(/[^\d]/g, ""))} /></Field>
+              </div>
+              <Field label="Benefit (satu per baris, bisa diedit)"><textarea className={inp + " h-24 resize-none text-sm"} value={p.benefit} onChange={(e) => setRow("pakets", i, "benefit", e.target.value)} /></Field>
+              <button onClick={() => delRow("pakets", i)} className="text-xs text-rose-600 font-semibold">✕ Hapus paket ini</button>
+            </div>
+          ))}
+        </div>
+        )}
 
         <div className="border border-slate-200 rounded-lg p-3">
           <div className="flex items-center justify-between mb-2 gap-2"><span className="text-xs font-semibold text-slate-500">ESTIMASI BIAYA</span>
