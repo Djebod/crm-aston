@@ -6,3 +6,5 @@ serviceAccountKey.json
 migrasi
 *.log
 backup-sebelum-reset-*.json
+# contoh surat asli (berisi data tamu) — jangan ikut ter-upload
+contoh

@@ -44,12 +44,14 @@ const JENIS_CL = [
   { key: "Wedding", label: "Wedding" },
   { key: "Graduation", label: "Graduation" },
 ];
-// Teks yang berbeda per jenis: label perihal & isi kalimat pembuka
-const TEKS_JENIS = {
-  Meeting: { perihal: "Perjanjian", paket: "harga kamar dan paket meeting" },
-  Wedding: { perihal: "Perjanjian Wedding", paket: "harga kamar dan wedding package" },
-  Graduation: { perihal: "Perjanjian Graduation", paket: "harga kamar dan paket graduation/wisuda" },
-};
+const ADDON_DEFAULT = [
+  "Mic Rp 300.000,-/mic",
+  "Screen Projector Rp 1.500.000,-",
+  "Internet 50 mbps Rp 10.000.000,-/meeting",
+  "Flip Chart Rp 200.000,-",
+  "Videotron Onyx Room (6 x 2.5 m) Rp 500.000,-/m",
+  "Videotron Sapphire Grand Ballroom (8 x 4 m) Rp 500.000,-/m",
+];
 
 // Isi Offering Letter tersimpan -> isi Perjanjian (nomor, tanggal & tanda tangan tidak ikut).
 const KOLOM_DARI_OL = ["rateCat", "rates", "sapaan", "namaTamu", "instansi", "kota", "noHP", "tglKamar", "jumlahKamar", "namaAcara", "jumlahPeserta", "rangkaian", "estimasi", "pakets", "weddings"];
@@ -110,6 +112,118 @@ function pasalList(g) {
   ];
 }
 
+// ====== Pasal untuk Perjanjian Wedding & Graduation (mengikuti format surat perjanjian hotel) ======
+function pasalAcara(g, wed) {
+  const H = "<b>Aston Cirebon Hotel and Convention Center</b>";
+  const acara = esc(g.namaAcara || g.instansi);
+  const tempat = esc((g.rangkaian[0] || {}).tempat) || "________";
+  const noShow = "Dalam hal ketidakhadiran tamu atau <i>no-show</i>, hotel berhak mengenakan biaya penuh terhadap seluruh kamar dan jumlah malam yang telah direservasi.";
+  const dekorasi = ["DEKORASI",
+    "Klien setuju bahwa tidak ada bendera, banner, poster, gambar, tanda tangan, logo perusahaan dan lain-lain yang akan dipasang dan ditunjukkan di setiap area umum termasuk di pintu masuk gedung, lobi, tempat makanan dan minuman, lantai tamu, fasilitas rekreasi dan lain-lain. Jika ada klien yang meminta dekorasi di gedung hotel (baik di dalam maupun di luar bangunan hotel), sebelumnya harus meminta persetujuan hotel. Persetujuan meliputi kebijaksanaan dari hotel, dan klien akan mengganti rugi pihak hotel dari segala tanggung jawab keuangan yang terjadi jika ada dekorasi yang tidak disetujui. Setiap bahan dekorasi yang disetujui harus mematuhi peraturan perlindungan kebakaran dan hotel berhak meminta sebuah sertifikat resmi untuk itu. Hotel berhak membebankan biaya atas segala kerusakan yang diakibatkan oleh dekorasi klien."];
+  const berbahaya = ["BARANG BERBAHAYA",
+    "Open flame (segala sesuatu yang berhubungan dengan api, seperti lampu lantern, lilin, obor, dan lain-lain), sparklers (kembang api besar), fireworks (kembang api), pyrotechnics (kembang api yang bervariasi), bahan kimia berbahaya, glitter, " + (wed ? "" : "confetti (kertas kecil berwarna yang biasanya ditaburi ke atas saat perayaan pernikahan, ulang tahun dan lain-lain), ") + "pasir dan segala zat yang menghasilkan sampah atau puing-puing dilarang keras di lokasi hotel (di dalam dan di luar ruangan). Pelanggaran dapat mengakibatkan acara terganggu dan pembatalan acara, tindakan hukum oleh hotel dan dikenakan biaya pembersihan / kerusakan."];
+  const deposit = ["DEPOSIT &amp; PEMBAYARAN",
+    "<ul><li>Biaya kamar akan secara otomatis ditagihkan ke dalam <i>Group Master Account</i>. Biaya tambahan yang dikonsumsi oleh tamu (misalnya minibar, telepon, laundry,…) akan ditambahkan kepada masing-masing tamu dan pembayaran dilakukan sebelum meninggalkan hotel. Apabila terdapat biaya tambahan yang belum terbayarkan setelah tamu meninggalkan hotel maka akan ditambahkan ke dalam <i>Group Master Account</i> dan ditagihkan kepada Panitia.</li>"
+    + "<li>Masing-masing tamu yang menginap harus memberikan jaminan atau deposit untuk pembayaran tambahan biaya personal.</li>"
+    + "<li>Hotel berhak meminta tambahan deposit apabila terdapat penambahan jumlah peserta atau penambahan lainnya.</li>"
+    + (wed
+      ? "<li>Pelunasan harus dilakukan paling lambat pada 30 hari sebelum acara yaitu tanggal <b>" + tglID(g.pelunasanDate) + "</b>.</li>"
+      : "<li>Untuk jaminan reservasi kami membutuhkan deposit paling lambat <b>" + tglID(g.dpDate) + "</b>.</li><li>Seluruh pembayaran harus dilakukan paling lambat <b>" + tglID(g.pelunasanDate) + "</b>.</li>")
+    + "</ul>Apabila pembayaran dilakukan melalui transfer bank harus dilakukan sebelum tanggal jatuh tempo seperti yang disebutkan sebelumnya. Apabila terjadi pembatalan" + (wed ? " atau hotel belum menerima pelunasan pembayaran sesuai dengan ketentuan yang telah disepakati" : "") + " maka deposit tidak dapat dikembalikan dan akan digunakan untuk pembayaran yang diakibatkan oleh pembatalan tersebut.<br><br>"
+    + "Pembayaran menggunakan " + (wed ? "<i>cash</i> atau " : "") + "bank transfer ke:<br>Nomor Rekening : <b>" + BANK.no + "</b><br>Atas Nama : <b>" + BANK.nama + "</b><br>Bank : <b>" + BANK.bank + "</b><br><br>"
+    + (wed ? "Salinan bank transfer dapat dikirimkan kepada " + H + " melalui email " + HOTEL.email + ".<br>" : "")
+    + "<i>Setelah klien men-transfer pembayaran, klien diminta untuk mengirimkan salinan bukti transfer kepada pihak " + H + " melalui email. Pembayaran apa pun yang dilakukan ke mana pun atau siapapun kecuali ke rekening bank ini tidak akan diterima sebagai bukti pembayaran."
+    + (wed ? "" : "<br><br>Kegagalan pembayaran oleh klien dapat menyebabkan penghentian perjanjian secara langsung tanpa melibatkan hotel maupun penyedia.") + "</i>"];
+  const jatuhTempo = ["JATUH TEMPO",
+    "Saat ini kami belum melakukan reservasi " + (wed ? "kamar maupun tempat" : "ruang meeting") + " untuk group tersebut di atas. Apabila Bapak/Ibu ingin melakukan reservasi silakan melakukan konfirmasi dengan menandatangani kontrak ini sebelum <b>" + tglID(g.jatuhTempoDate) + "</b>. Setelah hotel menerima kontrak yang telah ditandatangani, Bapak/Ibu akan menerima salinan kontrak yang telah ditandatangani oleh pihak " + H + ". Harga yang tercantum dalam kontrak ini berlaku hingga tanggal jatuh tempo yang disebutkan sebelumnya dan apabila melewati tanggal jatuh tempo hotel berhak melakukan revisi harga. Apabila kamar hotel telah terjual penuh pada periode yang disebutkan dalam kontrak ini maka hotel tidak akan mengenakan biaya terhadap kamar yang terjual pada masa tersebut."];
+  const darurat = ["KONDISI DARURAT",
+    "Kontrak ini akan berakhir tanpa menimbulkan kewajiban kepada masing-masing pihak apabila terdapat pekerjaan yang tertunda, terhambat atau terhalang yang disebabkan oleh hal-hal di luar kekuasaan kedua belah pihak. Termasuk dan tidak terbatas pada tindakan Tuhan, peraturan atau perintah atau otoritas pemerintah, kebakaran, banjir atau ledakan, perang, bencana, kekacauan sipil, pembatasan sarana transportasi, peringatan kesehatan regional atau epidemi, risiko tinggi serangan teroris, ilegal atau tidak memungkinkan untuk menyediakan fasilitas layanan, terjualnya hotel, keterlambatan dalam konstruksi yang diperlukan dan penting atau renovasi hotel, penangkapan atau penahanan dalam proses hukum, pemogokan, larangan bekerja, penghentian kerja, hambatan lain dari tenaga kerja, baik sebagian atau umum, dari sebab apapun."];
+  const keamanan = ["KEAMANAN",
+    "Penyelenggara Acara menyatakan bahwa " + H + " tidak dapat bertanggung jawab untuk menjaga keamanan dari peralatan, perlengkapan maupun barang berharga lainnya selama berada di hotel. Dengan demikian, Penyelenggara Acara menyatakan bahwa Penyelenggara Acara bertanggung jawab sepenuhnya terhadap keamanan setiap peralatan, perlengkapan maupun barang berharga lainnya tersebut dan bertanggung jawab terhadap kerugian yang ditimbulkan.<br><br>"
+    + "Setiap bahan atau peralatan yang dikirim terlebih dahulu ke hotel harus ditandai dan ditujukan kepada \"Sales Marketing\" dengan menyatakan nama acara. Hotel tidak bertanggung jawab terhadap kerusakan atau kerugian harta benda yang berada di hotel baik sebelum, selama atau setelah acara tanpa serah terima yang tepat.<br><br>"
+    + "Penyelenggara Acara harus mengatur asuransi dan / atau keamanan. Penyelenggara Acara harus mengeluarkan semua peralatan/perlengkapan acara dari lokasi hotel dalam jangka waktu yang disepakati bersama. Hotel berhak membuang barang yang masih tersisa di area hotel setelah jangka waktu tersebut."];
+  const kerusakan = ["KERUGIAN &amp; KERUSAKAN",
+    "Penyelenggara Acara dan semua Kontraktor, Pemasok dan Karyawannya harus menjaga dan tidak dibenarkan melakukan tindakan yang dapat menyebabkan kerusakan atau mengizinkan perbuatan yang menimbulkan kerusakan pada ruang acara atau bagian yang ada di dalamnya termasuk furnitur, perlengkapan, peralatan atau properti lainnya dan harus membayar setiap kerusakan (termasuk kerusakan akibat kecelakaan) yang disebabkan oleh tindakan apapun karena kelalaian dari Penyelenggara, Tim-nya, agen atau peserta yang menghadiri kegiatan tersebut.<br><br>"
+    + "Hotel berhak meminta Penyelenggara Acara untuk memberikan deposit sebelum pelaksanaan acara untuk perbaikan properti yang rusak sebesar <b>Rp 5.000.000 untuk seluruh Ballroom</b> dan akan dikembalikan setelah acara selesai dan diperiksa oleh perwakilan hotel."];
+  const hukumAwal = "Penyelenggara tidak memberikan izin kepada karyawannya, agen maupun peserta kegiatan untuk melakukan kegiatan ilegal, berbau mengganggu atau menyinggung atau melanggar undang-undang, perintah, peraturan atau ketentuan lain yang memiliki kekuatan hukum termasuk tetapi tidak terbatas pada lisensi minuman keras dan peraturan mengenai penggunaan api.<br>";
+  const hukumAkhir = "Berdasarkan peraturan pemerintah bahwa merokok dilarang di mana saja dalam salah satu outlet hotel atau ruang rapat maupun ruang publik.";
+  const hukum = ["HUKUM &amp; REGULASI", hukumAwal
+    + (wed ? "" : "Penyelenggara Acara memahami bahwa semua minuman keras yang disediakan oleh hotel adalah sah melalui jalur hukum dengan cap atau materai sah pemerintah di setiap botol. Hotel tidak bertanggung jawab atas setiap minuman keras yang dibawa oleh Penyelenggara Acara maupun Peserta. Setiap minuman keras yang dibawa ke dalam hotel dikenakan biaya <i>corkage</i> sebagai kebijakan hotel. Layanan minuman beralkohol dapat ditolak untuk tamu yang mabuk atau di bawah usia.<br>")
+    + hukumAkhir];
+  const rahasia = ["KERAHASIAAN",
+    "Semua rincian pada perjanjian bersifat rahasia dan tidak boleh ditunjukkan kepada pihak ketiga atau dipublikasikan pada saluran publik apapun termasuk website, media cetak dan lain-lain tanpa persetujuan khusus dengan pihak hotel sebelumnya."];
+  const gantiRugi = ["GANTI RUGI",
+    "Klien setuju untuk mengganti rugi hotel dan penyedianya, perusahaan induk mereka, anak perusahaan, afiliasi, pejabat, eksekutif, direktur, perwakilan, karyawan, agen dan lain-lain dari segala kewajiban, kerugian, klaim, perselisihan, tuntutan, kerusakan, biaya (termasuk biaya legal) dan lain-lain yang disebabkan oleh pelanggaran terhadap salah satu ketentuan yang ditetapkan dalam perjanjian ini."];
+  const kinerja = ["KETIDAKBERDAYAAN KINERJA",
+    "Perjanjian ini akan berakhir tanpa kewajiban kepada salah satu pihak jika kinerja substansial dari kewajiban salah satu pihak tertunda, terhambat atau dicegah oleh sebab apa pun yang secara wajar di luar kendali pihak tersebut. Penyebab tersebut termasuk, tetapi tidak terbatas pada Kuasa Tuhan, peraturan atau perintah / otoritas pemerintah, kebakaran, banjir, ledakan, perang, bencana, kekacauan sipil, pembatasan fasilitas transportasi, peringatan kesehatan regional atau epidemi, risiko tinggi serangan teroris regional atau keadaan darurat lainnya (membuatnya tidak disarankan, ilegal atau tidak mungkin untuk menyediakan fasilitas atau layanan untuk mengadakan fungsi apapun), penjualan hotel, keterlambatan yang diperlukan dan konstruksi esensial atau renovasi hotel, penangkapan atau penyitaan dalam proses hukum, mogok kerja, larangan bekerja, penghentian kerja, pengekangan tenaga kerja lainnya (baik sebagian atau umum) dari penyebab apa pun.<br><br>"
+    + "Perjanjian ini dapat diakhiri untuk satu atau alasan yang lebih dengan pemberitahuan tertulis dari satu pihak ke pihak lain tanpa pertanggungjawaban. Kemampuan untuk mengakhiri perjanjian ini tanpa pertanggungjawaban sesuai dengan paragraf ini dikondisikan pada saat penyampaian pemberitahuan tertulis kepada pihak lain yang menetapkan dasar untuk penghentian sesegera mungkin secara beralasan, tetapi tidak lebih dari sepuluh (10) hari setelah mempelajari dasar tersebut."];
+  const eksekusi = [wed ? "EKSEKUSI" : "EKSEKUSI YANG TEPAT",
+    "Perjanjian ini menggantikan semua perjanjian, proposal, baik lisan dan negosiasi tertulis, representasi, komitmen dan komunikasi lainnya antara hotel, penyedia dan klien, dan hanya dapat ditambahkan atau diubah secara tertulis melalui perjanjian bersama dan ditandatangani oleh hotel dan klien. Klien menyetujui bahwa setiap perubahan di perusahaan mereka atau struktur kepemilikan perusahaan baik penggabungan, pengambilalihan atau jika tidak akan dibatalkan, dimodifikasi, atau dengan cara mengurangi kewajiban berdasarkan perjanjian ini dan bahwa perjanjian ini akan tetap berlaku sepenuhnya dan berhubungan dengan klien dan entitas penggantinya.<br><br>"
+    + "Perjanjian ini tidak berlaku sampai dieksekusi oleh individu yang berwenang baik dari klien dan hotel. Yang bertanda tangan di bawah ini menyetujui dan menjamin bahwa mereka berwenang untuk menandatangani dan masuk ke dalam perjanjian ini atas nama pihak yang mereka tandatangani."];
+  const kelalaian = ["KELALAIAN",
+    "Apabila Penyelenggara Acara gagal melakukan pembayaran atau tidak mematuhi persyaratan maka Hotel dapat mengakhiri kontrak ini."];
+  const ttd = ["TANDA TANGAN",
+    "Silakan tandatangani semua lembar kontrak ini apabila telah disetujui dan dikirim kembali kepada " + H + ". Setelah kontrak ditandatangani maka kesepakatan yang mengikat dan pengaturan yang disebutkan dalam kontrak ini dianggap telah dikonfirmasi dan pasti."];
+
+  if (wed) {
+    return [
+      ["KEBIJAKAN HOTEL",
+        "<b>CHECK-IN: 14.00 waktu setempat<br>CHECK OUT: 12.00 waktu setempat</b><br>Apabila jam kedatangan tamu sebelum pukul 14.00 waktu setempat maka konfirmasi ketersediaan kamar akan dilakukan tergantung pada ketersediaan kamar. Apabila hotel dalam keadaan penuh, kami tidak dapat menjamin ketersediaan kamar untuk jam kedatangan yang lebih awal dari ketentuan jam check in hotel. <b><i>Late check out</i></b> hingga pukul 18.00 waktu setempat akan dikenakan biaya 50% dari harga kontrak dan apabila melebihi pukul 18.00 akan dikenakan biaya 100% dari harga kontrak.<br><br>"
+        + "<b>Ketidakhadiran <i>(No-Show)</i></b><br>" + noShow + "<br>Setelah penandatanganan kontrak : Booking Fee bersifat <i>non-refundable</i><br>Dalam 60 hari kedatangan : 50% of total cost<br>Dalam 30 hari kedatangan : 100% of total cost<br><br>"
+        + "<b><i>Force Majeure</i></b> – Dalam keadaan <i>force majeure</i>, musibah, kerusuhan, perang, pandemi (penyakit menular secara global), tidak ada biaya pembatalan dan tidak ada tuntutan dari kedua belah pihak."],
+      ["MENU",
+        "Konfirmasi menu paling lambat dilakukan 1 minggu sebelum pelaksanaan acara atau pemilihan menu akan dilakukan oleh hotel." + (String(g.menu || "").trim() ? "<br><br>" + esc(g.menu) : "")],
+      ["MAKANAN DAN MINUMAN",
+        "<b>Alergi</b><br>Klien harus menginformasikan kepada pihak hotel sebelumnya jika ada tamu yang memiliki alergi nutrisi dan harus memberitahukan nama lengkap tamu. Jika tidak, hotel tidak bertanggung jawab untuk mengganti kerugian untuk setiap klaim mengenai alergi makanan dan implikasi yang terkait.<br><b>Makanan dan Minuman di luar Hotel</b><br>Dilarang untuk membawa minuman dan makanan dari luar ke hotel."],
+      dekorasi, berbahaya, deposit, jatuhTempo, darurat, keamanan, kerusakan,
+      ["KEBIJAKAN LOADING BARANG",
+        "Sehubungan dengan acara <b><i>" + acara + "</i></b>, pada tanggal <b>" + tglID(g.tglKamar) + "</b> di <b>" + tempat + "</b>, untuk waktu loading memasukkan barang-barang berupa perlengkapan hiburan atau perlengkapan kebutuhan acara, dapat dilakukan pada tanggal <b>" + tglID(g.loadingTgl) + "</b> pukul <b>" + (esc(g.loadingJam) || "________") + "</b>. Selain itu untuk pembongkaran perlengkapan harus segera dilakukan langsung setelah selesainya acara pada tanggal <b>" + tglID(g.tglKamar) + "</b>."],
+      hukum, rahasia, gantiRugi, kinerja, eksekusi, kelalaian, ttd,
+    ];
+  }
+  return [
+    ["KEBIJAKAN PEMBATALAN",
+      "Dalam hal pembatalan, pemberitahuan tertulis harus telah diterima hotel paling lama 90 hari sebelum pelaksanaan kegiatan. Deposit akan hangus apabila Bapak/Ibu melakukan pembatalan. Apabila pembatalan dilakukan kurang dari 90 hari sebelum pelaksanaan kegiatan maka akan dikenakan 100% biaya pembatalan."],
+    ["KETIDAKHADIRAN <i>(No-Show)</i>", noShow],
+    dekorasi, berbahaya, deposit,
+    ["FASILITAS KREDIT",
+      "Fasilitas kredit dapat diberikan kepada perusahaan yang memenuhi syarat setelah sukses melakukan aplikasi. Pihak hotel membutuhkan setidaknya 14 hari kerja untuk memproses aplikasi sebelum tamu datang, agar mengefektifkan proses aplikasi. Hasil persetujuan aplikasi sesuai dengan kebijakan hotel dan tidak menutup kemungkinan akan terjadi sebuah penolakan tanpa penjelasan. Hanya klien yang akan menggunakan hotel lebih dari sekali yang dapat mengajukan, jika tidak aplikasi akan ditolak. Saat disetujui, kredit yang diperpanjang tidak bisa melebihi dari batas yang telah ditentukan. Fasilitas kredit tidak bisa diberlakukan untuk tamu individual."],
+    jatuhTempo, darurat, keamanan, kerusakan, hukum,
+    ["LISENSI",
+      "Klien sepenuhnya bertanggung jawab untuk mendapatkan lisensi atau izin yang diperlukan untuk melakukan, menyiarkan, mengirim, atau menampilkan karya hak cipta apa pun (termasuk, tanpa batasan, musik, audio, atau rekaman video, karya seni, dan lain-lain) yang dapat digunakan Grup atau diminta untuk digunakan di hotel."],
+    rahasia, gantiRugi, kinerja, eksekusi,
+    ["FLUKTUASI PAJAK",
+      "Apabila di kemudian hari terjadi perubahan nilai pajak dan atau retribusi selama masa kontrak ini dan mengharuskan hotel membayar pajak/retribusi tersebut maka hotel berhak mengumpulkan pajak/retribusi tersebut dari Penyelenggara Acara atau tamu atas nama kewenangan Pemerintah dengan pemberitahuan terlebih dahulu.<br><br>Hal ini secara khusus disepakati bahwa dengan menandatangani perjanjian ini tidak ada pembebasan diberikan kepada Penyelenggara Acara terhadap pembayaran perubahan pajak dan/atau retribusi yang dikenakan oleh Pemerintah."],
+    kelalaian, ttd,
+  ];
+}
+
+const CSS_ACARA = `
+  .doc { font-family: Arial, Helvetica, sans-serif; font-size:11px; color:#111; line-height:1.5; }
+  .doc .logo { text-align:center; margin-bottom:10px; }
+  .doc .logo img { height:46px; display:block; margin:0 auto; }
+  .doc b { color:#000; }
+  .doc .sec { font-weight:bold; margin:12px 0 4px; }
+  .doc .italb { font-weight:bold; font-style:italic; }
+  .doc ul { margin:4px 0 4px 18px; padding:0; }
+  .doc p { margin:6px 0; }
+  .doc table { width:100%; border-collapse:collapse; margin:8px 0; page-break-inside:avoid; }
+  .doc th, .doc td { border:1px solid #111; padding:5px 7px; text-align:left; vertical-align:top; font-size:10px; }
+  .doc th { text-align:center; }
+  .doc td.c { text-align:center; } .doc td.r { text-align:right; }
+  .doc .total td { font-weight:bold; }
+  .doc .pasal { margin:10px 0; }
+  .doc .ptitle { font-weight:bold; }
+  .doc .pbody { text-align:justify; }
+  .doc .polos td { border:0; padding:1px 6px 1px 0; font-size:11px; }
+  .doc .sign { page-break-inside:avoid; }
+  .doc .sign td { border:0; padding:2px 6px; vertical-align:bottom; font-size:11px; }
+  .doc .galeri { table-layout:fixed; }
+  .doc .galeri td { border:0; padding:0 3px; width:33.33%; }
+  .doc .galeri img { width:100%; height:auto; display:block; }
+  .doc .paket td { width:50%; font-size:10.5px; }
+`;
+
 function inisial(nama) { return String(nama || "").trim().split(/\s+/).map((w) => w[0] || "").join("").toUpperCase().slice(0, 4); }
 function buildNoDok(code, nomor, tgl, kode) {
   const d = tgl ? new Date(tgl) : new Date();
@@ -143,6 +257,12 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
     jenisCL: "Meeting",
     pakets: [],
     weddings: [],
+    paketPilihan: "",
+    addon: ADDON_DEFAULT.join("\n"),
+    dpNominal: "",
+    menu: "",
+    loadingTgl: "",
+    loadingJam: "23.00 WIB",
     kodeSales: user?.kode || inisial(user?.nama),
     rateCat: RATE_CATEGORIES[0],
     rates: rateDefault(),
@@ -204,7 +324,9 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
   const delRow = (arr, i) => setG((s) => ({ ...s, [arr]: s[arr].filter((_, j) => j !== i) }));
   const setRate = (i, kol, v) => setG((s) => ({ ...s, rates: { ...s.rates, [s.rateCat]: s.rates[s.rateCat].map((r, j) => (j === i ? [r[0], kol === "wd" ? v : r[1], kol === "we" ? v : r[2]] : r)) } }));
   const tambahPaket = (nama) => { const p = PAKET.find((x) => x.nama === nama); if (p) setG((s) => ({ ...s, estimasi: [...s.estimasi, { deskripsi: p.nama, jumlah: "", harga: String(p.harga) }] })); };
-  const grandTotal = g.estimasi.reduce((t, r) => t + angka(r.jumlah) * angka(r.harga), 0);
+  // Graduation menghitung per hari (Harga x Jumlah Hari x Kuantitas); jenis lain Harga x Jumlah.
+  const totalBaris = (r) => angka(r.jumlah) * angka(r.harga) * (g.jenisCL === "Graduation" ? angka(r.hari) || 1 : 1);
+  const grandTotal = g.estimasi.reduce((t, r) => t + totalBaris(r), 0);
   const clNo = buildNoDok("CL", g.nomor, g.tglSurat, g.kodeSales);
 
   useEffect(() => {
@@ -214,7 +336,151 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
       .catch(() => {});
   }, []); // eslint-disable-line
 
+  // Perjanjian Wedding & Graduation — susunan mengikuti surat perjanjian hotel untuk acara.
+  function buildAcara() {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const wed = g.jenisCL === "Wedding";
+    const acara = esc(g.namaAcara || g.instansi) || "-";
+    const r0 = g.rangkaian[0] || {};
+    const tglAcara = g.tglKamar ? tglID(g.tglKamar) : "-";
+    const li = (t) => String(t || "").split("\n").filter((x) => x.trim()).map((x) => `<li>${esc(x)}</li>`).join("");
+    const galeri = (p) => `<table class="galeri"><tr>${[1, 2, 3].map((i) => `<td><img src="${origin}/img/${p}-${i}.jpg"/></td>`).join("")}</tr></table>`;
+    const baris = (k, v) => `<tr><td width="28%"><b>${k}</b></td><td>: ${v}</td></tr>`;
+
+    const rangkaianRows = g.rangkaian.map((r) =>
+      `<tr><td class="c">${esc(tglID(r.hari))}</td><td class="c">${esc(r.waktu)}</td><td class="c">${esc(r.acara)}</td><td class="c">${esc(r.tempat)}</td><td class="c">${esc(r.setup)}</td><td class="c">${esc(r.jumlah)}</td></tr>`).join("");
+
+    // Tabel biaya + DP & sisa pembayaran
+    const dp = angka(g.dpNominal);
+    const kol = wed ? 4 : 5;
+    const biayaRows = g.estimasi.map((r) => {
+      const qty = angka(r.jumlah).toLocaleString("id-ID") + " " + esc(r.satuan || "pax");
+      return `<tr><td class="c">${tglAcara}</td><td class="c">${esc(r.deskripsi)}</td><td class="c">${rp(r.harga)}</td>${wed ? "" : `<td class="c">${angka(r.hari) || 1}</td>`}<td class="c">${qty}</td><td class="r">${rp(totalBaris(r))}</td></tr>`;
+    }).join("");
+    const biaya = `<div class="sec">${wed ? "Perkiraan Biaya" : "Biaya"}</div>
+<table>
+  <tr>${wed ? "<th>Tanggal</th><th>Jenis</th><th>Harga</th><th>Jumlah Orang / Kamar</th><th>Sub Total</th>" : "<th>Periode</th><th>Jenis</th><th>Harga</th><th>Jumlah Hari</th><th>Kuantitas</th><th>Total</th>"}</tr>
+  ${biayaRows}
+  <tr class="total"><td colspan="${kol}" class="c">Total</td><td class="r">${rp(grandTotal)}</td></tr>
+  ${dp ? `<tr class="total"><td colspan="${kol}" class="c">DP</td><td class="r">${rp(dp)}</td></tr>
+  <tr class="total"><td colspan="${kol}" class="c">Sisa Pembayaran</td><td class="r">${rp(Math.max(grandTotal - dp, 0))}</td></tr>` : ""}
+</table>
+<p><i><b>Catatan: Harga tersebut di atas sudah termasuk 21% pajak &amp; pelayanan dan hotel tidak memberikan komisi</b></i></p>`;
+
+    // Paket: Wedding dalam kotak berdampingan, Graduation daftar paket + ADD ON
+    let paket = "";
+    if (wed) {
+      const ws = g.weddings || [];
+      const sel = (w, lebar) => `<td${lebar ? ' colspan="2"' : ""}><b>${esc(w.key)} Package:</b><br>Harga: ${rp(w.harga)} Nett untuk ${esc(w.persons)} Orang<br><b>Termasuk :</b><ul>${li(w.benefit)}</ul></td>`;
+      let rows = "";
+      for (let i = 0; i < ws.length; i += 2) rows += `<tr>${sel(ws[i], !ws[i + 1])}${ws[i + 1] ? sel(ws[i + 1]) : ""}</tr>`;
+      const tambah = ws.filter((w) => angka(w.add)).map((w) => `<li>${esc(w.key)} Package ${rp(w.add)} Nett/Orang</li>`).join("");
+      paket = ws.length ? `<div class="sec">Susunan Acara</div>
+<table class="paket">
+  <tr><th colspan="2">Aston Cirebon Hotel and Convention Center</th></tr>
+  ${rows}
+  ${tambah ? `<tr><td colspan="2"><b>Penambahan pesanan:</b><ul>${tambah}</ul></td></tr>` : ""}
+</table>` : "";
+    } else {
+      paket = (g.pakets || []).map((p) => `<div class="sec">${esc(p.nama).toUpperCase()}</div>
+<div><b>${rp(p.harga)} Nett/Person/Day</b></div>
+${angka(p.hargaSpesial) ? `<div><b>Special Price ${rp(p.hargaSpesial)} Nett/Person/Day</b></div>` : ""}
+<div>Termasuk:</div><ul>${li(p.benefit)}</ul>`).join("")
+        + (String(g.addon || "").trim() ? `<div class="sec">ADD ON</div><ul>${li(g.addon)}</ul>` : "");
+    }
+
+    const kamar = wed ? `<div class="sec">KAMAR</div>
+<table class="polos">
+  ${baris("Tanggal", g.tglKamar ? tglID(g.tglKamar) : "tba")}
+  ${baris("Jumlah Kamar", angka(g.jumlahKamar) ? angka(g.jumlahKamar) + " Kamar" : "tba")}
+</table>
+<div class="sec">Harga Kamar dengan Breakfast — ${esc(g.rateCat)}</div>
+<table>
+  <tr><th>ROOM TYPE</th><th>WEEKDAYS RATE</th><th>WEEKEND RATE</th></tr>
+  ${(g.rates[g.rateCat] || []).map((r) => `<tr><td>${r[0]}</td><td class="c">${rp(r[1])}</td><td class="c">${rp(r[2])}</td></tr>`).join("")}
+</table>
+<div class="sec">Harga Kamar Sudah Termasuk:</div>
+<ul>${li(g.benefit)}</ul>
+<div class="sec">Kebijakan <i>Extra Bed</i> dan Anak Dibawah Umur</div>
+<p>Penggunaan <i>Extra Bed</i> dikenakan biaya Rp 400.000 per malam sudah termasuk sarapan. Gratis sarapan untuk anak di bawah 6 tahun dan dikenakan Rp 100.000 untuk usia kurang dari 12 tahun. Penambahan sarapan di luar paket kamar dikenakan biaya Rp 180.000 per orang.</p>` : "";
+
+    const detail = `<div class="sec">DETAIL KEGIATAN</div>
+<table class="polos">
+  ${baris("Nama Kegiatan", `<b><i>${acara}</i></b>`)}
+  ${wed
+    ? baris("Paket Wedding", esc(g.paketPilihan || (g.weddings[0] ? g.weddings[0].key + " Package" : "")) || "-")
+      + baris("Hari/Tanggal", tglAcara)
+      + baris("Jumlah Tamu", angka(g.jumlahPeserta) ? angka(g.jumlahPeserta) + " Pax" : "-")
+      + baris("Tempat", esc(r0.tempat) || "-")
+    : baris("Jumlah Peserta", angka(g.jumlahPeserta) ? angka(g.jumlahPeserta) + " Pax" : "-")
+      + baris("Tempat Kegiatan", esc(r0.tempat) || "-")
+      + baris("Set Up", esc(r0.setup) || "-")}
+</table>
+${galeri(wed ? "wedding" : "wisuda")}
+${wed ? "" : '<div class="sec">Event Arrangement</div>'}
+<table>
+  <tr>${wed ? "<th>Hari / Tanggal</th><th>Waktu</th><th>Kegiatan</th><th>Tempat</th><th>Set Up</th><th>Jumlah Peserta</th>" : "<th>Tanggal</th><th>Waktu</th><th>Nama Acara</th><th>Venue</th><th>Set Up</th><th>Pax</th>"}</tr>
+  ${rangkaianRows}
+</table>
+${wed ? "" : "<p><i>*Hotel berhak merubah Ruang Rapat sewaktu-waktu sesuai dengan ketersediaan ruangan selama kapasitas ruangan tersebut dapat mengakomodir jumlah peserta.</i></p>"}`;
+
+    // Graduation: pasal bernomor mulai dari 2 (seperti surat aslinya); Wedding tanpa nomor.
+    const pasalRows = pasalAcara(g, wed).map((p, i) =>
+      `<div class="pasal"><div class="ptitle">${wed ? "" : i + 2 + ". "}${p[0]}</div><div class="pbody">${p[1]}</div></div>`).join("");
+
+    const tglTtd = `<div>Tanggal : ${tglID(g.tglSurat)}</div>`;
+    const pembuka = wed
+      ? `Terima kasih atas kesempatan yang diberikan kepada kami untuk berpartisipasi dalam menyukseskan acara <b><i>${acara}</i></b> pada ${tglAcara}. Melanjutkan percakapan, bersama ini kami sampaikan konfirmasi acara tersebut:`
+      : `Terima kasih atas kesempatan yang diberikan kepada kami untuk berpartisipasi dalam menyukseskan kegiatan <b><i>${acara}</i></b>. Melanjutkan percakapan mengenai harga ${esc((g.pakets[0] || {}).nama || "paket graduation")}, bersama ini kami sampaikan konfirmasi acara tersebut:`;
+
+    return `<div class="doc">
+<style>${CSS_ACARA}</style>
+<div class="logo"><img src="${origin}/aston-logo.png" onerror="this.style.display='none'"/></div>
+<div><b>Cirebon, ${tglID(g.tglSurat)}</b></div>
+<br>
+<div><b>${esc(clNo)}</b></div>
+<br>
+<div><b>${esc(g.namaTamu) || "-"}</b></div>
+${g.instansi ? "<div><b>" + esc(g.instansi) + "</b></div>" : ""}
+${g.kota ? "<div><b>" + esc(g.kota) + "</b></div>" : ""}
+${g.noHP ? "<div><b>" + esc(g.noHP) + "</b></div>" : ""}
+<br>
+<div class="italb">Perihal: Perjanjian/${acara}/${tglAcara}</div>
+<p>Dengan hormat,</p>
+<div class="italb">Salam hangat dari Aston Cirebon Hotel and Convention Center</div>
+<p style="text-align:justify">${pembuka}</p>
+
+${kamar}
+${detail}
+${paket}
+${biaya}
+
+${pasalRows}
+
+<div class="sign">
+<p>Ditandatangani untuk <b>Aston Cirebon Hotel and Convention Center</b></p>
+<table class="sign">
+  <tr><td width="33%">Disiapkan oleh,</td><td width="33%">Mengetahui,</td><td width="34%">Mengetahui,</td></tr>
+  <tr>
+    <td>${blokTtd(g.prepImg, g.prepBy, g.prepTitle, "", esc, 44)}${tglTtd}</td>
+    <td>${blokTtd(g.leaderImg, g.leaderNama, g.leaderTitle, "", esc, 44)}${tglTtd}</td>
+    <td>${blokTtd(g.gmImg, g.gmNama, g.gmTitle, "", esc, 44)}${tglTtd}</td>
+  </tr>
+</table>
+<br>
+<div>Ditandatangani untuk <b><i>${acara}</i></b></div>
+<table class="sign" style="width:60%">
+  <tr><td width="35%">Nama</td><td>:</td></tr>
+  ${wed ? "" : "<tr><td>Jabatan</td><td>:</td></tr>"}
+  <tr><td>Tanggal</td><td>:</td></tr>
+  <tr><td>Tanda Tangan</td><td>:</td></tr>
+</table>
+</div>
+</div>`;
+  }
+
   function build() {
+    if (g.jenisCL !== "Meeting") return buildAcara();
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const rateRows = (g.rates[g.rateCat] || []).map((r) =>
       `<tr><td>${r[0]}</td><td class="c">${rp(r[1])}</td><td class="c">${rp(r[2])}</td></tr>`).join("");
@@ -227,19 +493,6 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
     }).join("");
     const pasalRows = pasalList(g).map((p, i) =>
       `<div class="pasal"><div class="ptitle">${i + 3}. ${p[0]}</div><div class="pbody">${p[1]}</div></div>`).join("");
-    const teks = TEKS_JENIS[g.jenisCL] || TEKS_JENIS.Meeting;
-    const liBenefit = (t) => String(t || "").split("\n").filter((x) => x.trim()).map((x) => `<li>${esc(x)}</li>`).join("");
-    // Paket yang disepakati — hanya untuk Wedding & Graduation (isinya dari Offering Letter)
-    const paketSection = g.jenisCL === "Wedding"
-      ? `<div class="sec">WEDDING PACKAGE</div>` + (g.weddings || []).map((w) =>
-        `<div style="margin-top:6px"><b>${esc(w.key)}</b></div>
-<div>Harga: <b>${rp(w.harga)} Nett</b> untuk <b>${esc(w.persons)} Orang</b></div>
-<div>Penambahan pesanan: <b>${rp(w.add)} Nett/Orang</b></div>
-<div>Benefit termasuk:</div><ul>${liBenefit(w.benefit)}</ul>`).join("")
-      : g.jenisCL === "Graduation"
-        ? `<div class="sec">PAKET GRADUATION</div>` + (g.pakets || []).map((p) =>
-          `<div style="margin-top:6px"><b>${esc(p.nama)}</b> &nbsp;—&nbsp; <b>${rp(p.harga)} Nett/Orang</b></div><ul>${liBenefit(p.benefit)}</ul>`).join("")
-        : "";
 
 
     return `<div class="doc">
@@ -276,10 +529,10 @@ ${g.instansi ? "<div><b>" + esc(g.instansi) + "</b></div>" : ""}
 ${g.kota ? "<div><b>" + esc(g.kota) + "</b></div>" : ""}
 ${g.noHP ? "<div><b>No HP : " + esc(g.noHP) + "</b></div>" : ""}
 <br>
-<div class="italb">Perihal: ${teks.perihal}/${esc(g.instansi || g.namaAcara)}/${g.tglKamar ? tglID(g.tglKamar) : ""}</div>
+<div class="italb">Perihal: Perjanjian/${esc(g.instansi || g.namaAcara)}/${g.tglKamar ? tglID(g.tglKamar) : ""}</div>
 <p>Dengan hormat,</p>
 <div class="italb">Salam hangat dari ${HOTEL.nama}.</div>
-<p>Terima kasih telah memilih <b>${HOTEL.nama}</b> sebagai tempat akomodasi <b>${esc(g.instansi || g.namaAcara)}</b>. Melanjutkan percakapan mengenai ${teks.paket}, bersama ini kami sampaikan konfirmasi acara tersebut:</p>
+<p>Terima kasih telah memilih <b>${HOTEL.nama}</b> sebagai tempat akomodasi <b>${esc(g.instansi || g.namaAcara)}</b>. Melanjutkan percakapan mengenai harga kamar dan paket meeting, bersama ini kami sampaikan konfirmasi acara tersebut:</p>
 
 <div class="sec">1. KAMAR — ${esc(g.rateCat)}</div>
 <div>Tanggal &nbsp;: ${g.tglKamar ? tglID(g.tglKamar) : "-"}</div>
@@ -301,8 +554,6 @@ ${g.noHP ? "<div><b>No HP : " + esc(g.noHP) + "</b></div>" : ""}
   <tr><th>Hari/Tanggal</th><th>Waktu</th><th>Acara</th><th>Tempat</th><th>Set up</th><th>Jumlah Peserta</th></tr>
   ${rangkaianRows}
 </table>
-
-${paketSection}
 
 <div class="sec">ESTIMASI BIAYA</div>
 <table>
@@ -404,7 +655,7 @@ ${pasalRows}
   const [busy, setBusy] = useState(false);
   async function unduh() {
     setBusy(true);
-    await unduhPDFdariHTML(build(), "CL-" + (clNo || "letter").replace(/[^\w-]/g, "_") + ".pdf", HOTEL.alamat + " · " + HOTEL.telp + " · " + HOTEL.web);
+    await unduhPDFdariHTML(build(), "CL-" + (clNo || "letter").replace(/[^\w-]/g, "_") + ".pdf", HOTEL.alamat + " · " + HOTEL.telp + " · " + HOTEL.web, { paraf: g.jenisCL !== "Meeting" });
     try {
       const th = new Date(g.tglSurat || hariIni()).getFullYear();
       await fetch("/api/docnum", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kode: "CL", tahun: th, nomor: angka(g.nomor) }) });
@@ -441,6 +692,8 @@ ${pasalRows}
           <Field label="No. CL (otomatis)"><input className={inp + " bg-slate-100 font-semibold"} value={clNo} readOnly /></Field>
         </div>
 
+        {/* Perjanjian Graduation tidak memuat bagian kamar */}
+        {g.jenisCL !== "Graduation" && (<>
         <div className="border border-slate-200 rounded-lg p-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-slate-500">HARGA KAMAR (Weekday / Weekend)</span>
@@ -465,6 +718,7 @@ ${pasalRows}
         <Field label="Benefit / Harga Kamar Sudah Termasuk (satu benefit per baris)">
           <textarea className={inp + " h-24 resize-none text-sm"} value={g.benefit} onChange={(e) => set("benefit", e.target.value)} />
         </Field>
+        </>)}
         <div className="border border-slate-200 rounded-lg p-3 grid grid-cols-2 gap-3">
           <div className="col-span-2 text-xs font-semibold text-slate-500">PENERIMA</div>
           <Field label="Nama"><input className={inp} value={g.namaTamu} onChange={(e) => set("namaTamu", e.target.value)} /></Field>
@@ -515,6 +769,12 @@ ${pasalRows}
               <button onClick={() => delRow("weddings", i)} className="text-xs text-rose-600 font-semibold">✕ Hapus paket ini</button>
             </div>
           ))}
+          <Field label="Paket yang dipilih (tampil di Detail Kegiatan)"><input className={inp} value={g.paketPilihan} onChange={(e) => set("paketPilihan", e.target.value)} placeholder={g.weddings[0] ? g.weddings[0].key + " Package" : "Sapphire Grand Ballroom Platinum Package"} /></Field>
+          <Field label="Menu (opsional, tulis apa adanya per baris)"><textarea className={inp + " h-28 resize-none text-sm"} value={g.menu} onChange={(e) => set("menu", e.target.value)} placeholder={"Appetizer\nLumpia Hongkong (700)\n\nMain Menu (700)\nSteamed Rice"} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Loading barang — tanggal"><input type="date" className={inp} value={g.loadingTgl} onChange={(e) => set("loadingTgl", e.target.value)} /></Field>
+            <Field label="Loading barang — jam"><input className={inp} value={g.loadingJam} onChange={(e) => set("loadingJam", e.target.value)} placeholder="23.00 WIB" /></Field>
+          </div>
         </div>
         )}
         {g.jenisCL === "Graduation" && (
@@ -526,14 +786,16 @@ ${pasalRows}
           {(g.pakets || []).length === 0 && <p className="text-xs text-slate-400">Belum ada paket. Ambil dari Offering Letter atau tambah manual.</p>}
           {(g.pakets || []).map((p, i) => (
             <div key={i} className="border border-slate-100 rounded-lg p-2 space-y-2 bg-slate-50/40">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <div className="col-span-2"><Field label={"Paket " + (i + 1)}><input className={inp} value={p.nama} onChange={(e) => setRow("pakets", i, "nama", e.target.value)} placeholder="Graduation Package" /></Field></div>
                 <Field label="Harga/Orang (Rp)"><input className={inp} inputMode="numeric" value={p.harga ? angka(p.harga).toLocaleString("id-ID") : ""} onChange={(e) => setRow("pakets", i, "harga", e.target.value.replace(/[^\d]/g, ""))} /></Field>
+                <Field label="Special Price (opsional)"><input className={inp} inputMode="numeric" value={p.hargaSpesial ? angka(p.hargaSpesial).toLocaleString("id-ID") : ""} onChange={(e) => setRow("pakets", i, "hargaSpesial", e.target.value.replace(/[^\d]/g, ""))} /></Field>
               </div>
-              <Field label="Benefit (satu per baris, bisa diedit)"><textarea className={inp + " h-24 resize-none text-sm"} value={p.benefit} onChange={(e) => setRow("pakets", i, "benefit", e.target.value)} /></Field>
+              <Field label="Termasuk (satu per baris, bisa diedit)"><textarea className={inp + " h-24 resize-none text-sm"} value={p.benefit} onChange={(e) => setRow("pakets", i, "benefit", e.target.value)} /></Field>
               <button onClick={() => delRow("pakets", i)} className="text-xs text-rose-600 font-semibold">✕ Hapus paket ini</button>
             </div>
           ))}
+          <Field label="ADD ON (satu per baris, kosongkan bila tidak perlu)"><textarea className={inp + " h-28 resize-none text-sm"} value={g.addon} onChange={(e) => set("addon", e.target.value)} /></Field>
         </div>
         )}
 
@@ -548,10 +810,12 @@ ${pasalRows}
             </div></div>
           {g.estimasi.map((r, i) => (
             <div key={i} className="grid grid-cols-12 gap-1 mb-1 items-center">
-              <input className={inp + " !py-1.5 text-xs col-span-5"} placeholder="Deskripsi" value={r.deskripsi} onChange={(e) => setRow("estimasi", i, "deskripsi", e.target.value)} />
+              <input className={inp + " !py-1.5 text-xs " + (g.jenisCL === "Meeting" ? "col-span-5" : g.jenisCL === "Wedding" ? "col-span-4" : "col-span-3")} placeholder="Deskripsi" value={r.deskripsi} onChange={(e) => setRow("estimasi", i, "deskripsi", e.target.value)} />
+              {g.jenisCL === "Graduation" && <input className={inp + " !py-1.5 text-xs col-span-1"} placeholder="Hari" inputMode="numeric" value={r.hari || ""} onChange={(e) => setRow("estimasi", i, "hari", e.target.value.replace(/[^\d]/g, ""))} />}
               <input className={inp + " !py-1.5 text-xs col-span-2"} placeholder="Jml" inputMode="numeric" value={r.jumlah} onChange={(e) => setRow("estimasi", i, "jumlah", e.target.value.replace(/[^\d]/g, ""))} />
-              <input className={inp + " !py-1.5 text-xs col-span-3"} placeholder="Harga" inputMode="numeric" value={r.harga ? angka(r.harga).toLocaleString("id-ID") : ""} onChange={(e) => setRow("estimasi", i, "harga", e.target.value.replace(/[^\d]/g, ""))} />
-              <div className="col-span-2 text-right text-xs text-slate-500">{(angka(r.jumlah) * angka(r.harga)).toLocaleString("id-ID")}{g.estimasi.length > 1 && <button onClick={() => delRow("estimasi", i)} className="text-rose-600 ml-1">✕</button>}</div>
+              {g.jenisCL !== "Meeting" && <input className={inp + " !py-1.5 text-xs col-span-2"} placeholder="Satuan (pax)" value={r.satuan || ""} onChange={(e) => setRow("estimasi", i, "satuan", e.target.value)} />}
+              <input className={inp + " !py-1.5 text-xs " + (g.jenisCL === "Meeting" ? "col-span-3" : "col-span-2")} placeholder="Harga" inputMode="numeric" value={r.harga ? angka(r.harga).toLocaleString("id-ID") : ""} onChange={(e) => setRow("estimasi", i, "harga", e.target.value.replace(/[^\d]/g, ""))} />
+              <div className="col-span-2 text-right text-xs text-slate-500">{totalBaris(r).toLocaleString("id-ID")}{g.estimasi.length > 1 && <button onClick={() => delRow("estimasi", i)} className="text-rose-600 ml-1">✕</button>}</div>
             </div>
           ))}
           <div className="text-right text-sm font-bold text-[#12263a] mt-1">Grand Total: Rp {grandTotal.toLocaleString("id-ID")}</div>
@@ -559,7 +823,10 @@ ${pasalRows}
 
         <div className="border border-slate-200 rounded-lg p-3 grid grid-cols-3 gap-3">
           <div className="col-span-3 text-xs font-semibold text-slate-500">TANGGAL PENTING</div>
-          <Field label="DP 50% s.d."><input type="date" className={inp} value={g.dpDate} onChange={(e) => set("dpDate", e.target.value)} /></Field>
+          {g.jenisCL !== "Meeting" && (
+            <div className="col-span-3"><Field label="Nominal DP yang sudah/akan dibayar (Rp) — sisa pembayaran dihitung otomatis"><input className={inp} inputMode="numeric" value={g.dpNominal ? angka(g.dpNominal).toLocaleString("id-ID") : ""} onChange={(e) => set("dpNominal", e.target.value.replace(/[^\d]/g, ""))} /></Field></div>
+          )}
+          {g.jenisCL !== "Wedding" && <Field label={g.jenisCL === "Meeting" ? "DP 50% s.d." : "Deposit s.d."}><input type="date" className={inp} value={g.dpDate} onChange={(e) => set("dpDate", e.target.value)} /></Field>}
           <Field label="Pelunasan s.d."><input type="date" className={inp} value={g.pelunasanDate} onChange={(e) => set("pelunasanDate", e.target.value)} /></Field>
           <Field label="Jatuh Tempo TTD"><input type="date" className={inp} value={g.jatuhTempoDate} onChange={(e) => set("jatuhTempoDate", e.target.value)} /></Field>
         </div>
