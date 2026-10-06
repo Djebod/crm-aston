@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ProfilSaya from "@/components/ProfilSaya";
 import Header from "@/components/Header";
 import { Modal, Field, inp } from "@/components/Modal";
+import DateRange, { dalamRentang } from "@/components/DateRange";
 import { JABATAN_ROLE, statusTtd } from "@/lib/ttd";
 
 const HOTEL = {
@@ -246,6 +247,10 @@ export default function GeoPage() {
   const [saving, setSaving] = useState(false);
   const [pdfBusy, setPdfBusy] = useState("");
   const [karyawan, setKaryawan] = useState([]);
+  const [cari, setCari] = useState("");
+  const [fSales, setFSales] = useState("");
+  const [dari, setDari] = useState("");
+  const [sampai, setSampai] = useState("");
 
   useEffect(() => {
     const raw = typeof window !== "undefined" ? localStorage.getItem("crm_user") : null;
@@ -420,6 +425,36 @@ export default function GeoPage() {
 
   const gt = useMemo(() => grandTotal(g), [g]);
 
+  // Info ringkas tiap baris (sales & tanggal) diambil dari JSON Data
+  const infoRow = useCallback((row) => {
+    let d = {};
+    try { d = JSON.parse(row.Data || "{}"); } catch (e) {}
+    const sales = String(d.salesPerson || row.CreatedBy || "").trim();
+    const tgl = String(d.issuedDate || row.CreatedAt || "").slice(0, 10);
+    return { sales, tgl };
+  }, []);
+
+  const salesOptions = useMemo(() => {
+    const s = new Set();
+    list.forEach((row) => { const n = infoRow(row).sales; if (n) s.add(n); });
+    return Array.from(s).sort((a, b) => a.localeCompare(b));
+  }, [list, infoRow]);
+
+  const listTampil = useMemo(() => {
+    const q = cari.toLowerCase().trim();
+    return list.filter((row) => {
+      const i = infoRow(row);
+      if (fSales && i.sales !== fSales) return false;
+      if ((dari || sampai) && !dalamRentang(i.tgl, dari, sampai)) return false;
+      if (q) {
+        const teks = [row.GeoNo, row.EventTitle, row.Company, i.sales].join(" ").toLowerCase();
+        if (!teks.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [list, cari, fSales, dari, sampai, infoRow]);
+  const adaFilter = !!(cari || fSales || dari || sampai);
+
   if (!user) return null;
 
   return (
@@ -435,24 +470,51 @@ export default function GeoPage() {
           <button onClick={bukaBaru} className="bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg px-4 py-2.5 whitespace-nowrap">+ Buat GEO</button>
         </div>
 
+        {/* Filter: cari, sales, periode */}
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 mb-4">
+          <input
+            value={cari}
+            onChange={(e) => setCari(e.target.value)}
+            placeholder="Cari no. GEO, event, company, sales…"
+            className="flex-1 min-w-[200px] border border-slate-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#c8962c]"
+          />
+          <select value={fSales} onChange={(e) => setFSales(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
+            <option value="">Semua Sales</option>
+            {salesOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <DateRange dari={dari} sampai={sampai} setDari={setDari} setSampai={setSampai} />
+          {adaFilter && (
+            <button onClick={() => { setCari(""); setFSales(""); setDari(""); setSampai(""); }} className="text-sm text-slate-500 hover:text-slate-800 px-2 whitespace-nowrap">Reset filter</button>
+          )}
+        </div>
+        {!loading && list.length > 0 && (
+          <div className="text-xs text-slate-500 mb-3">Menampilkan {listTampil.length} dari {list.length} GEO{dari || sampai ? " · periode berdasarkan Issued Date" : ""}</div>
+        )}
+
         {loading ? (
           <div className="text-center text-slate-500 py-16">Memuat data…</div>
         ) : list.length === 0 ? (
           <div className="text-center text-slate-500 py-16 border-2 border-dashed border-slate-200 rounded-2xl">Belum ada GEO. Klik <b>“+ Buat GEO”</b>.</div>
+        ) : listTampil.length === 0 ? (
+          <div className="text-center text-slate-500 py-16 border-2 border-dashed border-slate-200 rounded-2xl">Tidak ada GEO yang cocok dengan filter.</div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            {list.map((row) => (
+            {listTampil.map((row) => { const i = infoRow(row); return (
               <div key={row.ID} className="bg-white rounded-xl border border-slate-200 p-4">
                 <div className="font-bold text-[#12263a]">{row.GeoNo || "(tanpa nomor)"}</div>
                 <div className="text-sm text-slate-600">{row.EventTitle || "-"}</div>
                 <div className="text-xs text-slate-400">{row.Company || ""} · dibuat {row.CreatedAt}</div>
+                <div className="text-xs text-slate-500 mt-1">
+                  {i.sales && <span className="inline-block bg-slate-100 rounded px-1.5 py-0.5 mr-1">👤 {i.sales}</span>}
+                  {i.tgl && <span className="inline-block bg-slate-100 rounded px-1.5 py-0.5">📅 {i.tgl}</span>}
+                </div>
                 <div className="flex flex-wrap gap-2 mt-3">
                   <button onClick={() => { let d = {}; try { d = JSON.parse(row.Data || "{}"); } catch (e) {} unduhPDF({ ...GEO_KOSONG(), ...d }, row.ID); }} disabled={pdfBusy === row.ID} className="text-xs font-semibold bg-[#c8962c] text-white rounded-md px-3 py-1.5 disabled:opacity-60">{pdfBusy === row.ID ? "Membuat…" : "⬇ PDF"}</button>
                   <button onClick={() => bukaEdit(row)} className="text-xs font-semibold border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">Edit</button>
                   <button onClick={() => hapus(row)} className="text-xs font-semibold border border-rose-300 text-rose-700 rounded-md px-3 py-1.5 hover:bg-rose-50">Hapus</button>
                 </div>
               </div>
-            ))}
+            ); })}
           </div>
         )}
       </main>
