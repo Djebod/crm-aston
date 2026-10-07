@@ -59,3 +59,12 @@ Buka http://localhost:3000, login super admin.
 ## Catatan
 - Foto tetap ke Google Drive (env `DRIVE_UPLOAD_URL`), tidak perlu Firebase Storage.
 - Data & statistik dihitung dari Neon; pagination 25/halaman, chart top-10.
+
+## Persetujuan berjenjang GEO
+Alur: **Sales (Ajukan) → Sales Leader → Front Office Manager → Financial Controller → General Manager**.
+- Di **Kelola Tim**, beri role `leader`, `fom`, `fc`, atau `gm` kepada orang yang berwenang, dan pastikan masing-masing sudah mengunggah tanda tangan (Profil Saya → Tanda tangan).
+- Tanda tangan digital di PDF **hanya tercetak untuk tahap yang sudah di-acknowledge**; tahap yang belum, ruangnya kosong.
+- Mengubah isi GEO setelah diajukan akan **mereset seluruh persetujuan** (harus diajukan ulang). Penyetuju juga bisa **mengembalikan** GEO ke sales dengan alasan.
+- Halaman terakhir PDF berisi **audit trail**: jenjang persetujuan (siapa, kapan, catatan) dan riwayat aktivitas dokumen (dibuat, diubah, diajukan, acknowledge, dikembalikan, unduh PDF).
+- Admin dapat bertindak di tahap mana pun sebagai cadangan; hal itu tercatat di audit trail sebagai "dilakukan oleh admin mewakili …".
+- Kolom baru di tabel `geo` (`status`, `approvals`, `audit`) dibuat otomatis saat API pertama kali dipanggil, atau lewat `npm run init-db`.

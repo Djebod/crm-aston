@@ -956,6 +956,9 @@ function KelolaTim({ user, onClose }) {
           <select className={inp} value={role} onChange={(e) => setRole(e.target.value)}>
             <option value="marketing">marketing (sales)</option>
             <option value="leader">leader (ADOSM / Sales Leader)</option>
+            <option value="fom">fom (Front Office Manager)</option>
+            <option value="fc">fc (Financial Controller)</option>
+            <option value="gm">gm (General Manager)</option>
             <option value="admin">admin</option>
           </select>
         </Field>
@@ -1054,6 +1057,9 @@ function BarisUser({ u, requester, expanded, onToggle, onSaved }) {
               <select className={inp} value={role} onChange={(e) => setRole(e.target.value)}>
                 <option value="marketing">marketing (sales)</option>
                 <option value="leader">leader (ADOSM / Sales Leader)</option>
+                <option value="fom">fom (Front Office Manager)</option>
+                <option value="fc">fc (Financial Controller)</option>
+                <option value="gm">gm (General Manager)</option>
                 <option value="admin">admin</option>
               </select>
             </Field>

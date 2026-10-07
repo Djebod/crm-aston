@@ -6,7 +6,11 @@ import ProfilSaya from "@/components/ProfilSaya";
 import Header from "@/components/Header";
 import { Modal, Field, inp } from "@/components/Modal";
 import DateRange, { dalamRentang } from "@/components/DateRange";
-import { JABATAN_ROLE, statusTtd } from "@/lib/ttd";
+import { statusTtd, cariKaryawan } from "@/lib/ttd";
+import {
+  TAHAP_GEO, STATUS_GEO, WARNA_STATUS, labelStatus, parseGeoRow, tahapBerikut,
+  bolehBertindak, bolehEdit, bolehHapus,
+} from "@/lib/geoApproval";
 
 const HOTEL = {
   nama: "ASTON CIREBON HOTEL & CONVENTION CENTER",
@@ -15,6 +19,7 @@ const HOTEL = {
 const angka = (n) => Number(String(n).replace(/[^\d]/g, "")) || 0;
 const fmt = (n) => angka(n).toLocaleString("id-ID");
 const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+const low = (v) => String(v || "").trim().toLowerCase();
 
 function inisial(nama) {
   return String(nama || "").trim().split(/\s+/).map((w) => w[0] || "").join("").toUpperCase().slice(0, 4);
@@ -59,6 +64,9 @@ const KOMPONEN_DEFAULT = () => [
   { id: "others", nama: "Others" },
 ];
 
+// Kolom tanda tangan selalu 5, urutannya mengikuti jenjang persetujuan (TAHAP_GEO)
+const TTD_DEFAULT = () => TAHAP_GEO.map((t) => ({ nama: "", jabatan: t.jabatan }));
+
 /**
  * Menyesuaikan data GEO lama (yang masih memakai kolom tetap bfast/dinner/others)
  * ke bentuk komponen bebas, supaya dokumen lama tetap bisa dibuka & dicetak.
@@ -69,6 +77,10 @@ function normalisasiGeo(d) {
   n.rooms = (n.rooms || []).map((r) => {
     if (r.bd && typeof r.bd === "object") return r;
     return { ...r, bd: { bfast: r.bfast || "", dinner: r.dinner || "", others: r.others || "" } };
+  });
+  n.ttd = TAHAP_GEO.map((t, i) => {
+    const x = (Array.isArray(n.ttd) && n.ttd[i]) || {};
+    return { ...x, nama: x.nama || "", jabatan: x.jabatan || t.jabatan };
   });
   return n;
 }
@@ -81,13 +93,7 @@ const GEO_KOSONG = () => ({
   rooms: [{ type: "Superior", checkIn: "", checkOut: "", totalRoom: "", day: "", price: "", bd: {} }],
   dpAmount: "", dpDate: "", remark: "",
   notes: { ...DEFAULT_NOTES },
-  ttd: [
-    { nama: "", jabatan: "Sales Person" },
-    { nama: "", jabatan: "Sales Leader" },
-    { nama: "", jabatan: "Front Office Manager" },
-    { nama: "", jabatan: "Financial Controller" },
-    { nama: "", jabatan: "General Manager" },
-  ],
+  ttd: TTD_DEFAULT(),
 });
 
 // Jumlah malam (Room Night) dari check in – check out
@@ -114,7 +120,21 @@ function grandTotal(g) {
   return (g.rooms || []).reduce((t, r) => t + angka(r.totalRoom) * hitungMalam(r.checkIn, r.checkOut) * angka(r.price), 0);
 }
 
-function buildHTML(g, origin) {
+/**
+ * Kolom tanda tangan untuk PDF. Gambar tanda tangan digital HANYA dicetak
+ * untuk tahap yang sudah di-acknowledge/approve (tercatat di approvals);
+ * tahap yang belum, ruangnya dibiarkan kosong.
+ */
+function kolomTtd(g, ctx) {
+  return TAHAP_GEO.map((t, i) => {
+    const def = (g.ttd || [])[i] || {};
+    const a = (ctx.approvals || [])[i];
+    const img = a ? (cariKaryawan(ctx.karyawan, a.nama)?.Ttd || "") : "";
+    return { nama: a ? a.nama : def.nama || "", jabatan: def.jabatan || t.jabatan, img, waktu: a?.waktu || "" };
+  });
+}
+
+function buildHTML(g, origin, ctx) {
   const gt = grandTotal(g);
   const balance = gt - angka(g.dpAmount);
   const roomRows = (g.rooms || []).map((r) => {
@@ -152,6 +172,8 @@ function buildHTML(g, origin) {
         }).join("")}
       </table>`
     : "";
+
+  const ttd = kolomTtd(g, ctx);
 
   return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:9px;color:#111;width:100%;">
   <div style="border:1.5px solid #111;">
@@ -216,14 +238,92 @@ function buildHTML(g, origin) {
       <tr style="background:#eef2f8;font-weight:bold;">
         <td style="${TDB}">Prepared by,</td><td style="${TDB}" colspan="3">Acknowledged by,</td><td style="${TDB}">Approved by,</td>
       </tr>
-      <tr style="height:46px;">${(g.ttd || []).map((t) => `<td style="${TDB}">${t.img ? `<img src="${t.img}" style="max-height:42px;max-width:110px;display:block;margin:0 auto" />` : ""}</td>`).join("")}</tr>
+      <tr style="height:46px;">${ttd.map((t) => `<td style="${TDB}">${t.img ? `<img src="${t.img}" style="max-height:42px;max-width:110px;display:block;margin:0 auto" />` : ""}</td>`).join("")}</tr>
       <tr style="font-weight:bold;">
-        ${(g.ttd || []).map((t) => `<td style="${TDB}">${esc(t.nama) || "&nbsp;"}<div style="font-weight:normal">${esc(t.jabatan)}</div></td>`).join("")}
+        ${ttd.map((t) => `<td style="${TDB}">${esc(t.nama) || "&nbsp;"}<div style="font-weight:normal">${esc(t.jabatan)}</div>${t.waktu ? `<div style="font-weight:normal;font-size:6.5px;color:#555">Digitally signed · ${esc(t.waktu)}</div>` : ""}</td>`).join("")}
       </tr>
     </table>
     <div style="font-style:italic;font-weight:bold;font-size:8px;padding:3px;border-top:1px solid #111;">Distribution: GM, EAM, DOSM, FC, Chief Engineer, EHK, RBM, Chief Sec, HRM, AFOM, Reservation, Sales Admin, Ext. Chef, Outlet Rest.</div>
   </div>
   <div style="text-align:center;font-size:8px;color:#666;margin-top:4px;">${HOTEL.alamat}</div>
+</div>`;
+}
+
+/**
+ * Halaman terakhir PDF: audit trail dokumen — jenjang persetujuan
+ * (siapa, kapan, catatan) dan seluruh riwayat aktivitas GEO ini.
+ */
+function buildAuditHTML(g, origin, ctx) {
+  const T = "border:1px solid #111;padding:3px 4px;font-size:8px;vertical-align:top;";
+  const TH2 = T + "background:#dbe5f1;font-weight:bold;text-align:center;";
+  const next = tahapBerikut(ctx.info);
+  const approvals = ctx.approvals || [];
+  const audit = ctx.audit || [];
+
+  const barisTahap = TAHAP_GEO.map((t, i) => {
+    const a = approvals[i];
+    const def = (g.ttd || [])[i] || {};
+    const ket = a ? `<span style="color:#047857;font-weight:bold">&#10003; ${t.hasil}</span>`
+      : i === next ? `<span style="color:#b45309;font-weight:bold">Menunggu</span>` : `<span style="color:#888">Belum</span>`;
+    return `<tr>
+      <td style="${T}text-align:center;">${i + 1}</td>
+      <td style="${T}"><b>${esc(def.jabatan || t.jabatan)}</b><br><span style="color:#666">${t.kolom}</span></td>
+      <td style="${T}">${a ? esc(a.nama) : def.nama ? esc(def.nama) + ` <span style="color:#888">(belum tanda tangan)</span>` : "-"}</td>
+      <td style="${T}text-align:center;">${ket}</td>
+      <td style="${T}text-align:center;white-space:nowrap;">${a ? esc(a.waktu) : ""}</td>
+      <td style="${T}">${a ? esc(a.catatan) : ""}</td>
+    </tr>`;
+  }).join("");
+
+  const barisAudit = audit.length
+    ? audit.map((e, i) => `<tr>
+        <td style="${T}text-align:center;">${i + 1}</td>
+        <td style="${T}white-space:nowrap;">${esc(e.waktu)}</td>
+        <td style="${T}"><b>${esc(e.aksi)}</b></td>
+        <td style="${T}">${esc(e.oleh)}${e.role ? `<br><span style="color:#666">${esc(e.role)}</span>` : ""}</td>
+        <td style="${T}">${esc(e.ket) || "-"}</td>
+      </tr>`).join("")
+    : `<tr><td colspan="5" style="${T}text-align:center;color:#888;">Belum ada riwayat — dokumen belum disimpan (pratinjau).</td></tr>`;
+
+  const warnaStatus = ctx.status === "disetujui" ? "#047857" : ctx.status === "ditolak" ? "#b91c1c" : "#b45309";
+
+  return `<div style="page-break-before:always;font-family:Arial,Helvetica,sans-serif;font-size:9px;color:#111;width:100%;">
+  <div style="border:1.5px solid #111;">
+    <div style="text-align:center;padding:8px;"><img src="${origin}/aston-logo.png" style="height:36px;display:block;margin:0 auto;" onerror="this.style.display='none'"/></div>
+    <div style="text-align:center;font-weight:bold;font-size:12px;border-top:1px solid #111;border-bottom:1px solid #111;padding:4px;background:#dbe5f1;">AUDIT TRAIL — GROUP EVENT ORDER</div>
+    <table style="width:100%;border-collapse:collapse;">
+      ${infoRow("GEO No", g.geoNo, true)}
+      ${infoRow("Event Title", g.eventTitle)}
+      ${infoRow("Company/Organizer", g.company)}
+      ${infoRow("Sales Person", g.salesPerson)}
+      <tr><td style="border:1px solid #111;padding:3px;font-weight:bold;width:42%;background:#f8fafc;">Status Dokumen</td><td style="border:1px solid #111;padding:3px;font-weight:bold;color:${warnaStatus}">${esc(labelStatus(ctx.status))}</td></tr>
+    </table>
+
+    <div style="text-align:center;font-weight:bold;background:#eef2f8;border-top:1px solid #111;border-bottom:1px solid #111;padding:3px;">JENJANG PERSETUJUAN</div>
+    <table style="width:100%;border-collapse:collapse;">
+      <tr>
+        <td style="${TH2}width:4%">No</td><td style="${TH2}width:22%">Tahap / Jabatan</td><td style="${TH2}width:22%">Nama</td>
+        <td style="${TH2}width:14%">Status</td><td style="${TH2}width:16%">Waktu</td><td style="${TH2}">Catatan</td>
+      </tr>
+      ${barisTahap}
+    </table>
+
+    <div style="text-align:center;font-weight:bold;background:#eef2f8;border-top:1px solid #111;border-bottom:1px solid #111;padding:3px;">RIWAYAT AKTIVITAS DOKUMEN</div>
+    <table style="width:100%;border-collapse:collapse;">
+      <tr>
+        <td style="${TH2}width:4%">No</td><td style="${TH2}width:16%">Waktu</td><td style="${TH2}width:26%">Aktivitas</td>
+        <td style="${TH2}width:20%">Oleh</td><td style="${TH2}">Keterangan</td>
+      </tr>
+      ${barisAudit}
+    </table>
+
+    <div style="font-size:7.5px;color:#444;padding:4px;border-top:1px solid #111;">
+      Tanda tangan digital pada dokumen ini sah hanya untuk tahap yang tercatat pada jenjang persetujuan di atas.
+      Setiap perubahan isi GEO setelah diajukan akan membatalkan seluruh persetujuan dan tercatat pada riwayat.
+      Halaman ini dibuat otomatis oleh sistem CRM${ctx.dicetakOleh ? ` — diunduh oleh ${esc(ctx.dicetakOleh)}` : ""} pada ${esc(ctx.waktuCetak)}.
+    </div>
+  </div>
+  <div style="text-align:center;font-size:8px;color:#666;margin-top:4px;">${HOTEL.nama} · ${HOTEL.alamat}</div>
 </div>`;
 }
 
@@ -236,6 +336,29 @@ function notaBox(title, val) {
   return `<div style="border-bottom:1px solid #111;"><div style="text-align:center;font-weight:bold;background:#dbe5f1;padding:2px;font-size:8px;">${title}</div><div style="padding:3px;font-size:8px;min-height:20px;">${esc(val)}</div></div>`;
 }
 
+function waktuSekarang() {
+  const p = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date());
+  const g = (t) => p.find((x) => x.type === t)?.value || "";
+  return `${g("year")}-${g("month")}-${g("day")} ${g("hour")}:${g("minute")} WIB`;
+}
+
+function BadgeStatus({ status }) {
+  return <span className={"inline-block text-[11px] font-semibold rounded-full px-2 py-0.5 " + (WARNA_STATUS[status] || WARNA_STATUS.draft)}>{labelStatus(status)}</span>;
+}
+
+function Stepper({ info }) {
+  const next = tahapBerikut(info);
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {TAHAP_GEO.map((t, i) => {
+        const done = i < info.approvals.length;
+        const cls = done ? "bg-emerald-100 text-emerald-700" : i === next ? "bg-amber-100 text-amber-700 ring-1 ring-amber-300" : "bg-slate-100 text-slate-400";
+        return <span key={t.key} title={t.jabatan + (done ? " — " + info.approvals[i].nama + " · " + info.approvals[i].waktu : "")} className={"text-[10px] font-semibold rounded-full px-1.5 py-0.5 " + cls}>{done ? "✓ " : ""}{t.pendek}</span>;
+      })}
+    </div>
+  );
+}
+
 export default function GeoPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -243,12 +366,16 @@ export default function GeoPage() {
   const [loading, setLoading] = useState(true);
   const [modalProfil, setModalProfil] = useState(false);
   const [modalForm, setModalForm] = useState(false);
+  const [modalApvId, setModalApvId] = useState(null); // ID GEO yang dibuka di modal persetujuan
+  const [apvCatatan, setApvCatatan] = useState("");
+  const [apvBusy, setApvBusy] = useState(false);
   const [g, setG] = useState(GEO_KOSONG());
   const [saving, setSaving] = useState(false);
   const [pdfBusy, setPdfBusy] = useState("");
   const [karyawan, setKaryawan] = useState([]);
   const [cari, setCari] = useState("");
   const [fSales, setFSales] = useState("");
+  const [fStatus, setFStatus] = useState("");
   const [dari, setDari] = useState("");
   const [sampai, setSampai] = useState("");
 
@@ -258,18 +385,28 @@ export default function GeoPage() {
     setUser(JSON.parse(raw));
   }, [router]);
 
-  const ambil = useCallback(async () => {
-    setLoading(true);
+  // diam = true -> muat ulang tanpa menampilkan "Memuat data…" (dipakai setelah aksi kecil)
+  const ambil = useCallback(async (diam) => {
+    if (!diam) setLoading(true);
     try {
       const r = await fetch("/api/geo", { cache: "no-store" }).then((x) => x.json());
       if (r.status === "ok") setList(r.data || []);
-    } catch (e) {} finally { setLoading(false); }
+    } catch (e) {} finally { if (!diam) setLoading(false); }
     try {
       const k = await fetch("/api/karyawan", { cache: "no-store" }).then((x) => x.json());
       if (k.status === "ok") setKaryawan(k.data || []);
     } catch (e) {}
   }, []);
   useEffect(() => { if (user) ambil(); }, [user, ambil]);
+
+  // Nama penandatangan yang diharapkan per tahap diisi otomatis dari
+  // anggota tim yang punya role tersebut (leader, fom, fc, gm). Tetap bisa diganti.
+  const isiPenandatangan = useCallback((ttd) => ttd.map((t, i) => {
+    if (i === 0 || t.nama) return t;
+    const roleTahap = TAHAP_GEO[i].roles[0];
+    const orang = karyawan.find((x) => low(x.Role) === roleTahap);
+    return orang ? { ...t, nama: orang.Nama } : t;
+  }), [karyawan]);
 
   // Prefill dari Leads (klik "📋 GEO" di kartu lead)
   useEffect(() => {
@@ -283,6 +420,7 @@ export default function GeoPage() {
       const k = GEO_KOSONG();
       k.salesPerson = p.salesPerson || user?.nama || "";
       k.ttd[0].nama = p.salesPerson || user?.nama || "";
+      k.ttd = isiPenandatangan(k.ttd);
       const merged = normalisasiGeo({ ...k, ...p, notes: { ...DEFAULT_NOTES }, ttd: k.ttd, komponen: k.komponen });
       merged.nomor = String(nextNomor(list, new Date().getFullYear()));
       merged.kodeSales = user?.kode || inisial(p.salesPerson || user?.nama);
@@ -290,10 +428,11 @@ export default function GeoPage() {
       setG(merged);
       setModalForm(true);
     } catch (e) {}
-  }, [user, loading, list]);
+  }, [user, loading, list, isiPenandatangan]);
 
-  // Gambar tanda tangan selalu diturunkan dari nama + daftar karyawan,
-  // jadi tetap benar untuk GEO lama maupun setelah ganti nama.
+  // Gambar tanda tangan di form diturunkan dari nama + daftar karyawan
+  // (hanya untuk keterangan "sudah/belum unggah TTD"; di PDF gambar
+  // dicetak berdasarkan tahap yang sudah disetujui).
   useEffect(() => {
     if (!karyawan.length) return;
     setG((s) => {
@@ -315,6 +454,7 @@ export default function GeoPage() {
     const k = GEO_KOSONG();
     k.salesPerson = user?.nama || "";
     k.ttd[0].nama = user?.nama || "";
+    k.ttd = isiPenandatangan(k.ttd);
     k.nomor = String(nextNomor(list, new Date().getFullYear()));
     k.kodeSales = user?.kode || inisial(user?.nama);
     k.geoNo = rebuildNo(k);
@@ -322,9 +462,9 @@ export default function GeoPage() {
     setModalForm(true);
   }
   function bukaEdit(row) {
-    let d = {};
-    try { d = JSON.parse(row.Data || "{}"); } catch (e) {}
-    setG(normalisasiGeo({ ...GEO_KOSONG(), ...d, id: row.ID, notes: { ...DEFAULT_NOTES, ...(d.notes || {}) } }));
+    const info = parseGeoRow(row);
+    if (info.approvals.length > 0 && !confirm("GEO ini sudah masuk alur persetujuan. Bila Anda menyimpan perubahan, seluruh persetujuan yang ada akan direset dan GEO harus diajukan ulang dari awal. Lanjutkan?")) return;
+    setG(normalisasiGeo({ ...GEO_KOSONG(), ...info.data, id: row.ID, notes: { ...DEFAULT_NOTES, ...(info.data.notes || {}) } }));
     setModalForm(true);
   }
 
@@ -372,31 +512,68 @@ export default function GeoPage() {
   // Saat GEO dibuka lagi, gambarnya diambil ulang dari data karyawan berdasarkan nama.
   const untukDisimpan = (x) => ({ ...x, ttd: (x.ttd || []).map(({ img, ...t }) => t) });
 
-  async function simpan() {
+  // Pemanggil API GEO: identitas (email) selalu dikirim, role diverifikasi server.
+  async function apiGeo(body) {
+    const res = await fetch("/api/geo", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...body, email: user?.email || "", oleh: user?.nama || user?.email || "" }),
+    });
+    return res.json();
+  }
+
+  // ajukan = true -> setelah disimpan langsung diajukan ke Sales Leader (tanda tangan sales tercatat)
+  async function simpan(ajukan) {
     if (!g.geoNo.trim()) { alert("GEO No wajib diisi."); return; }
     setSaving(true);
     try {
-      const res = await fetch("/api/geo", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: g.id ? "updateGeo" : "addGeo", id: g.id, geoNo: g.geoNo, eventTitle: g.eventTitle, company: g.company, data: JSON.stringify(untukDisimpan(g)), oleh: user?.nama || user?.email || "" }),
+      const d = await apiGeo({
+        action: g.id ? "updateGeo" : "addGeo", id: g.id, geoNo: g.geoNo, eventTitle: g.eventTitle, company: g.company,
+        data: JSON.stringify(untukDisimpan(g)), ajukan: !!ajukan,
       });
-      const d = await res.json();
-      if (d.status === "ok") { setModalForm(false); await ambil(); } else alert("Gagal: " + (d.message || ""));
+      if (d.status === "ok") {
+        setModalForm(false);
+        if (d.peringatan) alert("GEO tersimpan sebagai draft, tetapi belum bisa diajukan: " + d.peringatan);
+        await ambil();
+      } else alert("Gagal: " + (d.message || ""));
     } catch (e) { alert("Tidak bisa terhubung ke server."); } finally { setSaving(false); }
   }
 
   async function hapus(row) {
     if (!confirm("Hapus GEO " + (row.GeoNo || "") + "?")) return;
     try {
-      const res = await fetch("/api/geo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "hapusGeo", id: row.ID }) });
-      const d = await res.json();
+      const d = await apiGeo({ action: "hapusGeo", id: row.ID });
       if (d.status === "ok") await ambil(); else alert("Gagal: " + (d.message || ""));
     } catch (e) { alert("Tidak bisa terhubung ke server."); }
   }
 
-  async function unduhPDF(data, key) {
+  // Ajukan / Acknowledge / Approve (mode "setuju") atau kembalikan ke sales (mode "tolak")
+  async function tindak(row, mode) {
+    const info = parseGeoRow(row);
+    const i = tahapBerikut(info);
+    if (i < 0) return;
+    const t = TAHAP_GEO[i];
+    const catatan = apvCatatan.trim();
+    if (mode === "tolak" && !catatan) { alert("Tulis alasan pengembalian di kolom catatan."); return; }
+    const tanya = mode === "tolak"
+      ? `Kembalikan GEO ${row.GeoNo || ""} ke sales? Seluruh persetujuan yang ada akan dibatalkan.`
+      : `${t.aksi} GEO ${row.GeoNo || ""} sebagai ${t.jabatan}? Tanda tangan digital Anda akan tercetak pada dokumen.`;
+    if (!confirm(tanya)) return;
+    setApvBusy(true);
+    try {
+      const d = await apiGeo(mode === "tolak" ? { action: "tolakGeo", id: row.ID, alasan: catatan } : { action: "setujuiGeo", id: row.ID, catatan });
+      if (d.status === "ok") { setApvCatatan(""); await ambil(true); } else alert("Gagal: " + (d.message || ""));
+    } catch (e) { alert("Tidak bisa terhubung ke server."); } finally { setApvBusy(false); }
+  }
+
+  /**
+   * Unduh PDF: halaman GEO + halaman terakhir audit trail.
+   * ctx berisi approvals/audit dari database (untuk GEO tersimpan) —
+   * tanda tangan digital hanya dicetak untuk tahap yang sudah disetujui.
+   */
+  async function unduhPDF(data, key, ctx) {
     const origin = window.location.origin;
-    const html = buildHTML(data, origin);
+    const c = { approvals: [], audit: [], status: "draft", info: { status: "draft", approvals: [] }, karyawan, dicetakOleh: user?.nama || "", waktuCetak: waktuSekarang(), ...(ctx || {}) };
+    const html = buildHTML(data, origin, c) + buildAuditHTML(data, origin, c);
     setPdfBusy(key || "form");
     try {
       await muatHtml2pdf();
@@ -408,14 +585,21 @@ export default function GeoPage() {
       document.body.appendChild(cont);
       const prevScroll = window.scrollY;
       window.scrollTo(0, 0);
+      // Tunggu logo & gambar tanda tangan selesai dimuat supaya tidak kosong di PDF
+      await Promise.all(Array.from(cont.querySelectorAll("img")).map((im) => im.complete ? Promise.resolve() : new Promise((r) => {
+        im.addEventListener("load", r, { once: true }); im.addEventListener("error", r, { once: true }); setTimeout(r, 5000);
+      })));
       await window.html2pdf().set({
         margin: 5, filename: "GEO-" + (data.geoNo || "dokumen").replace(/[^\w-]/g, "_") + ".pdf",
         image: { type: "jpeg", quality: 0.95 },
         html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        pagebreak: { mode: ["css", "legacy"] },
       }).from(cont).save();
       document.body.removeChild(cont);
       window.scrollTo(0, prevScroll);
+      // Catat pengunduhan di audit trail (hanya untuk GEO yang sudah tersimpan)
+      if (ctx?.id) { try { await apiGeo({ action: "logUnduhGeo", id: ctx.id }); await ambil(true); } catch (e) {} }
     } catch (e) {
       const w = window.open("", "_blank");
       if (w) { w.document.open(); w.document.write("<html><head><title>GEO</title></head><body>" + html + "<scr" + "ipt>window.onload=function(){window.print()}</scr" + "ipt></body></html>"); w.document.close(); }
@@ -423,15 +607,20 @@ export default function GeoPage() {
     } finally { setPdfBusy(""); }
   }
 
+  function unduhPDFRow(row) {
+    const info = parseGeoRow(row);
+    const data = normalisasiGeo({ ...GEO_KOSONG(), ...info.data, notes: { ...DEFAULT_NOTES, ...(info.data.notes || {}) } });
+    unduhPDF(data, row.ID, { id: row.ID, approvals: info.approvals, audit: info.audit, status: info.status, info });
+  }
+
   const gt = useMemo(() => grandTotal(g), [g]);
 
-  // Info ringkas tiap baris (sales & tanggal) diambil dari JSON Data
+  // Info ringkas tiap baris (sales, tanggal, status) diambil dari JSON Data
   const infoRow = useCallback((row) => {
-    let d = {};
-    try { d = JSON.parse(row.Data || "{}"); } catch (e) {}
-    const sales = String(d.salesPerson || row.CreatedBy || "").trim();
-    const tgl = String(d.issuedDate || row.CreatedAt || "").slice(0, 10);
-    return { sales, tgl };
+    const info = parseGeoRow(row);
+    const sales = String(info.data.salesPerson || row.CreatedBy || "").trim();
+    const tgl = String(info.data.issuedDate || row.CreatedAt || "").slice(0, 10);
+    return { sales, tgl, info };
   }, []);
 
   const salesOptions = useMemo(() => {
@@ -445,6 +634,7 @@ export default function GeoPage() {
     return list.filter((row) => {
       const i = infoRow(row);
       if (fSales && i.sales !== fSales) return false;
+      if (fStatus === "giliran_saya" ? !bolehBertindak(user, i.info) : fStatus && i.info.status !== fStatus) return false;
       if ((dari || sampai) && !dalamRentang(i.tgl, dari, sampai)) return false;
       if (q) {
         const teks = [row.GeoNo, row.EventTitle, row.Company, i.sales].join(" ").toLowerCase();
@@ -452,8 +642,11 @@ export default function GeoPage() {
       }
       return true;
     });
-  }, [list, cari, fSales, dari, sampai, infoRow]);
-  const adaFilter = !!(cari || fSales || dari || sampai);
+  }, [list, cari, fSales, fStatus, dari, sampai, infoRow, user]);
+  const adaFilter = !!(cari || fSales || fStatus || dari || sampai);
+  const jumlahGiliran = useMemo(() => list.filter((row) => bolehBertindak(user, parseGeoRow(row))).length, [list, user]);
+
+  const rowApv = modalApvId ? list.find((r) => r.ID === modalApvId) : null;
 
   if (!user) return null;
 
@@ -465,12 +658,18 @@ export default function GeoPage() {
         <div className="flex items-center justify-between gap-2 mb-4">
           <div>
             <h1 className="text-xl font-extrabold text-[#12263a]">Group Event Order (GEO)</h1>
-            <p className="text-sm text-slate-500">Buat &amp; unduh GEO dalam bentuk PDF.</p>
+            <p className="text-sm text-slate-500">Buat GEO, ajukan persetujuan berjenjang, lalu unduh PDF bertanda tangan digital.</p>
           </div>
           <button onClick={bukaBaru} className="bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg px-4 py-2.5 whitespace-nowrap">+ Buat GEO</button>
         </div>
 
-        {/* Filter: cari, sales, periode */}
+        {jumlahGiliran > 0 && (
+          <button onClick={() => setFStatus("giliran_saya")} className="w-full text-left mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 hover:bg-amber-100">
+            ⏳ <b>{jumlahGiliran} GEO</b> menunggu tindakan Anda. Klik untuk menampilkan.
+          </button>
+        )}
+
+        {/* Filter: cari, sales, status, periode */}
         <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 mb-4">
           <input
             value={cari}
@@ -482,9 +681,14 @@ export default function GeoPage() {
             <option value="">Semua Sales</option>
             {salesOptions.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
+          <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
+            <option value="">Semua Status</option>
+            <option value="giliran_saya">Menunggu tindakan saya</option>
+            {Object.keys(STATUS_GEO).map((k) => <option key={k} value={k}>{STATUS_GEO[k]}</option>)}
+          </select>
           <DateRange dari={dari} sampai={sampai} setDari={setDari} setSampai={setSampai} />
           {adaFilter && (
-            <button onClick={() => { setCari(""); setFSales(""); setDari(""); setSampai(""); }} className="text-sm text-slate-500 hover:text-slate-800 px-2 whitespace-nowrap">Reset filter</button>
+            <button onClick={() => { setCari(""); setFSales(""); setFStatus(""); setDari(""); setSampai(""); }} className="text-sm text-slate-500 hover:text-slate-800 px-2 whitespace-nowrap">Reset filter</button>
           )}
         </div>
         {!loading && list.length > 0 && (
@@ -499,25 +703,119 @@ export default function GeoPage() {
           <div className="text-center text-slate-500 py-16 border-2 border-dashed border-slate-200 rounded-2xl">Tidak ada GEO yang cocok dengan filter.</div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            {listTampil.map((row) => { const i = infoRow(row); return (
-              <div key={row.ID} className="bg-white rounded-xl border border-slate-200 p-4">
-                <div className="font-bold text-[#12263a]">{row.GeoNo || "(tanpa nomor)"}</div>
-                <div className="text-sm text-slate-600">{row.EventTitle || "-"}</div>
-                <div className="text-xs text-slate-400">{row.Company || ""} · dibuat {row.CreatedAt}</div>
-                <div className="text-xs text-slate-500 mt-1">
-                  {i.sales && <span className="inline-block bg-slate-100 rounded px-1.5 py-0.5 mr-1">👤 {i.sales}</span>}
-                  {i.tgl && <span className="inline-block bg-slate-100 rounded px-1.5 py-0.5">📅 {i.tgl}</span>}
+            {listTampil.map((row) => {
+              const i = infoRow(row);
+              const info = i.info;
+              const next = tahapBerikut(info);
+              const giliran = bolehBertindak(user, info);
+              return (
+                <div key={row.ID} className={"bg-white rounded-xl border p-4 " + (giliran ? "border-amber-300 shadow-sm" : "border-slate-200")}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="font-bold text-[#12263a] break-all">{row.GeoNo || "(tanpa nomor)"}</div>
+                    <BadgeStatus status={info.status} />
+                  </div>
+                  <div className="text-sm text-slate-600">{row.EventTitle || "-"}</div>
+                  <div className="text-xs text-slate-400">{row.Company || ""} · dibuat {row.CreatedAt}</div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    {i.sales && <span className="inline-block bg-slate-100 rounded px-1.5 py-0.5 mr-1">👤 {i.sales}</span>}
+                    {i.tgl && <span className="inline-block bg-slate-100 rounded px-1.5 py-0.5">📅 {i.tgl}</span>}
+                  </div>
+                  <div className="mt-2"><Stepper info={info} /></div>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {giliran && (
+                      <button onClick={() => { setApvCatatan(""); setModalApvId(row.ID); }} className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md px-3 py-1.5">
+                        {next === 0 ? "📤 Ajukan" : "✔ " + TAHAP_GEO[next].aksi}
+                      </button>
+                    )}
+                    <button onClick={() => unduhPDFRow(row)} disabled={pdfBusy === row.ID} className="text-xs font-semibold bg-[#c8962c] text-white rounded-md px-3 py-1.5 disabled:opacity-60">{pdfBusy === row.ID ? "Membuat…" : "⬇ PDF"}</button>
+                    <button onClick={() => { setApvCatatan(""); setModalApvId(row.ID); }} className="text-xs font-semibold border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">Riwayat</button>
+                    {bolehEdit(user, info) && <button onClick={() => bukaEdit(row)} className="text-xs font-semibold border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">Edit</button>}
+                    {bolehHapus(user, info) && <button onClick={() => hapus(row)} className="text-xs font-semibold border border-rose-300 text-rose-700 rounded-md px-3 py-1.5 hover:bg-rose-50">Hapus</button>}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2 mt-3">
-                  <button onClick={() => { let d = {}; try { d = JSON.parse(row.Data || "{}"); } catch (e) {} unduhPDF({ ...GEO_KOSONG(), ...d }, row.ID); }} disabled={pdfBusy === row.ID} className="text-xs font-semibold bg-[#c8962c] text-white rounded-md px-3 py-1.5 disabled:opacity-60">{pdfBusy === row.ID ? "Membuat…" : "⬇ PDF"}</button>
-                  <button onClick={() => bukaEdit(row)} className="text-xs font-semibold border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">Edit</button>
-                  <button onClick={() => hapus(row)} className="text-xs font-semibold border border-rose-300 text-rose-700 rounded-md px-3 py-1.5 hover:bg-rose-50">Hapus</button>
-                </div>
-              </div>
-            ); })}
+              );
+            })}
           </div>
         )}
       </main>
+
+      {/* Modal persetujuan & riwayat */}
+      {rowApv && (() => {
+        const info = parseGeoRow(rowApv);
+        const next = tahapBerikut(info);
+        const giliran = bolehBertindak(user, info);
+        return (
+          <Modal title={"Persetujuan GEO " + (rowApv.GeoNo || "")} onClose={() => setModalApvId(null)}>
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <BadgeStatus status={info.status} />
+                <span className="text-slate-600">{rowApv.EventTitle || "-"} · {rowApv.Company || "-"}</span>
+              </div>
+
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <div className="bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">JENJANG PERSETUJUAN</div>
+                {TAHAP_GEO.map((t, i) => {
+                  const a = info.approvals[i];
+                  const def = (info.data.ttd || [])[i] || {};
+                  return (
+                    <div key={t.key} className="flex items-start gap-3 px-3 py-2 border-t border-slate-100 text-sm">
+                      <span className={"mt-0.5 w-5 h-5 rounded-full text-[11px] flex items-center justify-center shrink-0 font-bold " + (a ? "bg-emerald-500 text-white" : i === next ? "bg-amber-400 text-white" : "bg-slate-200 text-slate-500")}>{a ? "✓" : i + 1}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-slate-800">{def.jabatan || t.jabatan} <span className="text-slate-400 font-normal">· {t.kolom}</span></div>
+                        {a ? (
+                          <div className="text-xs text-slate-600">{t.hasil} oleh <b>{a.nama}</b> · {a.waktu}{a.catatan ? <span className="block italic text-slate-500">“{a.catatan}”</span> : null}</div>
+                        ) : (
+                          <div className="text-xs text-slate-400">{i === next ? "Menunggu" : "Belum"}{def.nama ? " · " + def.nama : ""}</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {giliran ? (
+                <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-2">
+                  <div className="text-sm font-semibold text-amber-800">Giliran Anda: {TAHAP_GEO[next].jabatan}</div>
+                  <p className="text-xs text-amber-700">
+                    {next === 0
+                      ? "Dengan mengajukan, tanda tangan digital Anda tercetak di kolom Prepared by dan GEO diteruskan ke Sales Leader."
+                      : "Dengan " + TAHAP_GEO[next].aksi.toLowerCase() + ", tanda tangan digital Anda tercetak pada dokumen dan GEO diteruskan ke tahap berikutnya."}
+                    {" "}Semua tindakan tercatat di audit trail.
+                  </p>
+                  <textarea className={inp + " h-16 resize-none text-sm"} placeholder={next === 0 ? "Catatan (opsional)" : "Catatan (opsional; wajib diisi bila dikembalikan)"} value={apvCatatan} onChange={(e) => setApvCatatan(e.target.value)} />
+                  <div className="flex gap-2">
+                    <button onClick={() => tindak(rowApv, "setuju")} disabled={apvBusy} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg py-2 text-sm disabled:opacity-60">{apvBusy ? "Memproses…" : (next === 0 ? "📤 Ajukan ke Sales Leader" : "✔ " + TAHAP_GEO[next].aksi)}</button>
+                    {next > 0 && <button onClick={() => tindak(rowApv, "tolak")} disabled={apvBusy} className="border border-rose-300 text-rose-700 hover:bg-rose-50 font-semibold rounded-lg py-2 px-4 text-sm disabled:opacity-60">Kembalikan</button>}
+                  </div>
+                </div>
+              ) : next >= 0 ? (
+                <p className="text-sm text-slate-500">Menunggu tindakan <b>{TAHAP_GEO[next].jabatan}</b>{next === 0 ? " (sales pembuat GEO)" : ""}.</p>
+              ) : (
+                <p className="text-sm text-emerald-700 font-medium">✓ GEO sudah disetujui penuh. Semua tanda tangan digital tercetak pada PDF.</p>
+              )}
+
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <div className="bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">RIWAYAT AKTIVITAS (AUDIT TRAIL)</div>
+                {info.audit.length === 0 ? (
+                  <div className="px-3 py-3 text-xs text-slate-400">Belum ada riwayat.</div>
+                ) : (
+                  <div className="max-h-60 overflow-y-auto">
+                    {[...info.audit].reverse().map((e, i) => (
+                      <div key={i} className="px-3 py-2 border-t border-slate-100 text-xs">
+                        <div className="flex justify-between gap-2"><span className="font-semibold text-slate-800">{e.aksi}</span><span className="text-slate-400 whitespace-nowrap">{e.waktu}</span></div>
+                        <div className="text-slate-600">{e.oleh}{e.role ? <span className="text-slate-400"> · {e.role}</span> : null}</div>
+                        {e.ket && <div className="text-slate-500 italic">{e.ket}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button onClick={() => unduhPDFRow(rowApv)} disabled={pdfBusy === rowApv.ID} className="w-full border border-[#c8962c] text-[#a9781f] font-semibold rounded-lg py-2.5 text-sm disabled:opacity-60">{pdfBusy === rowApv.ID ? "Membuat…" : "⬇ Unduh PDF (dengan halaman audit trail)"}</button>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {modalForm && (
         <Modal title={g.id ? "Edit GEO" : "Buat GEO"} onClose={() => setModalForm(false)}>
@@ -645,7 +943,11 @@ export default function GeoPage() {
             </div>
 
             <div className="border border-slate-200 rounded-lg p-3">
-              <div className="text-xs font-semibold text-slate-500 mb-2">TANDA TANGAN (nama &amp; jabatan bisa disesuaikan)</div>
+              <div className="text-xs font-semibold text-slate-500 mb-1">PENANDATANGAN (nama &amp; jabatan bisa disesuaikan)</div>
+              <p className="text-xs text-slate-400 mb-2">
+                Gambar tanda tangan <b>tidak</b> langsung tercetak. Tanda tangan digital baru muncul di PDF setelah tahapnya di-acknowledge oleh orang yang berwenang:
+                Sales (ajukan) → Sales Leader → Front Office Manager → Financial Controller → General Manager.
+              </p>
               <div className="space-y-2">
                 {(g.ttd || []).map((t, i) => {
                   const st = statusTtd(t.nama, t.img, karyawan);
@@ -667,10 +969,11 @@ export default function GeoPage() {
             </div>
           </div>
 
-          <div className="flex gap-2 mt-5">
+          <div className="flex flex-wrap gap-2 mt-5">
             <button onClick={() => setModalForm(false)} className="flex-1 border border-slate-300 rounded-lg py-2.5 font-medium hover:bg-slate-50">Batal</button>
-            <button onClick={() => unduhPDF(g, "form")} disabled={pdfBusy === "form"} className="flex-1 border border-[#c8962c] text-[#a9781f] font-semibold rounded-lg py-2.5 disabled:opacity-60">{pdfBusy === "form" ? "Membuat…" : "⬇ PDF"}</button>
-            <button onClick={simpan} disabled={saving} className="flex-1 bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg py-2.5 disabled:opacity-60">{saving ? "Menyimpan…" : "Simpan"}</button>
+            <button onClick={() => unduhPDF(g, "form")} disabled={pdfBusy === "form"} title="Pratinjau tanpa tanda tangan digital" className="flex-1 border border-[#c8962c] text-[#a9781f] font-semibold rounded-lg py-2.5 disabled:opacity-60">{pdfBusy === "form" ? "Membuat…" : "⬇ PDF pratinjau"}</button>
+            <button onClick={() => simpan(false)} disabled={saving} className="flex-1 border border-[#12263a] text-[#12263a] font-semibold rounded-lg py-2.5 disabled:opacity-60">{saving ? "Menyimpan…" : "Simpan draft"}</button>
+            <button onClick={() => simpan(true)} disabled={saving} className="flex-1 bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg py-2.5 disabled:opacity-60">{saving ? "Menyimpan…" : "Simpan & Ajukan"}</button>
           </div>
         </Modal>
       )}
