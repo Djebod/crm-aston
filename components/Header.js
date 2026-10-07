@@ -14,6 +14,17 @@ const ITEMS = [
   { href: "/log", label: "Log", key: "log" },
 ];
 
+// Pintasan ke portal staf (situs terpisah) — dibuka di tab baru supaya CRM tetap terbuka
+const STAFF_PORTAL = { href: "https://aston-staff-page.vercel.app", label: "Staff Portal" };
+
+function IkonPortal({ className }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 3h7v7" /><path d="M10 14 21 3" /><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" />
+    </svg>
+  );
+}
+
 export default function Header({ active, user, onKelolaTim, onProfil, onKeluar }) {
   const [open, setOpen] = useState(false);
   const isAdmin = user?.role === "admin";
@@ -43,6 +54,10 @@ export default function Header({ active, user, onKelolaTim, onProfil, onKeluar }
 
           {/* Kanan: profil+keluar (desktop) / hamburger (mobile) */}
           <div className="flex items-center gap-2 shrink-0 ml-auto md:ml-0">
+            <a href={STAFF_PORTAL.href} target="_blank" rel="noopener noreferrer" title="Buka Aston Cirebon Staff Portal (tab baru)"
+              className="hidden md:inline-flex items-center gap-1.5 text-xs font-semibold border border-[#c8962c]/70 text-[#e9c46a] hover:bg-[#c8962c] hover:text-[#12263a] rounded-lg px-3 py-2 transition whitespace-nowrap">
+              <IkonPortal /> {STAFF_PORTAL.label}
+            </a>
             <button onClick={onProfil} title="Profil saya"
               className="hidden md:block text-right leading-tight bg-white/10 hover:bg-white/20 rounded-lg px-3 py-1.5 transition">
               <div className="text-sm font-semibold whitespace-nowrap">{user?.nama}</div>
@@ -75,6 +90,10 @@ export default function Header({ active, user, onKelolaTim, onProfil, onKeluar }
             {isAdmin && onKelolaTim && (
               <button onClick={() => { setOpen(false); onKelolaTim(); }} className="text-left px-3 py-2 rounded-lg hover:bg-white/10">Kelola Tim</button>
             )}
+            <a href={STAFF_PORTAL.href} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#c8962c]/50 text-[#e9c46a] hover:bg-white/10 mt-1">
+              <IkonPortal /> Aston Cirebon {STAFF_PORTAL.label} <span className="text-xs text-slate-300 ml-auto">tab baru</span>
+            </a>
             <button onClick={() => { setOpen(false); onProfil(); }} className="text-left px-3 py-2 rounded-lg hover:bg-white/10">Profil Saya</button>
             <button onClick={onKeluar} className="text-left px-3 py-2 rounded-lg bg-[#c8962c] text-[#12263a] font-semibold mt-1">Keluar</button>
           </div>
