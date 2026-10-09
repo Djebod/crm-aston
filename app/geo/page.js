@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import ProfilSaya from "@/components/ProfilSaya";
 import Header from "@/components/Header";
@@ -9,7 +9,7 @@ import DateRange, { dalamRentang } from "@/components/DateRange";
 import { statusTtd, cariKaryawan } from "@/lib/ttd";
 import {
   TAHAP_GEO, STATUS_GEO, WARNA_STATUS, labelStatus, parseGeoRow, tahapBerikut,
-  bolehBertindak, bolehEdit, bolehHapus,
+  bolehBertindak, bolehEdit, bolehHapus, bolehKirimAlert,
 } from "@/lib/geoApproval";
 
 const HOTEL = {
@@ -369,6 +369,8 @@ export default function GeoPage() {
   const [modalApvId, setModalApvId] = useState(null); // ID GEO yang dibuka di modal persetujuan
   const [apvCatatan, setApvCatatan] = useState("");
   const [apvBusy, setApvBusy] = useState(false);
+  const [alertBusy, setAlertBusy] = useState(false);
+  const bukaDariLink = useRef(false); // ?id=GEOxxx dari tautan di email alert -> buka modal persetujuan
   const [g, setG] = useState(GEO_KOSONG());
   const [saving, setSaving] = useState(false);
   const [pdfBusy, setPdfBusy] = useState("");
@@ -398,6 +400,16 @@ export default function GeoPage() {
     } catch (e) {}
   }, []);
   useEffect(() => { if (user) ambil(); }, [user, ambil]);
+
+  // Tautan dari email alert: /geo?id=GEOxxx -> langsung buka modal persetujuan GEO tersebut
+  useEffect(() => {
+    if (loading || bukaDariLink.current || typeof window === "undefined") return;
+    const id = new URLSearchParams(window.location.search).get("id");
+    if (!id) return;
+    bukaDariLink.current = true;
+    if (list.some((r) => r.ID === id)) { setApvCatatan(""); setModalApvId(id); }
+    try { window.history.replaceState(null, "", window.location.pathname); } catch (e) {}
+  }, [loading, list]);
 
   // Nama penandatangan yang diharapkan per tahap diisi otomatis dari
   // anggota tim yang punya role tersebut (leader, fom, fc, gm). Tetap bisa diganti.
@@ -565,6 +577,20 @@ export default function GeoPage() {
     } catch (e) { alert("Tidak bisa terhubung ke server."); } finally { setApvBusy(false); }
   }
 
+  // Kirim ulang email alert sesuai status GEO sekarang (ke penyetuju berikutnya / sales / semua)
+  async function kirimUlangAlert(row) {
+    if (!confirm("Kirim ulang email alert untuk GEO " + (row.GeoNo || "") + "?")) return;
+    setAlertBusy(true);
+    try {
+      const d = await apiGeo({ action: "kirimAlertGeo", id: row.ID });
+      if (d.status === "ok") {
+        const a = d.alert || {};
+        alert("Alert terkirim.\nKe: " + (a.ke || []).join(", ") + (a.cc?.length ? "\nCC: " + a.cc.join(", ") : ""));
+        await ambil(true);
+      } else alert("Gagal mengirim alert: " + (d.message || ""));
+    } catch (e) { alert("Tidak bisa terhubung ke server."); } finally { setAlertBusy(false); }
+  }
+
   /**
    * Unduh PDF: halaman GEO + halaman terakhir audit trail.
    * ctx berisi approvals/audit dari database (untuk GEO tersimpan) —
@@ -651,7 +677,7 @@ export default function GeoPage() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen md:pl-60">
       <Header active="geo" user={user} onProfil={() => setModalProfil(true)} onKeluar={logout} />
 
       <main className="max-w-5xl mx-auto px-4 py-5">
@@ -793,6 +819,36 @@ export default function GeoPage() {
               ) : (
                 <p className="text-sm text-emerald-700 font-medium">✓ GEO sudah disetujui penuh. Semua tanda tangan digital tercetak pada PDF.</p>
               )}
+
+              {info.status !== "draft" && (() => {
+                let al = null;
+                try { al = rowApv.AlertTerakhir ? JSON.parse(rowApv.AlertTerakhir) : null; } catch (e) {}
+                return (
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <div className="bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">NOTIFIKASI EMAIL</div>
+                    <div className="px-3 py-2 text-xs text-slate-600 space-y-1">
+                      {al ? (
+                        <>
+                          <div>
+                            <span className={"inline-block rounded px-1.5 py-0.5 font-semibold mr-1 " + (al.hasil === "terkirim" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700")}>{al.hasil === "terkirim" ? "Terkirim" : "Gagal"}</span>
+                            {al.waktu}{al.ulang ? " (kirim ulang" + (al.oleh ? " oleh " + al.oleh : "") + ")" : ""}
+                          </div>
+                          {al.ke?.length ? <div>Ke: {al.ke.join(", ")}</div> : null}
+                          {al.cc?.length ? <div>CC: {al.cc.join(", ")}</div> : null}
+                          {al.pesan && al.hasil !== "terkirim" ? <div className="text-rose-700 italic">{al.pesan}</div> : null}
+                        </>
+                      ) : (
+                        <div className="text-slate-400">Belum ada alert email yang tercatat untuk GEO ini.</div>
+                      )}
+                      {bolehKirimAlert(user, info) && (
+                        <button onClick={() => kirimUlangAlert(rowApv)} disabled={alertBusy} className="mt-1 text-xs font-semibold border border-sky-300 text-sky-700 hover:bg-sky-50 rounded-md px-3 py-1.5 disabled:opacity-60">
+                          {alertBusy ? "Mengirim…" : "🔔 Kirim ulang alert email"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="border border-slate-200 rounded-lg overflow-hidden">
                 <div className="bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">RIWAYAT AKTIVITAS (AUDIT TRAIL)</div>

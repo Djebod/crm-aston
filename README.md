@@ -68,3 +68,39 @@ Alur: **Sales (Ajukan) → Sales Leader → Front Office Manager → Financial C
 - Halaman terakhir PDF berisi **audit trail**: jenjang persetujuan (siapa, kapan, catatan) dan riwayat aktivitas dokumen (dibuat, diubah, diajukan, acknowledge, dikembalikan, unduh PDF).
 - Admin dapat bertindak di tahap mana pun sebagai cadangan; hal itu tercatat di audit trail sebagai "dilakukan oleh admin mewakili …".
 - Kolom baru di tabel `geo` (`status`, `approvals`, `audit`) dibuat otomatis saat API pertama kali dipanggil, atau lewat `npm run init-db`.
+
+## Alert email persetujuan GEO (Apps Script)
+Setiap langkah alur persetujuan mengirim email otomatis lewat **Google Apps Script** (`apps-script-alert-geo/Code.gs`), tanpa perlu SMTP tambahan:
+
+| Kejadian | Email ke | CC |
+|---|---|---|
+| Sales **Ajukan** / penyetuju **Acknowledge** | semua user aktif dengan role tahap berikutnya (`leader` → `fom` → `fc` → `gm`) | sales pembuat |
+| GEO **dikembalikan** | sales pembuat | semua `leader` |
+| GM **Approve** (disetujui penuh) | sales pembuat + semua penyetuju | – |
+
+Bila tidak ada user dengan role tersebut (atau email sales tidak ditemukan), email jatuh ke `ADMIN_EMAIL`. Email berisi tombol tautan `/geo?id=…` yang langsung membuka modal persetujuan GEO itu.
+Hasil pengiriman terakhir tampil di modal **Riwayat → Notifikasi Email**, dan ada tombol **🔔 Kirim ulang alert email** (admin, leader, sales pembuat, atau penyetuju yang sedang giliran). Gagal kirim email **tidak** membatalkan persetujuan.
+
+### Cara setting (sekali saja)
+1. Buka https://script.google.com → **New project** → beri nama `Alert GEO Aston CRM`.
+2. Hapus isi editor, tempel seluruh isi `apps-script-alert-geo/Code.gs` → **Save** (ikon disket).
+3. Di baris paling atas ganti `TOKEN = "GANTI_DENGAN_TOKEN_RAHASIA"` dengan teks rahasia bebas, minimal 20 karakter (contoh: `aston-geo-2026-xK9mQ2pL`). Simpan.
+4. Di toolbar pilih fungsi **`tesKirim`** → klik **Run** → **Review permissions** → pilih akun Gmail pengirim → **Advanced → Go to … (unsafe)** → **Allow**.
+   Cek inbox akun itu: harus masuk email berjudul *[Perlu Acknowledge] GEO … TES alert GEO*. Kalau sudah masuk, script berfungsi.
+5. **Deploy → New deployment** → ikon gerigi pilih **Web app** → isi:
+   - Description: `alert geo`
+   - Execute as: **Me**
+   - Who has access: **Anyone**
+   → **Deploy** → salin **Web app URL** (berakhiran `/exec`).
+6. Vercel → project → **Settings → Environment Variables**, tambahkan:
+   - `GEO_ALERT_URL` = Web app URL tadi
+   - `GEO_ALERT_TOKEN` = token yang sama persis dengan langkah 3
+   Lalu **Deployments → ⋯ → Redeploy**.
+7. Pastikan di **Kelola Tim** setiap penyetuju punya **email yang benar** dan role `leader` / `fom` / `fc` / `gm`, karena alamat penerima diambil dari sana.
+8. Uji: ajukan satu GEO → Sales Leader harus menerima email. Jika tidak, buka **Riwayat** GEO itu → bagian **Notifikasi Email** menampilkan alasan gagal, lalu klik **Kirim ulang alert email** setelah diperbaiki.
+
+### Catatan
+- Pengirim email = akun Google yang melakukan deploy. Pakai akun kantor (mis. `itm@astoncirebon.com`) supaya nama pengirimnya resmi. Kuota MailApp: 100 email/hari untuk Gmail biasa, 1.500/hari untuk Google Workspace.
+- Mengubah kode script = wajib **Deploy → Manage deployments → ✎ → Version: New version → Deploy** agar URL yang sama memakai kode baru.
+- Kolom `alert_terakhir` di tabel `geo` dibuat otomatis (atau `npm run init-db`).
+- Lokal tanpa `GEO_ALERT_URL`: fitur alert diam (tidak error), tombol kirim ulang memberi pesan "GEO_ALERT_URL belum di-set".

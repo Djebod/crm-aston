@@ -52,6 +52,8 @@ export const STATEMENTS = [
   `ALTER TABLE geo ADD COLUMN IF NOT EXISTS status TEXT`,
   `ALTER TABLE geo ADD COLUMN IF NOT EXISTS approvals TEXT`,
   `ALTER TABLE geo ADD COLUMN IF NOT EXISTS audit TEXT`,
+  // Hasil pengiriman alert email terakhir (JSON) untuk tombol "Kirim ulang alert"
+  `ALTER TABLE geo ADD COLUMN IF NOT EXISTS alert_terakhir TEXT`,
   `CREATE TABLE IF NOT EXISTS call_plan (
     id TEXT PRIMARY KEY, tanggal_rencana TEXT, sales_name TEXT, company_name TEXT,
     pic_name TEXT, phone TEXT, tujuan TEXT, status TEXT DEFAULT 'Plan',

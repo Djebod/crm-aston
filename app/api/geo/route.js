@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql, raw, waktuJakarta, pastikanKolomGeo } from "@/lib/db";
-import { TAHAP_GEO, parseGeoRow, tahapBerikut, bolehBertindak, bolehEdit, bolehHapus, statusDari } from "@/lib/geoApproval";
+import { TAHAP_GEO, parseGeoRow, tahapBerikut, bolehBertindak, bolehEdit, bolehHapus, bolehKirimAlert, statusDari } from "@/lib/geoApproval";
+import { kirimAlertGeo } from "@/lib/geoAlert";
 import { isAdmin } from "@/lib/akses";
 
 export const runtime = "nodejs";
@@ -14,7 +15,7 @@ const gagal = (message, code) => NextResponse.json({ status: "error", message },
 
 const KOLOM = `id AS "ID", geo_no AS "GeoNo", event_title AS "EventTitle", company AS "Company",
   data AS "Data", created_at AS "CreatedAt", created_by AS "CreatedBy",
-  status AS "Status", approvals AS "Approvals", audit AS "Audit"`;
+  status AS "Status", approvals AS "Approvals", audit AS "Audit", alert_terakhir AS "AlertTerakhir"`;
 
 /**
  * Identitas pelaku diambil dari database berdasarkan email (bukan dari body),
@@ -33,7 +34,7 @@ async function siapa(email) {
 async function ambilRow(id) {
   const r = await sql`SELECT id AS "ID", geo_no AS "GeoNo", event_title AS "EventTitle", company AS "Company",
     data AS "Data", created_at AS "CreatedAt", created_by AS "CreatedBy",
-    status AS "Status", approvals AS "Approvals", audit AS "Audit" FROM geo WHERE id = ${id}`;
+    status AS "Status", approvals AS "Approvals", audit AS "Audit", alert_terakhir AS "AlertTerakhir" FROM geo WHERE id = ${id}`;
   return r[0] || null;
 }
 
@@ -64,6 +65,8 @@ async function majukanTahap(id, user, catatan) {
   const ket = (isAdmin(user) && !t.roles.includes(user.role) && i > 0 ? "Dilakukan oleh admin mewakili " + t.jabatan + ". " : "") + String(catatan || "").trim();
   const audit = [...info.audit, entriAudit(`${t.hasil} — ${t.jabatan}`, user, ket)];
   await simpanAlur(id, status, approvals, audit);
+  // Email alert ke penyetuju berikutnya (atau ke semua bila sudah disetujui penuh). Gagal kirim tidak membatalkan persetujuan.
+  await kirimAlertGeo(await ambilRow(id), user, false);
   return null;
 }
 
@@ -134,7 +137,21 @@ export async function POST(req) {
       if (!bolehBertindak(user, info)) return gagal(`Hanya ${TAHAP_GEO[i].jabatan} yang bisa mengembalikan GEO pada tahap ini.`, 403);
       const audit = [...info.audit, entriAudit(`Dikembalikan — ${TAHAP_GEO[i].jabatan}`, user, alasan)];
       await simpanAlur(b.id, "ditolak", [], audit);
+      await kirimAlertGeo(await ambilRow(b.id), user, false);
       return ok();
+    }
+
+    // Tombol "Kirim ulang alert email" sesuai status GEO saat ini
+    if (b.action === "kirimAlertGeo") {
+      if (!b.id) return gagal("ID tidak ada.");
+      const row = await ambilRow(b.id);
+      if (!row) return gagal("GEO tidak ditemukan.");
+      const info = parseGeoRow(row);
+      if (info.status === "draft") return gagal("GEO masih draft. Ajukan dulu, alert akan terkirim otomatis.");
+      if (!bolehKirimAlert(user, info)) return gagal("Anda tidak berhak mengirim ulang alert GEO ini.", 403);
+      const alert = await kirimAlertGeo(row, user, true);
+      if (alert.hasil !== "terkirim") return gagal(alert.pesan || "Alert gagal dikirim.");
+      return ok({ alert });
     }
 
     if (b.action === "logUnduhGeo") {
