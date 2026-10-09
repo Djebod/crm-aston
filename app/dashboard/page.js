@@ -442,7 +442,7 @@ export default function Dashboard() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen md:pl-60">
       {/* Header */}
       <Header active="leads" user={user}
         onKelolaTim={() => setModalUser(true)}

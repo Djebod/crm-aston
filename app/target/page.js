@@ -165,7 +165,7 @@ export default function TargetPage() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen md:pl-60">
       <Header active="target" user={user} onProfil={() => setModalProfil(true)} onKeluar={logout} />
 
       <main className="max-w-5xl mx-auto px-4 py-5">
