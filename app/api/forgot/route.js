@@ -16,7 +16,9 @@ export async function POST(req) {
       const token = crypto.randomBytes(24).toString("hex");
       const expiry = Date.now() + 60 * 60 * 1000;
       await sql`UPDATE users SET reset_token = ${token}, reset_expiry = ${expiry} WHERE email = ${em}`;
-      const link = (process.env.APP_URL || "") + "/reset?email=" + encodeURIComponent(em) + "&token=" + token;
+      const rawUrl = String(process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://crm-astoncirebon.vercel.app").replace(/\/+$/, "");
+      const baseUrl = rawUrl.replace("crm-aston.vercel.app", "crm-astoncirebon.vercel.app");
+      const link = baseUrl + "/reset?email=" + encodeURIComponent(em) + "&token=" + token;
       const isi =
         "Halo " + (rows[0].Nama || "") + ",\n\n" +
         "Kami menerima permintaan reset password untuk akun Aston CRM Anda.\n" +

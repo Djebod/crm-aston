@@ -52,7 +52,7 @@ Buka http://localhost:3000, login super admin.
    `APP_URL`, `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_PASSWORD_HASH`,
    `DATABASE_URL`, `DRIVE_UPLOAD_URL`, `MAIL_USER`, `MAIL_APP_PASSWORD`.
    - `ADMIN_PASSWORD_HASH` di Vercel: tanpa `\` (versi apa adanya).
-3. **Deploy** -> set `APP_URL` ke URL final -> Redeploy.
+3. **Deploy** -> set `APP_URL` ke `https://crm-astoncirebon.vercel.app` -> Redeploy.
 
 > Aplikasi tidak lagi memakai Firebase. Variabel `FIREBASE_*` boleh dihapus dari Vercel.
 

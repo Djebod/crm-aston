@@ -70,6 +70,9 @@ function susunEmail(b) {
   var jenis = b.jenis || "menunggu";
   var ulang = b.ulang ? " (kirim ulang)" : "";
   var link = b.link || "";
+  if (link && link.indexOf("crm-aston.vercel.app") >= 0) {
+    link = link.replace("crm-aston.vercel.app", "crm-astoncirebon.vercel.app");
+  }
 
   var judul, warna, pembuka, ajakan;
   if (jenis === "dikembalikan") {
@@ -174,7 +177,7 @@ function tesKirim() {
       { jabatan: "Financial Controller", status: "belum" },
       { jabatan: "General Manager", status: "belum" },
     ],
-    link: "https://crm-aston.vercel.app/geo",
+    link: "https://crm-astoncirebon.vercel.app/geo",
   });
   MailApp.sendEmail({ to: saya, subject: surat.subject, htmlBody: surat.html, body: surat.text, name: NAMA_PENGIRIM });
   Logger.log("Email tes dikirim ke " + saya + ". Sisa kuota hari ini: " + MailApp.getRemainingDailyQuota());
