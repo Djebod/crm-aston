@@ -278,7 +278,7 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
     namaAcara: lead.Instansi || lead.JenisEvent || "",
     jumlahPeserta: lead.JumlahPax || "",
     rangkaian: [{ hari: lead.TanggalEvent || "", waktu: "", acara: "", tempat: "", setup: "", jumlah: lead.JumlahPax || "" }],
-    estimasi: [{ deskripsi: "Residential Twin", jumlah: "", harga: "1500000" }],
+    estimasi: [{ checkIn: "", checkOut: "", deskripsi: "Residential Twin", jumlah: "", harga: "1500000" }],
     dpDate: "", pelunasanDate: "", jatuhTempoDate: "",
     prepBy: user?.nama || "", prepTitle: "Sales Person", prepImg: "",
     leaderNama: "", leaderTitle: "Sales Leader", leaderImg: "",
@@ -324,8 +324,18 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
   const delRow = (arr, i) => setG((s) => ({ ...s, [arr]: s[arr].filter((_, j) => j !== i) }));
   const setRate = (i, kol, v) => setG((s) => ({ ...s, rates: { ...s.rates, [s.rateCat]: s.rates[s.rateCat].map((r, j) => (j === i ? [r[0], kol === "wd" ? v : r[1], kol === "we" ? v : r[2]] : r)) } }));
   const tambahPaket = (nama) => { const p = PAKET.find((x) => x.nama === nama); if (p) setG((s) => ({ ...s, estimasi: [...s.estimasi, { deskripsi: p.nama, jumlah: "", harga: String(p.harga) }] })); };
-  // Graduation menghitung per hari (Harga x Jumlah Hari x Kuantitas); jenis lain Harga x Jumlah.
-  const totalBaris = (r) => angka(r.jumlah) * angka(r.harga) * (g.jenisCL === "Graduation" ? angka(r.hari) || 1 : 1);
+  const hariDariTanggal = (checkIn, checkOut) => {
+    if (!checkIn || !checkOut) return 0;
+    const mulai = new Date(checkIn + "T00:00:00");
+    const selesai = new Date(checkOut + "T00:00:00");
+    return Number.isNaN(mulai.getTime()) || Number.isNaN(selesai.getTime())
+      ? 0
+      : Math.max(0, Math.round((selesai - mulai) / 86400000));
+  };
+  const lamaBaris = (r) => r.checkIn || r.checkOut
+    ? hariDariTanggal(r.checkIn, r.checkOut)
+    : g.jenisCL === "Graduation" ? angka(r.hari) || 1 : 1;
+  const totalBaris = (r) => angka(r.jumlah) * angka(r.harga) * lamaBaris(r);
   const grandTotal = g.estimasi.reduce((t, r) => t + totalBaris(r), 0);
   const clNo = buildNoDok("CL", g.nomor, g.tglSurat, g.kodeSales);
 
@@ -355,7 +365,10 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
     const kol = wed ? 4 : 5;
     const biayaRows = g.estimasi.map((r) => {
       const qty = angka(r.jumlah).toLocaleString("id-ID") + " " + esc(r.satuan || "pax");
-      return `<tr><td class="c">${tglAcara}</td><td class="c">${esc(r.deskripsi)}</td><td class="c">${rp(r.harga)}</td>${wed ? "" : `<td class="c">${angka(r.hari) || 1}</td>`}<td class="c">${qty}</td><td class="r">${rp(totalBaris(r))}</td></tr>`;
+      const checkInOut = r.checkIn || r.checkOut
+        ? `${esc(tglID(r.checkIn))} - ${esc(tglID(r.checkOut))}`
+        : tglAcara;
+      return `<tr><td class="c">${checkInOut}</td><td class="c">${esc(r.deskripsi)}</td><td class="c">${rp(r.harga)}</td>${wed ? "" : `<td class="c">${lamaBaris(r)}</td>`}<td class="c">${qty}</td><td class="r">${rp(totalBaris(r))}</td></tr>`;
     }).join("");
     const biaya = `<div class="sec">${wed ? "Perkiraan Biaya" : "Biaya"}</div>
 <table>
@@ -488,8 +501,11 @@ ${pasalRows}
     const rangkaianRows = g.rangkaian.map((r) =>
       `<tr><td>${esc(tglID(r.hari))}</td><td>${esc(r.waktu)}</td><td>${esc(r.acara)}</td><td>${esc(r.tempat)}</td><td>${esc(r.setup)}</td><td class="c">${esc(r.jumlah)}</td></tr>`).join("");
     const estRows = g.estimasi.map((r, i) => {
-      const tot = angka(r.jumlah) * angka(r.harga);
-      return `<tr><td class="c">${i + 1}</td><td>${esc(r.deskripsi)}</td><td class="r">${angka(r.jumlah).toLocaleString("id-ID")}</td><td class="r">${angka(r.harga).toLocaleString("id-ID")}</td><td class="r">${tot.toLocaleString("id-ID")}</td></tr>`;
+      const durasi = lamaBaris(r);
+      const rentang = r.checkIn || r.checkOut
+        ? `${esc(tglID(r.checkIn))} - ${esc(tglID(r.checkOut))}`
+        : "-";
+      return `<tr><td class="c">${i + 1}</td><td class="c">${rentang}</td><td>${esc(r.deskripsi)}</td><td class="r">${durasi}</td><td class="r">${angka(r.jumlah).toLocaleString("id-ID")}</td><td class="r">${angka(r.harga).toLocaleString("id-ID")}</td><td class="r">${totalBaris(r).toLocaleString("id-ID")}</td></tr>`;
     }).join("");
     const pasalRows = pasalList(g).map((p, i) =>
       `<div class="pasal"><div class="ptitle">${i + 3}. ${p[0]}</div><div class="pbody">${p[1]}</div></div>`).join("");
@@ -557,9 +573,9 @@ ${g.noHP ? "<div><b>No HP : " + esc(g.noHP) + "</b></div>" : ""}
 
 <div class="sec">ESTIMASI BIAYA</div>
 <table>
-  <tr><th>No</th><th>Deskripsi</th><th>Jumlah</th><th>Harga</th><th>Total</th></tr>
+  <tr><th>No</th><th>Check in / Check out</th><th>Description</th><th>Day(s)</th><th>Jumlah</th><th>Harga</th><th>Total</th></tr>
   ${estRows}
-  <tr class="total"><td colspan="4" class="r">Grand Total</td><td class="r">${grandTotal.toLocaleString("id-ID")}</td></tr>
+  <tr class="total"><td colspan="6" class="r">Grand Total</td><td class="r">${grandTotal.toLocaleString("id-ID")}</td></tr>
 </table>
 <p><i><b>Catatan: Harga tersebut di atas sudah termasuk 21% pajak &amp; pelayanan dan hotel tidak memberikan komisi.</b></i></p>
 
@@ -806,16 +822,18 @@ ${pasalRows}
                 <option value="">+ Tambah paket…</option>
                 {PAKET.map((p) => <option key={p.nama} value={p.nama}>{p.nama} — {angka(p.harga).toLocaleString("id-ID")}</option>)}
               </select>
-              <button onClick={() => addRow("estimasi", { deskripsi: "", jumlah: "", harga: "" })} className="text-xs bg-[#12263a] text-white rounded px-2 py-1">+ Baris</button>
+              <button onClick={() => addRow("estimasi", { checkIn: "", checkOut: "", deskripsi: "", jumlah: "", harga: "" })} className="text-xs bg-[#12263a] text-white rounded px-2 py-1">+ Baris</button>
             </div></div>
           {g.estimasi.map((r, i) => (
             <div key={i} className="grid grid-cols-12 gap-1 mb-1 items-center">
-              <input className={inp + " !py-1.5 text-xs " + (g.jenisCL === "Meeting" ? "col-span-5" : g.jenisCL === "Wedding" ? "col-span-4" : "col-span-3")} placeholder="Deskripsi" value={r.deskripsi} onChange={(e) => setRow("estimasi", i, "deskripsi", e.target.value)} />
-              {g.jenisCL === "Graduation" && <input className={inp + " !py-1.5 text-xs col-span-1"} placeholder="Hari" inputMode="numeric" value={r.hari || ""} onChange={(e) => setRow("estimasi", i, "hari", e.target.value.replace(/[^\d]/g, ""))} />}
-              <input className={inp + " !py-1.5 text-xs col-span-2"} placeholder="Jml" inputMode="numeric" value={r.jumlah} onChange={(e) => setRow("estimasi", i, "jumlah", e.target.value.replace(/[^\d]/g, ""))} />
-              {g.jenisCL !== "Meeting" && <input className={inp + " !py-1.5 text-xs col-span-2"} placeholder="Satuan (pax)" value={r.satuan || ""} onChange={(e) => setRow("estimasi", i, "satuan", e.target.value)} />}
-              <input className={inp + " !py-1.5 text-xs " + (g.jenisCL === "Meeting" ? "col-span-3" : "col-span-2")} placeholder="Harga" inputMode="numeric" value={r.harga ? angka(r.harga).toLocaleString("id-ID") : ""} onChange={(e) => setRow("estimasi", i, "harga", e.target.value.replace(/[^\d]/g, ""))} />
-              <div className="col-span-2 text-right text-xs text-slate-500">{totalBaris(r).toLocaleString("id-ID")}{g.estimasi.length > 1 && <button onClick={() => delRow("estimasi", i)} className="text-rose-600 ml-1">✕</button>}</div>
+              <input type="date" aria-label="Check in" className={inp + " !py-1.5 text-xs col-span-2"} value={r.checkIn || ""} onChange={(e) => setRow("estimasi", i, "checkIn", e.target.value)} />
+              <input type="date" aria-label="Check out" className={inp + " !py-1.5 text-xs col-span-2"} value={r.checkOut || ""} min={r.checkIn || undefined} onChange={(e) => setRow("estimasi", i, "checkOut", e.target.value)} />
+              <input className={inp + " !py-1.5 text-xs col-span-3"} placeholder="Description" value={r.deskripsi} onChange={(e) => setRow("estimasi", i, "deskripsi", e.target.value)} />
+              <input className={inp + " !py-1.5 text-xs col-span-1"} placeholder="Jumlah" inputMode="numeric" value={r.jumlah} onChange={(e) => setRow("estimasi", i, "jumlah", e.target.value.replace(/[^\d]/g, ""))} />
+              {g.jenisCL !== "Meeting" && <input className={inp + " !py-1.5 text-xs col-span-1"} placeholder="Satuan" value={r.satuan || ""} onChange={(e) => setRow("estimasi", i, "satuan", e.target.value)} />}
+              <input className={inp + " !py-1.5 text-xs col-span-2"} placeholder="Harga" inputMode="numeric" value={r.harga ? angka(r.harga).toLocaleString("id-ID") : ""} onChange={(e) => setRow("estimasi", i, "harga", e.target.value.replace(/[^\d]/g, ""))} />
+              <div className="col-span-1 text-right text-xs text-slate-500">{lamaBaris(r)} hari</div>
+              <div className="col-span-12 text-right text-xs text-slate-500">Subtotal: {totalBaris(r).toLocaleString("id-ID")}{g.estimasi.length > 1 && <button onClick={() => delRow("estimasi", i)} className="text-rose-600 ml-1">✕</button>}</div>
             </div>
           ))}
           <div className="text-right text-sm font-bold text-[#12263a] mt-1">Grand Total: Rp {grandTotal.toLocaleString("id-ID")}</div>
