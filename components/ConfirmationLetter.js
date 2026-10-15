@@ -332,9 +332,18 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
       ? 0
       : Math.max(0, Math.round((selesai - mulai) / 86400000));
   };
-  const lamaBaris = (r) => r.checkIn || r.checkOut
-    ? hariDariTanggal(r.checkIn, r.checkOut)
-    : g.jenisCL === "Graduation" ? angka(r.hari) || 1 : 1;
+  // Aturan hitung hari paket (berlaku Meeting, Wedding, Graduation):
+  // - Residential dihitung per malam (hari berbeda): check-in/out beda 1 hari = 1 malam.
+  // - Paket lain dihitung per hari kalender: hari yang sama = 1 hari, hari berikutnya = 2 hari.
+  const isResidential = (r) => /residen/i.test(r.deskripsi || "");
+  const lamaBaris = (r) => {
+    if (r.checkIn || r.checkOut) {
+      if (!r.checkIn || !r.checkOut) return 1;
+      const selisih = hariDariTanggal(r.checkIn, r.checkOut);
+      return isResidential(r) ? Math.max(1, selisih) : selisih + 1;
+    }
+    return g.jenisCL === "Graduation" ? angka(r.hari) || 1 : 1;
+  };
   const totalBaris = (r) => angka(r.jumlah) * angka(r.harga) * lamaBaris(r);
   const grandTotal = g.estimasi.reduce((t, r) => t + totalBaris(r), 0);
   const clNo = buildNoDok("CL", g.nomor, g.tglSurat, g.kodeSales);
