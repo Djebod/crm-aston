@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Modal, Field, inp } from "@/components/Modal";
 import { unduhPDFdariHTML } from "@/lib/pdf";
-import { RATE_CATEGORIES, rateDefault } from "@/lib/rates";
+import { RATE_CATEGORIES, ROOM_TYPES, rateDefault } from "@/lib/rates";
 import { JABATAN_ROLE, blokTtd, statusTtd } from "@/lib/ttd";
 
 const HOTEL = {
@@ -333,14 +333,18 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
       : Math.max(0, Math.round((selesai - mulai) / 86400000));
   };
   // Aturan hitung hari paket (berlaku Meeting, Wedding, Graduation):
-  // - Residential dihitung per malam (hari berbeda): check-in/out beda 1 hari = 1 malam.
+  // - Residential & tipe kamar (Superior, Deluxe, Suite, dst.) dihitung per malam dari
+  //   check-in ke check-out: beda 1 hari = 1 malam.
   // - Paket lain dihitung per hari kalender: hari yang sama = 1 hari, hari berikutnya = 2 hari.
-  const isResidential = (r) => /residen/i.test(r.deskripsi || "");
+  const perMalam = (r) => {
+    const d = (r.deskripsi || "").toLowerCase();
+    return /residen|kamar|room|suite|twin|single/.test(d) || ROOM_TYPES.some((t) => d.includes(t.toLowerCase()));
+  };
   const lamaBaris = (r) => {
     if (r.checkIn || r.checkOut) {
       if (!r.checkIn || !r.checkOut) return 1;
       const selisih = hariDariTanggal(r.checkIn, r.checkOut);
-      return isResidential(r) ? Math.max(1, selisih) : selisih + 1;
+      return perMalam(r) ? Math.max(1, selisih) : selisih + 1;
     }
     return g.jenisCL === "Graduation" ? angka(r.hari) || 1 : 1;
   };
