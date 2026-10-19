@@ -112,7 +112,7 @@ export default function RuangHargaPage() {
   const cb = (k) => (
     <label className="flex items-center gap-2 text-sm text-slate-700">
       <input type="checkbox" checked={!!f[k]} onChange={(e) => setF({ ...f, [k]: e.target.checked })} className="w-4 h-4 accent-[#12263a]" />
-      {{ tampil_publik: "Tampil di Ucup (situs publik)", booking_langsung: "Booking langsung (tampilkan harga)", aktif: "Aktif" }[k]}
+      {{ tampil_publik: "Tampilkan di situs publik", booking_langsung: "Booking langsung (tampilkan harga)", aktif: "Aktif" }[k]}
     </label>
   );
 
