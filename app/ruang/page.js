@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import ProfilSaya from "@/components/ProfilSaya";
 import Header from "@/components/Header";
 import { Modal, Field, inp } from "@/components/Modal";
-import { isAdmin } from "@/lib/akses";
+import { isAdmin, isLeader } from "@/lib/akses";
 import { resetCacheRuangan } from "@/lib/ruangan";
 
 const KOSONG = () => ({
