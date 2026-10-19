@@ -193,7 +193,7 @@ export default function RuangHargaPage() {
         <Modal title={f.id ? "Edit Ruangan" : "Ruangan Baru"} onClose={() => setModalForm(false)}>
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2"><Field label="Nama ruangan"><input className={inp} value={f.nama} onChange={(e) => setF({ ...f, nama: e.target.value })} disabled={!!f.id} /></Field></div>
+              <div className="col-span-2"><Field label="Nama ruangan"><input className={inp} value={f.nama} onChange={(e) => setF({ ...f, nama: e.target.value })} /></Field></div>
               <Field label="Urutan"><input className={inp} inputMode="numeric" value={f.urutan} onChange={(e) => setF({ ...f, urutan: e.target.value.replace(/[^\d]/g, "") })} /></Field>
               <Field label="Lantai"><input className={inp} value={f.lantai} onChange={(e) => setF({ ...f, lantai: e.target.value })} placeholder="1st Floor" /></Field>
               <div className="col-span-2"><Field label="Dimensi"><input className={inp} value={f.dimensi} onChange={(e) => setF({ ...f, dimensi: e.target.value })} placeholder="8 × 6 m" /></Field></div>
