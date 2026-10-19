@@ -170,6 +170,13 @@ export default function RuangHargaPage() {
                       <option value="true">Aktif — Ucup menerima booking</option>
                       <option value="false">Nonaktif — situs Ucup ditutup sementara</option>
                     </select>
+                  ) : s.kode === "ucup_llm" ? (
+                    <select className={inp} value={s.nilai} onChange={(e) => setSetting(setting.map((x, j) => (j === i ? { ...x, nilai: e.target.value } : x)))}>
+                      <option value="true">Aktif — percakapan pakai AI (Gemini)</option>
+                      <option value="false">Nonaktif — alur tombol statis saja</option>
+                    </select>
+                  ) : s.kode === "ucup_faq" ? (
+                    <textarea className={inp} rows={6} value={s.nilai || ""} onChange={(e) => setSetting(setting.map((x, j) => (j === i ? { ...x, nilai: e.target.value } : x)))} placeholder={"Parkir? | Parkir gratis di basement hotel\nPembayaran? | DP 50% setelah konfirmasi sales, pelunasan H-3\nAlamat? | Jl. Brigjen Dharsono No. 12C, Cirebon"} />
                   ) : (
                     <input className={inp} value={s.nilai || ""} onChange={(e) => setSetting(setting.map((x, j) => (j === i ? { ...x, nilai: e.target.value } : x)))} />
                   )}

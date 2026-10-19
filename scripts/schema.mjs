@@ -88,7 +88,9 @@ export const STATEMENTS = [
     ('ucup_email_sales', 'sa@astoncirebon.com', 'Penerima notifikasi booking baru dari Ucup'),
     ('ucup_hold_jam', '48', 'Masa hold booking Tentative dari Ucup (jam)'),
     ('ucup_max_hari', '90', 'Maksimal booking ke depan (hari)'),
-    ('ucup_aktif', 'true', 'Matikan (false) untuk menutup sementara situs Ucup')
+    ('ucup_aktif', 'true', 'Matikan (false) untuk menutup sementara situs Ucup'),
+    ('ucup_llm', 'true', 'Pakai AI (Gemini) untuk percakapan Ucup; false = alur tombol statis'),
+    ('ucup_faq', '', 'FAQ untuk Ucup (satu baris per item: Pertanyaan | Jawaban). Contoh: Parkir? | Parkir gratis di basement')
     ON CONFLICT DO NOTHING`,
   // Kolom tambahan room_booking untuk booking dari Ucup
   `ALTER TABLE room_booking ADD COLUMN IF NOT EXISTS sumber TEXT`,
