@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { sql, waktuJakarta } from "@/lib/db";
 import { kirimEmail } from "@/lib/mail";
 
-// ===== Lead masuk dari situs publik MICE (https://astoncirebon-mice.vercel.app) =====
+// ===== Lead masuk dari situs publik MICE (https://mice-helper.vercel.app) =====
 // Dipanggil oleh fungsi /api/lead di project mice-helper (server ke server) dengan header
 // x-intake-token = MICE_INTAKE_TOKEN. Membuat Lead (Tentative) + booking ruangan Tentative,
 // menentukan PIC dari segmen (pengaturan `mice_routing`), lalu kirim email ke `mice_email_sales` + email PIC.
@@ -26,7 +26,7 @@ const DEFAULT_ROUTING = [
 
 const SEEDS = [
   ["mice_email_sales", "allsales@astoncirebon.com",
-    "Penerima email notifikasi lead baru dari situs MICE (astoncirebon-mice.vercel.app). Pisahkan dengan koma bila lebih dari satu."],
+    "Penerima email notifikasi lead baru dari situs MICE (mice-helper.vercel.app). Pisahkan dengan koma bila lebih dari satu."],
   ["mice_routing", DEFAULT_ROUTING,
     "Pembagian PIC lead dari situs MICE: satu baris per segmen, format 'Segmen = Nama sales' (nama persis seperti di menu Tim). Baris '* = ...' dipakai untuk segmen lainnya."],
 ];

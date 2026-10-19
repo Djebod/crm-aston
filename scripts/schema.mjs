@@ -91,7 +91,7 @@ export const STATEMENTS = [
     ('ucup_aktif', 'true', 'Matikan (false) untuk menutup sementara situs Ucup'),
     ('ucup_llm', 'true', 'Pakai AI (Gemini) untuk percakapan Ucup; false = alur tombol statis'),
     ('ucup_faq', '', 'FAQ untuk Ucup (satu baris per item: Pertanyaan | Jawaban). Contoh: Parkir? | Parkir gratis di basement'),
-    ('mice_email_sales', 'allsales@astoncirebon.com', 'Penerima email notifikasi lead baru dari situs MICE (astoncirebon-mice.vercel.app). Pisahkan dengan koma bila lebih dari satu.'),
+    ('mice_email_sales', 'allsales@astoncirebon.com', 'Penerima email notifikasi lead baru dari situs MICE (mice-helper.vercel.app). Pisahkan dengan koma bila lebih dari satu.'),
     ('mice_routing', 'Company = Wahyu Kusuma Dinata
 Social Event = Wahyu Kusuma Dinata
 Personal = Wahyu Kusuma Dinata
