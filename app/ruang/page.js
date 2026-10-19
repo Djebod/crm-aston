@@ -51,7 +51,8 @@ export default function RuangHargaPage() {
     const raw = typeof window !== "undefined" ? localStorage.getItem("crm_user") : null;
     if (!raw) { router.replace("/"); return; }
     const u = JSON.parse(raw);
-    if (!isAdmin(u)) { router.replace("/dashboard"); return; }
+    // Admin dan Sales Leader (ADOSM) boleh mengelola ruangan, foto, harga publik, dan pengaturan
+    if (!isAdmin(u) && !isLeader(u)) { router.replace("/dashboard"); return; }
     setUser(u);
   }, [router]);
 
