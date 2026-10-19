@@ -123,7 +123,7 @@ export default function RuangHargaPage() {
         <div className="flex items-center justify-between gap-2 mb-4">
           <div>
             <h1 className="text-xl font-extrabold text-[#12263a]">Ruang &amp; Harga</h1>
-            <p className="text-sm text-slate-500">Master ruangan meeting, harga publik, dan pengaturan asisten Ucup.</p>
+            <p className="text-sm text-slate-500">Master ruangan meeting, harga publik, pengaturan asisten Ucup, dan lead dari situs MICE.</p>
           </div>
           {tab === "ruang" && <button onClick={bukaBaru} className="bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg px-4 py-2.5 whitespace-nowrap">+ Ruangan</button>}
         </div>
@@ -175,7 +175,7 @@ export default function RuangHargaPage() {
                       <option value="true">Aktif — percakapan pakai AI (Gemini)</option>
                       <option value="false">Nonaktif — alur tombol statis saja</option>
                     </select>
-                  ) : s.kode === "ucup_faq" ? (
+                  ) : s.kode === "ucup_faq" || s.kode === "mice_routing" ? (
                     <textarea className={inp} rows={6} value={s.nilai || ""} onChange={(e) => setSetting(setting.map((x, j) => (j === i ? { ...x, nilai: e.target.value } : x)))} placeholder={"Parkir? | Parkir gratis di basement hotel\nPembayaran? | DP 50% setelah konfirmasi sales, pelunasan H-3\nAlamat? | Jl. Brigjen Dharsono No. 12C, Cirebon"} />
                   ) : (
                     <input className={inp} value={s.nilai || ""} onChange={(e) => setSetting(setting.map((x, j) => (j === i ? { ...x, nilai: e.target.value } : x)))} />

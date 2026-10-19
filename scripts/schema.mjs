@@ -90,7 +90,16 @@ export const STATEMENTS = [
     ('ucup_max_hari', '90', 'Maksimal booking ke depan (hari)'),
     ('ucup_aktif', 'true', 'Matikan (false) untuk menutup sementara situs Ucup'),
     ('ucup_llm', 'true', 'Pakai AI (Gemini) untuk percakapan Ucup; false = alur tombol statis'),
-    ('ucup_faq', '', 'FAQ untuk Ucup (satu baris per item: Pertanyaan | Jawaban). Contoh: Parkir? | Parkir gratis di basement')
+    ('ucup_faq', '', 'FAQ untuk Ucup (satu baris per item: Pertanyaan | Jawaban). Contoh: Parkir? | Parkir gratis di basement'),
+    ('mice_email_sales', 'allsales@astoncirebon.com', 'Penerima email notifikasi lead baru dari situs MICE (astoncirebon-mice.vercel.app). Pisahkan dengan koma bila lebih dari satu.'),
+    ('mice_routing', 'Company = Wahyu Kusuma Dinata
+Social Event = Wahyu Kusuma Dinata
+Personal = Wahyu Kusuma Dinata
+Event Organizer = Wahyu Kusuma Dinata
+Wedding Organizer = Wahyu Kusuma Dinata
+Government = Tri Wahyuni Handayani
+BUMN = Tri Wahyuni Handayani
+* = Maya Dhamayanti', 'Pembagian PIC lead dari situs MICE: satu baris per segmen, format Segmen = Nama sales (nama persis seperti di menu Tim). Baris * = ... dipakai untuk segmen lainnya.')
     ON CONFLICT DO NOTHING`,
   // Kolom tambahan room_booking untuk booking dari Ucup
   `ALTER TABLE room_booking ADD COLUMN IF NOT EXISTS sumber TEXT`,
