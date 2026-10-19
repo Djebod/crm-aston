@@ -74,13 +74,19 @@ function PanelNav({ active, user, isAdmin, onKelolaTim, onProfil, onKeluar, onPi
             <span className="truncate">{it.label}</span>
           </a>
         ))}
-        {isAdmin && onKelolaTim && (
+        {isAdmin && (
           <>
             <div className="mt-2 mb-1 px-3 text-[10.5px] uppercase tracking-wider text-slate-400 font-semibold">Admin</div>
+            <a href="/ruang" onClick={onPilih} className={itemCls(active === "ruang")} aria-current={active === "ruang" ? "page" : undefined}>
+              <Ikon name="door" className="shrink-0 opacity-90" />
+              <span>Ruang &amp; Harga</span>
+            </a>
+            {onKelolaTim && (
             <button onClick={() => { onPilih?.(); onKelolaTim(); }} className={itemCls(false) + " text-left w-full"}>
               <Ikon name="team" className="shrink-0 opacity-90" />
               <span>Kelola Tim</span>
             </button>
+            )}
           </>
         )}
 
@@ -130,7 +136,7 @@ export default function Header({ active, user, onKelolaTim, onProfil, onKeluar }
   }, [open]);
 
   const panelProps = { active, user, isAdmin, onKelolaTim, onProfil, onKeluar };
-  const judulAktif = ITEMS.find((it) => it.key === active)?.label || "Aston CRM";
+  const judulAktif = ITEMS.find((it) => it.key === active)?.label || (active === "ruang" ? "Ruang & Harga" : "Aston CRM");
 
   return (
     <>

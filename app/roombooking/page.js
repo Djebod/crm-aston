@@ -6,39 +6,30 @@ import ProfilSaya from "@/components/ProfilSaya";
 import Header from "@/components/Header";
 import { Modal, Field, inp } from "@/components/Modal";
 import DateRange, { dalamRentang } from "@/components/DateRange";
+import { useRuangan, SETUPS } from "@/lib/ruangan";
 
-// Data ruangan (dari Meeting Room Dimension)
-const ROOMS = [
-  { name: "Diamond 12", floor: "1st Floor", cap: { theater: 120, class: 63, round: 60, ushape: 48, hollow: 36 }, dim: "17,7 × 8 m" },
-  { name: "Diamond 3", floor: "1st Floor", cap: { theater: 50, class: 21, round: 30, ushape: 39, hollow: 24 }, dim: "8,7 × 8 m" },
-  { name: "Diamond 5", floor: "1st Floor", cap: { theater: 50, class: 21, round: 30, ushape: 39, hollow: 24 }, dim: "8,7 × 8 m" },
-  { name: "Diamond 6", floor: "1st Floor", cap: { theater: 140, class: 90, round: 80, ushape: 66, hollow: 48 }, dim: "22 × 8 m" },
-  { name: "Diamond 7", floor: "1st Floor", cap: { theater: 140, class: 90, round: 80, ushape: 66, hollow: 48 }, dim: "22 × 8 m" },
-  { name: "Crystal", floor: "Lobby Floor", cap: { theater: 80, class: 30, round: 50, ushape: 30, hollow: 30 }, dim: "15,8 × 6 m" },
-  { name: "Emerald", floor: "Base Main Floor", cap: { theater: 120, class: 60, round: 60, ushape: 48, hollow: 36 }, dim: "16,3 × 8 m" },
-  { name: "Iron", floor: "Eagle", cap: { theater: 24, class: 18, round: 20, ushape: 27, hollow: 18 }, dim: "6,3 × 6 m" },
-  { name: "Wood", floor: "Eagle", cap: { theater: 40, class: 27, round: 30, ushape: 27, hollow: 18 }, dim: "8 × 6 m" },
-  { name: "Onyx", floor: "1st Floor", cap: { theater: 250, class: 180, round: 200, ushape: 150, hollow: 54 }, dim: "26,5 × 18,6 m" },
-  { name: "Sapphire Grand Ballroom", floor: "Lobby Floor", cap: { theater: 1445, class: 504, round: 720, ushape: 345, hollow: 345 }, dim: "35,3 × 48,5 m" },
-];
-const SETUPS = [
-  { key: "theater", label: "Theater" },
-  { key: "class", label: "Class Room" },
-  { key: "round", label: "Round Table" },
-  { key: "ushape", label: "U Shape" },
-  { key: "hollow", label: "Hollow Square" },
-];
-const STATUS = ["Tentative", "Definite", "Cancel"];
+// Data ruangan diambil dari tabel meeting_room (kelola di menu Admin > Ruang & Harga)
+const STATUS = ["Tentative", "Definite", "Cancel", "Expired"];
 const STATUS_STYLE = {
-  Tentative: "bg-amber-100 text-amber-800", Definite: "bg-emerald-100 text-emerald-800", Cancel: "bg-rose-100 text-rose-700",
+  Tentative: "bg-amber-100 text-amber-800", Definite: "bg-emerald-100 text-emerald-800", Cancel: "bg-rose-100 text-rose-700", Expired: "bg-slate-200 text-slate-600",
 };
-const BORDER_STYLE = { Definite: "border-l-emerald-500", Tentative: "border-l-amber-400", Cancel: "border-l-rose-400" };
-const findRoom = (n) => ROOMS.find((r) => r.name === n);
+const BORDER_STYLE = { Definite: "border-l-emerald-500", Tentative: "border-l-amber-400", Cancel: "border-l-rose-400", Expired: "border-l-slate-400" };
+const BEBAS = ["Cancel", "Expired"]; // status yang tidak memblok slot
 const setupLabel = (k) => SETUPS.find((s) => s.key === k)?.label || k || "-";
 const menit = (hhmm) => { const m = String(hhmm || "").match(/^(\d{1,2}):(\d{2})/); return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : null; };
 const hariID = (s) => { if (!s) return "-"; const d = new Date(s); return isNaN(d) ? s : d.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }); };
+const rp = (n) => (n ? "Rp " + Number(n).toLocaleString("id-ID") : "-");
+// Sisa waktu hold booking Ucup: "2 hari 3 jam" / "habis"
+function sisaHold(iso) {
+  if (!iso) return "";
+  const ms = new Date(iso).getTime() - Date.now();
+  if (isNaN(ms)) return "";
+  if (ms <= 0) return "hold habis";
+  const jam = Math.floor(ms / 3600000), hari = Math.floor(jam / 24);
+  return "hold " + (hari > 0 ? hari + " hari " : "") + (jam % 24) + " jam lagi";
+}
 
-const FORM_KOSONG = () => ({ id: "", room: "Diamond 12", tanggal: new Date().toISOString().slice(0, 10), jamMulai: "08:00", jamSelesai: "17:00", eventTitle: "", company: "", pax: "", setup: "theater", pic: "", status: "Tentative", catatan: "" });
+const FORM_KOSONG = () => ({ id: "", room: "", tanggal: new Date().toISOString().slice(0, 10), jamMulai: "08:00", jamSelesai: "17:00", eventTitle: "", company: "", pax: "", setup: "theater", pic: "", status: "Tentative", catatan: "" });
 
 export default function RoomBookingPage() {
   const router = useRouter();
@@ -50,6 +41,10 @@ export default function RoomBookingPage() {
   const [modalRuang, setModalRuang] = useState(false);
   const [f, setF] = useState(FORM_KOSONG());
   const [saving, setSaving] = useState(false);
+  const ROOMS = useRuangan();
+  const findRoom = (n) => ROOMS.find((r) => r.name === n);
+  const [modalTolak, setModalTolak] = useState(null); // booking Ucup yang akan ditolak
+  const [alasanTolak, setAlasanTolak] = useState("");
 
   const [tglBoard, setTglBoard] = useState(new Date().toISOString().slice(0, 10));
   const [tab, setTab] = useState("board"); // board | list
@@ -79,16 +74,16 @@ export default function RoomBookingPage() {
   // Papan ketersediaan untuk tanggal terpilih
   const board = useMemo(() => {
     return ROOMS.map((r) => {
-      const bookings = list.filter((x) => x.Room === r.name && x.Tanggal === tglBoard && x.Status !== "Cancel")
+      const bookings = list.filter((x) => x.Room === r.name && x.Tanggal === tglBoard && !BEBAS.includes(x.Status))
         .sort((a, b) => String(a.JamMulai).localeCompare(String(b.JamMulai)));
       return { room: r, bookings };
     });
-  }, [list, tglBoard]);
+  }, [list, tglBoard, ROOMS]);
   const jmlTersedia = board.filter((b) => b.bookings.length === 0).length;
 
   // Booking yang belum ada ruangannya (otomatis dari lead)
   const belumDijadwal = useMemo(
-    () => list.filter((x) => (!x.Room || x.Room === "") && x.Status !== "Cancel")
+    () => list.filter((x) => (!x.Room || x.Room === "") && !BEBAS.includes(x.Status) && !(x.Sumber === "Ucup" && x.Status === "Tentative"))
       .sort((a, b) => String(a.Tanggal).localeCompare(String(b.Tanggal))),
     [list]
   );
@@ -103,15 +98,16 @@ export default function RoomBookingPage() {
 
   const room = findRoom(f.room);
   const kapasitas = room ? room.cap[f.setup] : 0;
+  const pendingUcup = useMemo(() => list.filter((x) => x.Sumber === "Ucup" && x.Status === "Tentative").sort((a, b) => String(a.Tanggal).localeCompare(String(b.Tanggal))), [list]);
   const paxLebih = f.pax && kapasitas && Number(f.pax) > kapasitas;
 
   const bentrok = useMemo(() => {
-    if (!f.room || f.status === "Cancel") return null;
+    if (!f.room || BEBAS.includes(f.status)) return null;
     const s = menit(f.jamMulai), e = menit(f.jamSelesai);
     if (s === null || e === null || e <= s) return null;
     return list.find((x) => {
       if (x.ID === f.id) return false;
-      if (x.Room !== f.room || x.Tanggal !== f.tanggal || x.Status === "Cancel") return false;
+      if (x.Room !== f.room || x.Tanggal !== f.tanggal || BEBAS.includes(x.Status)) return false;
       const rs = menit(x.JamMulai), re = menit(x.JamSelesai);
       if (rs === null || re === null) return false;
       return !(s >= re + 120 || rs >= e + 120);
@@ -119,7 +115,7 @@ export default function RoomBookingPage() {
   }, [f, list]);
 
   function bukaBaru(prefRoom, prefTgl) {
-    const k = FORM_KOSONG(); k.pic = user?.nama || "";
+    const k = FORM_KOSONG(); k.pic = user?.nama || ""; k.room = ROOMS[0]?.name || "";
     if (prefRoom) k.room = prefRoom;
     if (prefTgl) k.tanggal = prefTgl;
     setF(k); setModalForm(true);
@@ -133,7 +129,7 @@ export default function RoomBookingPage() {
     if (!f.room) { alert("Silakan pilih ruangan."); return; }
     if (menit(f.jamSelesai) <= menit(f.jamMulai)) { alert("Jam selesai harus setelah jam mulai."); return; }
     if (paxLebih) { alert(`Kapasitas ${f.room} untuk setup ${setupLabel(f.setup)} hanya ${kapasitas} orang, sedangkan peserta ${f.pax}. Pilih ruangan lebih besar atau ubah setup.`); return; }
-    if (bentrok && f.status !== "Cancel") { alert(`Bentrok dengan booking ${bentrok.JamMulai}-${bentrok.JamSelesai} (${bentrok.EventTitle || "-"}) di ${f.room}. Minimal jeda 2 jam.`); return; }
+    if (bentrok && !BEBAS.includes(f.status)) { alert(`Bentrok dengan booking ${bentrok.JamMulai}-${bentrok.JamSelesai} (${bentrok.EventTitle || "-"}) di ${f.room}. Minimal jeda 2 jam.`); return; }
     setSaving(true);
     try {
       const res = await fetch("/api/roombooking", {
@@ -162,6 +158,30 @@ export default function RoomBookingPage() {
     } catch (e) { alert("Tidak bisa terhubung ke server."); }
   }
 
+  // ===== Booking dari Ucup =====
+  async function konfirmasiUcup(x) {
+    if (!confirm(`Konfirmasi booking ${x.KodeBooking || ""} (${x.TamuNama}, ${x.Room}, ${x.Tanggal} ${x.JamMulai}-${x.JamSelesai})?\n\nStatus jadi Definite, dibuat Lead baru atas nama kamu, dan tamu dikirim email konfirmasi.`)) return;
+    setSaving(true);
+    try {
+      const d = await fetch("/api/roombooking", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "konfirmasiUcup", id: x.ID, oleh: user?.nama || user?.email || "" }) }).then((r) => r.json());
+      if (d.status === "ok") await ambil(); else alert("Gagal: " + (d.message || ""));
+    } catch (e) { alert("Tidak bisa terhubung ke server."); } finally { setSaving(false); }
+  }
+  async function tolakUcup() {
+    if (!modalTolak) return;
+    if (!alasanTolak.trim()) { alert("Isi alasan penolakan (dikirim ke tamu)."); return; }
+    setSaving(true);
+    try {
+      const d = await fetch("/api/roombooking", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "tolakUcup", id: modalTolak.ID, alasan: alasanTolak, oleh: user?.nama || user?.email || "" }) }).then((r) => r.json());
+      if (d.status === "ok") { setModalTolak(null); setAlasanTolak(""); await ambil(); } else alert("Gagal: " + (d.message || ""));
+    } catch (e) { alert("Tidak bisa terhubung ke server."); } finally { setSaving(false); }
+  }
+  const BadgeUcup = ({ x }) => x.Sumber === "Ucup" ? (
+    <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700" title={"Booking online via Ucup " + (x.KodeBooking || "")}>
+      🤖 Ucup{x.Status === "Tentative" && x.HoldUntil ? " · " + sisaHold(x.HoldUntil) : ""}
+    </span>
+  ) : null;
+
   if (!user) return null;
 
   return (
@@ -185,6 +205,35 @@ export default function RoomBookingPage() {
           <button onClick={() => setTab("board")} className={"px-4 py-1.5 rounded-md text-sm font-semibold " + (tab === "board" ? "bg-white shadow text-[#12263a]" : "text-slate-500")}>Ketersediaan</button>
           <button onClick={() => setTab("list")} className={"px-4 py-1.5 rounded-md text-sm font-semibold " + (tab === "list" ? "bg-white shadow text-[#12263a]" : "text-slate-500")}>Daftar Booking</button>
         </div>
+
+        {/* Booking dari Ucup menunggu konfirmasi sales */}
+        {pendingUcup.length > 0 && (
+          <div className="mb-4 rounded-xl border border-sky-300 bg-sky-50 p-3">
+            <div className="text-sm font-semibold text-sky-900 mb-2">🤖 Booking online via Ucup menunggu konfirmasi ({pendingUcup.length})</div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {pendingUcup.map((x) => (
+                <div key={x.ID} className="bg-white rounded-lg border border-sky-200 px-3 py-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-[#12263a] truncate">{x.KodeBooking || "-"} · {x.TamuNama || "-"}{x.Company ? " (" + x.Company + ")" : ""}</div>
+                      <div className="text-xs text-slate-600">{x.Room || <span className="text-amber-600">tanpa ruangan — minta dicarikan</span>} · 🗓 {x.Tanggal} ⏰ {x.JamMulai}–{x.JamSelesai} · 👥 {x.Pax || "-"} {x.Preferensi ? "· " + x.Preferensi : ""}</div>
+                      <div className="text-xs text-slate-500">📱 {x.TamuWA || "-"} · ✉ {x.TamuEmail || "-"}{x.EstimasiHarga ? " · 💰 " + rp(x.EstimasiHarga) : ""}</div>
+                      {x.RequestKhusus && <div className="text-xs text-slate-500 italic">“{x.RequestKhusus}”</div>}
+                      <div className="text-[11px] text-sky-700 font-semibold mt-0.5">⏳ {sisaHold(x.HoldUntil) || "tanpa batas hold"}</div>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {x.Room
+                      ? <button onClick={() => konfirmasiUcup(x)} disabled={saving} className="text-xs font-semibold bg-emerald-600 text-white rounded-md px-3 py-1.5 disabled:opacity-50">✓ Konfirmasi &amp; Jadikan Lead</button>
+                      : <button onClick={() => bukaEdit(x)} className="text-xs font-semibold bg-[#12263a] text-white rounded-md px-3 py-1.5">Jadwalkan ruangan dulu</button>}
+                    <button onClick={() => { setModalTolak(x); setAlasanTolak(""); }} className="text-xs font-semibold border border-rose-300 text-rose-700 rounded-md px-3 py-1.5 hover:bg-rose-50">Tolak</button>
+                    <button onClick={() => bukaEdit(x)} className="text-xs font-semibold border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">Edit</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Booking belum terjadwal (dari lead) */}
         {belumDijadwal.length > 0 && (
@@ -243,7 +292,7 @@ export default function RoomBookingPage() {
                                 <span className={"text-[11px] font-semibold px-1.5 py-0.5 rounded-full " + (STATUS_STYLE[x.Status] || "")}>{x.Status}</span>
                               </div>
                               <div className="text-xs text-slate-600 truncate">{x.EventTitle || "-"}{x.Company ? " · " + x.Company : ""}</div>
-                              <div className="text-[11px] text-slate-400">{setupLabel(x.Setup)}{x.Pax ? " · " + x.Pax + " pax" : ""}</div>
+                              <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-1">{setupLabel(x.Setup)}{x.Pax ? " · " + x.Pax + " pax" : ""} <BadgeUcup x={x} /></div>
                             </button>
                           ))}
                         </div>
@@ -287,10 +336,15 @@ export default function RoomBookingPage() {
                     <div className="text-sm text-slate-500 flex flex-wrap gap-x-3 mt-1">
                       <span>🎭 {setupLabel(x.Setup)}</span>{x.Pax && <span>👥 {x.Pax} pax</span>}{x.PIC && <span>👤 {x.PIC}</span>}
                     </div>
+                    {x.Sumber === "Ucup" && <div className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-2"><BadgeUcup x={x} /><span>{x.KodeBooking}</span><span>👤 {x.TamuNama}</span><span>📱 {x.TamuWA}</span><span>✉ {x.TamuEmail}</span></div>}
                     {x.LeadID && <div className="text-[11px] text-amber-600 mt-1">↳ tertaut Lead</div>}
                     <div className="flex flex-wrap gap-2 mt-3">
-                      {x.Status !== "Definite" && <button onClick={() => ubahStatus(x, "Definite")} className="text-xs font-semibold bg-emerald-600 text-white rounded-md px-3 py-1.5">Definite</button>}
-                      {x.Status !== "Cancel" && <button onClick={() => ubahStatus(x, "Cancel")} className="text-xs font-semibold border border-rose-300 text-rose-700 rounded-md px-3 py-1.5 hover:bg-rose-50">Cancel</button>}
+                      {x.Sumber === "Ucup" && x.Status === "Tentative" && x.Room && !x.LeadID
+                        ? <button onClick={() => konfirmasiUcup(x)} disabled={saving} className="text-xs font-semibold bg-emerald-600 text-white rounded-md px-3 py-1.5 disabled:opacity-50">✓ Konfirmasi &amp; Jadikan Lead</button>
+                        : x.Status !== "Definite" && <button onClick={() => ubahStatus(x, "Definite")} className="text-xs font-semibold bg-emerald-600 text-white rounded-md px-3 py-1.5">Definite</button>}
+                      {x.Sumber === "Ucup" && x.Status === "Tentative"
+                        ? <button onClick={() => { setModalTolak(x); setAlasanTolak(""); }} className="text-xs font-semibold border border-rose-300 text-rose-700 rounded-md px-3 py-1.5 hover:bg-rose-50">Tolak</button>
+                        : x.Status !== "Cancel" && <button onClick={() => ubahStatus(x, "Cancel")} className="text-xs font-semibold border border-rose-300 text-rose-700 rounded-md px-3 py-1.5 hover:bg-rose-50">Cancel</button>}
                       <button onClick={() => bukaEdit(x)} className="text-xs font-semibold border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">Edit</button>
                       <button onClick={() => hapus(x)} className="text-xs font-semibold border border-slate-300 text-slate-500 rounded-md px-3 py-1.5 hover:bg-slate-50">Hapus</button>
                     </div>
@@ -333,7 +387,7 @@ export default function RoomBookingPage() {
               <Field label="Jam Selesai"><input type="time" className={inp} value={f.jamSelesai} onChange={(e) => setF({ ...f, jamSelesai: e.target.value })} /></Field>
             </div>
 
-            {bentrok && f.status !== "Cancel" && (
+            {bentrok && !BEBAS.includes(f.status) && (
               <div className="text-sm bg-rose-50 border border-rose-300 text-rose-700 rounded-md px-3 py-2 font-semibold">
                 ⚠ Bentrok dengan {bentrok.JamMulai}–{bentrok.JamSelesai} ({bentrok.EventTitle || "-"}). Perlu jeda minimal 2 jam antar-booking di ruangan yang sama.
               </div>
@@ -351,7 +405,19 @@ export default function RoomBookingPage() {
 
           <div className="flex gap-2 mt-5">
             <button onClick={() => setModalForm(false)} className="flex-1 border border-slate-300 rounded-lg py-2.5 font-medium hover:bg-slate-50">Batal</button>
-            <button onClick={simpan} disabled={saving || paxLebih || (!!bentrok && f.status !== "Cancel")} className="flex-1 bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg py-2.5 disabled:opacity-50">{saving ? "Menyimpan…" : "Simpan"}</button>
+            <button onClick={simpan} disabled={saving || paxLebih || (!!bentrok && !BEBAS.includes(f.status))} className="flex-1 bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg py-2.5 disabled:opacity-50">{saving ? "Menyimpan…" : "Simpan"}</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal tolak booking Ucup */}
+      {modalTolak && (
+        <Modal title={"Tolak Booking " + (modalTolak.KodeBooking || "")} onClose={() => setModalTolak(null)}>
+          <p className="text-sm text-slate-600 mb-3">{modalTolak.TamuNama} · {modalTolak.Room || "tanpa ruangan"} · {modalTolak.Tanggal} {modalTolak.JamMulai}–{modalTolak.JamSelesai}. Status jadi <b>Cancel</b> dan alasan dikirim ke email tamu.</p>
+          <Field label="Alasan penolakan"><textarea className={inp} rows={3} value={alasanTolak} onChange={(e) => setAlasanTolak(e.target.value)} placeholder="Contoh: ruangan sudah terpakai untuk acara internal, silakan pilih tanggal lain." /></Field>
+          <div className="flex gap-2 mt-5">
+            <button onClick={() => setModalTolak(null)} className="flex-1 border border-slate-300 rounded-lg py-2.5 font-medium hover:bg-slate-50">Batal</button>
+            <button onClick={tolakUcup} disabled={saving} className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg py-2.5 disabled:opacity-50">{saving ? "Memproses…" : "Tolak & Kirim Email"}</button>
           </div>
         </Modal>
       )}

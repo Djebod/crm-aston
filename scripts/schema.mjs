@@ -67,4 +67,55 @@ export const STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_dokumen_lead ON dokumen (lead_id, jenis)`,
   // Penyeragaman nama ballroom (aman diulang)
   `UPDATE room_booking SET room = 'Sapphire Grand Ballroom' WHERE room = 'Sapphire Ballroom'`,
+
+  // ====== UCUP (meeting room booking assistant publik) ======
+  // Master ruangan — menggantikan konstanta ROOMS yang dulu hardcoded di halaman Room Booking
+  `CREATE TABLE IF NOT EXISTS meeting_room (
+    id TEXT PRIMARY KEY, nama TEXT NOT NULL, lantai TEXT, dimensi TEXT,
+    cap_theater INT, cap_class INT, cap_round INT, cap_ushape INT, cap_hollow INT,
+    fasilitas TEXT, deskripsi TEXT, foto TEXT,
+    tampil_publik BOOLEAN DEFAULT false, booking_langsung BOOLEAN DEFAULT false,
+    urutan INT DEFAULT 0, aktif BOOLEAN DEFAULT true )`,
+  // Harga publik per ruangan (hanya dipakai bila booking_langsung = true)
+  `CREATE TABLE IF NOT EXISTS room_price (
+    room_id TEXT PRIMARY KEY REFERENCES meeting_room(id) ON DELETE CASCADE,
+    per_jam BIGINT, half_day BIGINT, full_day BIGINT, weekend_pct INT DEFAULT 0,
+    catatan TEXT, updated_at TEXT, updated_by TEXT )`,
+  // Pengaturan umum key-value (email sales, masa hold, dll) supaya bisa diubah tanpa deploy
+  `CREATE TABLE IF NOT EXISTS pengaturan (
+    kode TEXT PRIMARY KEY, nilai TEXT, keterangan TEXT, updated_at TEXT, updated_by TEXT )`,
+  `INSERT INTO pengaturan (kode, nilai, keterangan) VALUES
+    ('ucup_email_sales', 'sa@astoncirebon.com', 'Penerima notifikasi booking baru dari Ucup'),
+    ('ucup_hold_jam', '48', 'Masa hold booking Tentative dari Ucup (jam)'),
+    ('ucup_max_hari', '90', 'Maksimal booking ke depan (hari)'),
+    ('ucup_aktif', 'true', 'Matikan (false) untuk menutup sementara situs Ucup')
+    ON CONFLICT DO NOTHING`,
+  // Kolom tambahan room_booking untuk booking dari Ucup
+  `ALTER TABLE room_booking ADD COLUMN IF NOT EXISTS sumber TEXT`,
+  `ALTER TABLE room_booking ADD COLUMN IF NOT EXISTS hold_until TEXT`,
+  `ALTER TABLE room_booking ADD COLUMN IF NOT EXISTS tamu_nama TEXT`,
+  `ALTER TABLE room_booking ADD COLUMN IF NOT EXISTS tamu_wa TEXT`,
+  `ALTER TABLE room_booking ADD COLUMN IF NOT EXISTS tamu_email TEXT`,
+  `ALTER TABLE room_booking ADD COLUMN IF NOT EXISTS preferensi TEXT`,
+  `ALTER TABLE room_booking ADD COLUMN IF NOT EXISTS request_khusus TEXT`,
+  `ALTER TABLE room_booking ADD COLUMN IF NOT EXISTS estimasi_harga BIGINT`,
+  `ALTER TABLE room_booking ADD COLUMN IF NOT EXISTS kode_booking TEXT`,
+  `CREATE INDEX IF NOT EXISTS idx_roombooking_tgl ON room_booking (tanggal, room)`,
+  // Log percakapan Ucup (analitik tahap)
+  `CREATE TABLE IF NOT EXISTS ucup_log (
+    id BIGSERIAL PRIMARY KEY, waktu TEXT, sesi TEXT, tahap TEXT, data TEXT, ip_hash TEXT )`,
+  // Seed 11 ruangan dari data Meeting Room Dimension (aman diulang)
+  `INSERT INTO meeting_room (id, nama, lantai, dimensi, cap_theater, cap_class, cap_round, cap_ushape, cap_hollow, urutan) VALUES
+    ('diamond-12', 'Diamond 12', '1st Floor', '17,7 × 8 m', 120, 63, 60, 48, 36, 1),
+    ('diamond-3', 'Diamond 3', '1st Floor', '8,7 × 8 m', 50, 21, 30, 39, 24, 2),
+    ('diamond-5', 'Diamond 5', '1st Floor', '8,7 × 8 m', 50, 21, 30, 39, 24, 3),
+    ('diamond-6', 'Diamond 6', '1st Floor', '22 × 8 m', 140, 90, 80, 66, 48, 4),
+    ('diamond-7', 'Diamond 7', '1st Floor', '22 × 8 m', 140, 90, 80, 66, 48, 5),
+    ('crystal', 'Crystal', 'Lobby Floor', '15,8 × 6 m', 80, 30, 50, 30, 30, 6),
+    ('emerald', 'Emerald', 'Base Main Floor', '16,3 × 8 m', 120, 60, 60, 48, 36, 7),
+    ('iron', 'Iron', 'Eagle', '6,3 × 6 m', 24, 18, 20, 27, 18, 8),
+    ('wood', 'Wood', 'Eagle', '8 × 6 m', 40, 27, 30, 27, 18, 9),
+    ('onyx', 'Onyx', '1st Floor', '26,5 × 18,6 m', 250, 180, 200, 150, 54, 10),
+    ('sapphire-grand-ballroom', 'Sapphire Grand Ballroom', 'Lobby Floor', '35,3 × 48,5 m', 1445, 504, 720, 345, 345, 11)
+    ON CONFLICT (id) DO NOTHING`,
 ];

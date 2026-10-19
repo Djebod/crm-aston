@@ -8,3 +8,5 @@ migrasi
 backup-sebelum-reset-*.json
 # contoh surat asli (berisi data tamu) — jangan ikut ter-upload
 contoh
+.vercel
+.env*

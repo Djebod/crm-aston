@@ -8,7 +8,7 @@ async function adaBentrokRuang(room, tanggal, mulai, selesai) {
   if (!room || !tanggal) return false;
   const s = keMenit(mulai), e = keMenit(selesai);
   if (s === null || e === null || e <= s) return true;
-  const rows = await sql`SELECT jam_mulai, jam_selesai FROM room_booking WHERE room = ${room} AND tanggal = ${tanggal} AND status <> ${"Cancel"}`;
+  const rows = await sql`SELECT jam_mulai, jam_selesai FROM room_booking WHERE room = ${room} AND tanggal = ${tanggal} AND status <> 'Cancel' AND status <> 'Expired'`;
   for (const r of rows) {
     const rs = keMenit(r.jam_mulai), re = keMenit(r.jam_selesai);
     if (rs === null || re === null) continue;

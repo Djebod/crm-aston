@@ -8,6 +8,7 @@ import { Donut, BarList, ChartCard, hitungPer, beriWarna, topN } from "@/compone
 import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
 import Pager from "@/components/Pager";
 import DateRange, { dalamRentang } from "@/components/DateRange";
+import { useRuangan } from "@/lib/ruangan";
 import { normalizeWA, validWA } from "@/lib/phone";
 import { ambilCompanies } from "@/lib/companiesCache";
 import { bisaLihatSemua, milikSaya } from "@/lib/akses";
@@ -27,19 +28,7 @@ const JENIS_EVENT = ["Wedding", "Meeting / Rapat", "Gathering", "Ulang Tahun", "
 const SUMBER = ["Sales Call", "Site Inspection", "Telemarketing", "Referral", "Walk-in", "Lainnya"];
 const STATUS = ["Tentative", "Definite", "Cancel"];
 
-const RUANGAN = [
-  { name: "Diamond 12", cap: { theater: 120, class: 63, round: 60, ushape: 48, hollow: 36 } },
-  { name: "Diamond 3", cap: { theater: 50, class: 21, round: 30, ushape: 39, hollow: 24 } },
-  { name: "Diamond 5", cap: { theater: 50, class: 21, round: 30, ushape: 39, hollow: 24 } },
-  { name: "Diamond 6", cap: { theater: 140, class: 90, round: 80, ushape: 66, hollow: 48 } },
-  { name: "Diamond 7", cap: { theater: 140, class: 90, round: 80, ushape: 66, hollow: 48 } },
-  { name: "Crystal", cap: { theater: 80, class: 30, round: 50, ushape: 30, hollow: 30 } },
-  { name: "Emerald", cap: { theater: 120, class: 60, round: 60, ushape: 48, hollow: 36 } },
-  { name: "Iron", cap: { theater: 24, class: 18, round: 20, ushape: 27, hollow: 18 } },
-  { name: "Wood", cap: { theater: 40, class: 27, round: 30, ushape: 27, hollow: 18 } },
-  { name: "Onyx", cap: { theater: 250, class: 180, round: 200, ushape: 150, hollow: 54 } },
-  { name: "Sapphire Grand Ballroom", cap: { theater: 1445, class: 504, round: 720, ushape: 345, hollow: 345 } },
-];
+// Ruangan meeting diambil dari tabel meeting_room (lib/ruangan.js)
 const SETUP_MEETING = [
   { key: "theater", label: "Theater" }, { key: "class", label: "Class Room" },
   { key: "round", label: "Round Table" }, { key: "ushape", label: "U Shape" }, { key: "hollow", label: "Hollow Square" },
@@ -108,6 +97,7 @@ async function kompresFoto(file, maxDim = 1600, quality = 0.7) {
 export default function AktivitasPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const RUANGAN = useRuangan();
   const [list, setList] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -136,14 +126,14 @@ export default function AktivitasPage() {
     let bentrok = null;
     if (s !== null && e !== null && e > s && lead.tanggalEvent) {
       bentrok = bookings.find((x) => {
-        if (x.Room !== lead.meetRoom || x.Tanggal !== lead.tanggalEvent || x.Status === "Cancel") return false;
+        if (x.Room !== lead.meetRoom || x.Tanggal !== lead.tanggalEvent || (x.Status === "Cancel" || x.Status === "Expired")) return false;
         const rs = keMenit(x.JamMulai), re = keMenit(x.JamSelesai);
         if (rs === null || re === null) return false;
         return !(s >= re + 120 || rs >= e + 120);
       });
     }
     return { kap, paxLebih, bentrok };
-  }, [lead, bookings]);
+  }, [lead, bookings, RUANGAN]);
   const [realisasiPlanId, setRealisasiPlanId] = useState("");
   const [targets, setTargets] = useState([]);
   const lihatSemua = bisaLihatSemua(user); // admin & leader (ADOSM/Sales Leader) melihat semua sales
@@ -260,7 +250,7 @@ export default function AktivitasPage() {
       if (kap && pax > kap) { alert(`Kapasitas ${lead.meetRoom} (${SETUP_MEETING.find((s) => s.key === lead.meetSetup)?.label}) hanya ${kap} orang, peserta ${pax}.`); return; }
       const s = keMenit(lead.meetMulai), e = keMenit(lead.meetSelesai);
       const bentrok = bookings.find((x) => {
-        if (x.Room !== lead.meetRoom || x.Tanggal !== lead.tanggalEvent || x.Status === "Cancel") return false;
+        if (x.Room !== lead.meetRoom || x.Tanggal !== lead.tanggalEvent || (x.Status === "Cancel" || x.Status === "Expired")) return false;
         const rs = keMenit(x.JamMulai), re = keMenit(x.JamSelesai);
         if (rs === null || re === null) return false;
         return !(s >= re + 120 || rs >= e + 120);
