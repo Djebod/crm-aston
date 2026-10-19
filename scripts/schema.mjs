@@ -129,4 +129,6 @@ BUMN = Tri Wahyuni Handayani
     ('onyx', 'Onyx', '1st Floor', '26,5 × 18,6 m', 250, 180, 200, 150, 54, 10),
     ('sapphire-grand-ballroom', 'Sapphire Grand Ballroom', 'Lobby Floor', '35,3 × 48,5 m', 1445, 504, 720, 345, 345, 11)
     ON CONFLICT (id) DO NOTHING`,
+  // Foto per layout ruangan (JSON {theater, class, round, ushape, hollow} -> link Drive), dipakai situs MICE
+  `ALTER TABLE meeting_room ADD COLUMN IF NOT EXISTS foto_setup TEXT`,
 ];

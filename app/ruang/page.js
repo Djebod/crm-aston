@@ -11,8 +11,12 @@ import { resetCacheRuangan } from "@/lib/ruangan";
 const KOSONG = () => ({
   id: "", nama: "", lantai: "", dimensi: "", cap_theater: "", cap_class: "", cap_round: "", cap_ushape: "", cap_hollow: "",
   fasilitas: "", deskripsi: "", foto: "", fotoBase64: "", fotoNama: "", tampil_publik: false, booking_langsung: false, urutan: 0, aktif: true,
+  foto_setup: {}, fotoSetupBase64: {}, fotoSetupNama: {}, fotoSetupHapus: [],
   per_jam: "", half_day: "", full_day: "", weekend_pct: "", catatan_harga: "belum termasuk pajak & F&B",
 });
+// Foto per layout: label slot & konversi link Google Drive ke link gambar langsung (untuk thumbnail)
+const SETUP_FOTO = [["theater", "Theater"], ["class", "Class Room"], ["round", "Round Table"], ["ushape", "U Shape"], ["hollow", "Hollow Square"]];
+const fotoLangsung = (u) => { const m = String(u || "").match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:[^#]*&)?id=)([\w-]{20,})/); return m ? `https://lh3.googleusercontent.com/d/${m[1]}` : String(u || ""); };
 const rp = (n) => (n ? "Rp " + Number(n).toLocaleString("id-ID") : "-");
 const parseFas = (s) => { try { const a = JSON.parse(s); return Array.isArray(a) ? a : []; } catch { return String(s || "").split(",").map((x) => x.trim()).filter(Boolean); } };
 
@@ -72,6 +76,7 @@ export default function RuangHargaPage() {
       ...KOSONG(), id: r.id, nama: r.nama || "", lantai: r.lantai || "", dimensi: r.dimensi || "",
       cap_theater: r.cap_theater ?? "", cap_class: r.cap_class ?? "", cap_round: r.cap_round ?? "", cap_ushape: r.cap_ushape ?? "", cap_hollow: r.cap_hollow ?? "",
       fasilitas: parseFas(r.fasilitas).join(", "), deskripsi: r.deskripsi || "", foto: r.foto || "",
+      foto_setup: r.foto_setup && typeof r.foto_setup === "object" ? r.foto_setup : {},
       tampil_publik: !!r.tampil_publik, booking_langsung: !!r.booking_langsung, urutan: r.urutan ?? 0, aktif: r.aktif !== false,
       per_jam: r.per_jam ?? "", half_day: r.half_day ?? "", full_day: r.full_day ?? "", weekend_pct: r.weekend_pct ?? "", catatan_harga: r.catatan_harga || "belum termasuk pajak & F&B",
     });
@@ -82,6 +87,19 @@ export default function RuangHargaPage() {
     setF((x) => ({ ...x, fotoNama: "memproses foto…" }));
     const base64 = await kompresFoto(file);
     setF((x) => ({ ...x, fotoBase64: base64, fotoNama: file.name }));
+  }
+  async function pilihFotoSetup(k, e) {
+    const file = e.target.files?.[0]; if (!file) return;
+    setF((x) => ({ ...x, fotoSetupNama: { ...x.fotoSetupNama, [k]: "memproses foto…" } }));
+    const base64 = await kompresFoto(file);
+    setF((x) => ({ ...x, fotoSetupBase64: { ...x.fotoSetupBase64, [k]: base64 }, fotoSetupNama: { ...x.fotoSetupNama, [k]: file.name }, fotoSetupHapus: x.fotoSetupHapus.filter((h) => h !== k) }));
+  }
+  function hapusFotoSetup(k) {
+    setF((x) => {
+      const b64 = { ...x.fotoSetupBase64 }; delete b64[k];
+      const nm = { ...x.fotoSetupNama }; delete nm[k];
+      return { ...x, fotoSetupBase64: b64, fotoSetupNama: nm, fotoSetupHapus: x.foto_setup?.[k] && !x.fotoSetupHapus.includes(k) ? [...x.fotoSetupHapus, k] : x.fotoSetupHapus };
+    });
   }
 
   async function simpan() {
@@ -152,7 +170,7 @@ export default function RuangHargaPage() {
                 {(r.per_jam || r.half_day || r.full_day) && (
                   <div className="text-xs text-slate-600 mt-1">💰 {r.per_jam ? rp(r.per_jam) + "/jam" : ""}{r.half_day ? " · Half day " + rp(r.half_day) : ""}{r.full_day ? " · Full day " + rp(r.full_day) : ""}{r.weekend_pct ? " · Weekend +" + r.weekend_pct + "%" : ""}</div>
                 )}
-                {r.foto && <div className="text-[11px] text-emerald-700 mt-1">📷 ada foto</div>}
+                {(r.foto || Object.keys(r.foto_setup || {}).length > 0) && <div className="text-[11px] text-emerald-700 mt-1">📷 {r.foto ? "foto umum" : ""}{r.foto && Object.keys(r.foto_setup || {}).length > 0 ? " + " : ""}{Object.keys(r.foto_setup || {}).length > 0 ? Object.keys(r.foto_setup).length + " foto layout" : ""}</div>}
                 <div className="flex gap-2 mt-3">
                   <button onClick={() => bukaEdit(r)} className="text-xs font-semibold border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">Edit</button>
                   <button onClick={() => hapus(r)} className="text-xs font-semibold border border-slate-300 text-slate-500 rounded-md px-3 py-1.5 hover:bg-slate-50">Hapus</button>
@@ -211,6 +229,26 @@ export default function RuangHargaPage() {
               {f.fotoNama && <p className="text-xs text-emerald-700 mt-1">Siap unggah: {f.fotoNama}</p>}
               {!f.fotoBase64 && f.foto && <p className="text-xs text-slate-500 mt-1 truncate">Foto saat ini: <a href={f.foto} target="_blank" rel="noreferrer" className="underline">{f.foto}</a></p>}
             </Field>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="text-sm font-semibold text-slate-700">Foto per layout <span className="font-normal text-slate-400">— tampil di situs MICE sesuai layout yang dipilih tamu; kosong = pakai foto ruangan umum</span></div>
+              <div className="mt-2 space-y-2">
+                {SETUP_FOTO.map(([k, l]) => {
+                  const ada = f.foto_setup?.[k] && !f.fotoSetupHapus.includes(k);
+                  const baru = f.fotoSetupBase64?.[k];
+                  return (
+                    <div key={k} className="flex items-center gap-3">
+                      <div className="w-16 h-11 rounded bg-slate-200 overflow-hidden flex-none">
+                        {(baru || ada) && <img src={baru || fotoLangsung(f.foto_setup[k])} alt={l} className="w-full h-full object-cover" />}
+                      </div>
+                      <div className="w-28 text-sm text-slate-700 flex-none">{l}</div>
+                      <input type="file" accept="image/*" onChange={(e) => pilihFotoSetup(k, e)} className="text-xs flex-1 min-w-0" />
+                      <span className="text-[11px] text-emerald-700 truncate max-w-[9rem]">{f.fotoSetupNama?.[k] || (ada ? "tersimpan" : "")}</span>
+                      {(ada || baru) && <button type="button" onClick={() => hapusFotoSetup(k)} className="text-xs text-red-600 hover:underline flex-none">Hapus</button>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
             <div className="flex flex-wrap gap-4 py-1">{cb("aktif")}{cb("tampil_publik")}{cb("booking_langsung")}</div>
 
             <div className={"rounded-lg border p-3 " + (f.booking_langsung ? "border-[#c8962c] bg-amber-50/40" : "border-slate-200 bg-slate-50")}>
