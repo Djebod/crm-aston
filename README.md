@@ -84,7 +84,8 @@ Hasil pengiriman terakhir tampil di modal **Riwayat → Notifikasi Email**, dan 
 ### Cara setting (sekali saja)
 1. Buka https://script.google.com → **New project** → beri nama `Alert GEO Aston CRM`.
 2. Hapus isi editor, tempel seluruh isi `apps-script-alert-geo/Code.gs` → **Save** (ikon disket).
-3. Di baris paling atas ganti `TOKEN = "GANTI_DENGAN_TOKEN_RAHASIA"` dengan teks rahasia bebas, minimal 20 karakter (contoh: `aston-geo-2026-xK9mQ2pL`). Simpan.
+3. Simpan token di **Script Properties** (bukan di kode): klik ikon gerigi **Project Settings** → bagian **Script properties** → **Add script property** → Property: `TOKEN`, Value: teks rahasia bebas minimal 20 karakter (contoh: `aston-geo-2026-xK9mQ2pL`) → **Save script properties**.
+   Lalu di toolbar pilih fungsi **`cekToken`** → **Run**; log harus menulis *TOKEN terpasang*.
 4. Di toolbar pilih fungsi **`tesKirim`** → klik **Run** → **Review permissions** → pilih akun Gmail pengirim → **Advanced → Go to … (unsafe)** → **Allow**.
    Cek inbox akun itu: harus masuk email berjudul *[Perlu Acknowledge] GEO … TES alert GEO*. Kalau sudah masuk, script berfungsi.
 5. **Deploy → New deployment** → ikon gerigi pilih **Web app** → isi:
@@ -101,6 +102,7 @@ Hasil pengiriman terakhir tampil di modal **Riwayat → Notifikasi Email**, dan 
 
 ### Catatan
 - Pengirim email = akun Google yang melakukan deploy. Pakai akun kantor (mis. `itm@astoncirebon.com`) supaya nama pengirimnya resmi. Kuota MailApp: 100 email/hari untuk Gmail biasa, 1.500/hari untuk Google Workspace.
-- Mengubah kode script = wajib **Deploy → Manage deployments → ✎ → Version: New version → Deploy** agar URL yang sama memakai kode baru.
+- Mengubah kode script = wajib **Deploy → Manage deployments → ✎ → Version: New version → Deploy** agar URL yang sama memakai kode baru. Token tersimpan di Script Properties, jadi menempel ulang isi `Code.gs` tidak menghapusnya.
+- Bila di **Riwayat → Notifikasi Email** muncul *TOKEN belum di-set di Script Properties* atau *Token tidak cocok*, cek Script property `TOKEN` di Apps Script dan `GEO_ALERT_TOKEN` di Vercel harus sama persis, lalu deploy versi baru.
 - Kolom `alert_terakhir` di tabel `geo` dibuat otomatis (atau `npm run init-db`).
 - Lokal tanpa `GEO_ALERT_URL`: fitur alert diam (tidak error), tombol kirim ulang memberi pesan "GEO_ALERT_URL belum di-set".

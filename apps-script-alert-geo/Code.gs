@@ -11,21 +11,25 @@
  *
  * Cara pasang:
  *  1) script.google.com -> New project -> tempel kode ini -> simpan
- *  2) Ganti TOKEN di bawah dengan teks rahasia bebas (min. 20 karakter)
- *  3) Jalankan fungsi tesKirim sekali dari editor -> Authorize (izinkan Gmail)
+ *  2) Simpan token di Script Properties (BUKAN di kode, supaya tidak hilang
+ *     saat kode ditempel ulang):
+ *       Project Settings (ikon gerigi) -> Script properties -> Add script property
+ *       Property: TOKEN   Value: teks rahasia bebas (min. 20 karakter) -> Save
+ *  3) Jalankan fungsi cekToken dari editor -> log harus "TOKEN terpasang"
+ *  4) Jalankan fungsi tesKirim sekali dari editor -> Authorize (izinkan Gmail)
  *     -> cek inbox Anda, harus ada email "TES alert GEO"
- *  4) Deploy -> New deployment -> Web app
+ *  5) Deploy -> New deployment -> Web app
  *     Execute as: Me | Who has access: Anyone -> Deploy -> salin Web app URL
- *  5) Di Vercel isi env:
+ *  6) Di Vercel isi env:
  *        GEO_ALERT_URL   = Web app URL tadi
- *        GEO_ALERT_TOKEN = TOKEN yang sama persis dengan di bawah
+ *        GEO_ALERT_TOKEN = TOKEN yang sama persis dengan Script property
  *     lalu Redeploy.
  *  Catatan: setiap kali kode ini diubah, Deploy -> Manage deployments
  *     -> Edit (pensil) -> Version: New version -> Deploy, supaya URL yang
- *     sama memakai kode terbaru.
+ *     sama memakai kode terbaru. Script Properties tidak ikut tertimpa.
  *************************************************************/
 
-var TOKEN = "GANTI_DENGAN_TOKEN_RAHASIA";          // samakan dengan GEO_ALERT_TOKEN di Vercel
+var NAMA_PROPERTI_TOKEN = "TOKEN";                  // nama Script property yang menyimpan token
 var NAMA_PENGIRIM = "Aston CRM - GEO";              // nama yang tampil di kolom "From"
 var NAMA_HOTEL = "Aston Cirebon Hotel & Convention Center";
 var CC_SELALU = "";                                 // opsional: email yang selalu di-CC, pisahkan koma
@@ -38,8 +42,9 @@ function doGet() {
 function doPost(e) {
   try {
     var b = JSON.parse(e.postData.contents || "{}");
-    if (!TOKEN || TOKEN === "GANTI_DENGAN_TOKEN_RAHASIA") return json({ status: "error", message: "TOKEN di Apps Script belum diganti." });
-    if (b.token !== TOKEN) return json({ status: "error", message: "Token tidak cocok." });
+    var token = ambilToken();
+    if (!token) return json({ status: "error", message: "TOKEN belum di-set di Script Properties Apps Script (Project Settings -> Script properties)." });
+    if (b.token !== token) return json({ status: "error", message: "Token tidak cocok dengan GEO_ALERT_TOKEN di Vercel." });
     if (b.action !== "alertGeo") return json({ status: "error", message: "action tidak dikenal" });
 
     var to = bersihkanEmail(b.to);
@@ -140,6 +145,12 @@ function susunEmail(b) {
 }
 
 // ---------- Util ----------
+/** Token rahasia dari Script Properties; kosong bila belum di-set atau masih placeholder. */
+function ambilToken() {
+  var t = String(PropertiesService.getScriptProperties().getProperty(NAMA_PROPERTI_TOKEN) || "").trim();
+  if (!t || t === "GANTI_DENGAN_TOKEN_RAHASIA" || t.length < 20) return "";
+  return t;
+}
 function bersihkanEmail(arr) {
   var out = [];
   (Array.isArray(arr) ? arr : String(arr || "").split(",")).forEach(function (x) {
@@ -162,7 +173,13 @@ function teks(s) {
   return ContentService.createTextOutput(s).setMimeType(ContentService.MimeType.TEXT);
 }
 
-// ---------- Tes manual (jalankan dari editor: pilih "tesKirim" -> Run) ----------
+// ---------- Tes manual (jalankan dari editor: pilih fungsinya -> Run) ----------
+/** Cek apakah token sudah tersimpan di Script Properties (nilainya tidak ditampilkan). */
+function cekToken() {
+  var t = ambilToken();
+  Logger.log(t ? "TOKEN terpasang (" + t.length + " karakter). Samakan dengan GEO_ALERT_TOKEN di Vercel."
+               : "TOKEN BELUM di-set / terlalu pendek. Project Settings -> Script properties -> TOKEN (min. 20 karakter).");
+}
 function tesKirim() {
   var saya = Session.getActiveUser().getEmail();
   var surat = susunEmail({
