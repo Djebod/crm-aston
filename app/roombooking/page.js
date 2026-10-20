@@ -323,22 +323,71 @@ export default function RoomBookingPage() {
               <div className="text-center text-slate-500 py-16 border-2 border-dashed border-slate-200 rounded-2xl">Belum ada booking.</div>
             ) : (
               <div className="grid gap-3">
-                {tampil.map((x) => (
+                {tampil.map((x) => {
+                  const r = findRoom(x.Room);
+                  const kapSetup = r ? r.cap[x.Setup] : 0;
+                  const paxNum = Number(String(x.Pax).replace(/\D/g, "")) || 0;
+                  return (
                   <div key={x.ID} className={"bg-white rounded-xl border border-slate-200 border-l-4 p-4 " + (BORDER_STYLE[x.Status] || "border-l-slate-300")}>
-                    <div className="flex items-start justify-between gap-2">
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="min-w-0">
-                        <div className="font-bold text-[#12263a]">{x.Room || <span className="text-amber-600">Belum ada ruangan</span>} {x.Room && <span className="text-slate-400 font-normal">· {findRoom(x.Room)?.floor}</span>}</div>
-                        <div className="text-xs text-slate-500">🗓 {x.Tanggal} · ⏰ {x.JamMulai}–{x.JamSelesai}</div>
+                        <div className="font-bold text-[#12263a] truncate">{x.Room || <span className="text-amber-600">Belum ada ruangan</span>} {x.Room && <span className="text-slate-400 font-normal">· {r?.floor}</span>}</div>
+                        <div className="text-xs text-slate-500">🗓 {hariID(x.Tanggal)} · ⏰ {x.JamMulai}–{x.JamSelesai}</div>
                       </div>
                       <span className={"text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap " + (STATUS_STYLE[x.Status] || "bg-slate-100 text-slate-700")}>{x.Status}</span>
                     </div>
+
+                    {/* Info acara */}
                     <div className="text-sm text-slate-600 mt-1">{x.EventTitle && <span className="font-medium">{x.EventTitle}</span>}{x.Company ? " · " + x.Company : ""}</div>
-                    <div className="text-sm text-slate-500 flex flex-wrap gap-x-3 mt-1">
-                      <span>🎭 {setupLabel(x.Setup)}</span>{x.Pax && <span>👥 {x.Pax} pax</span>}{x.PIC && <span>👤 {x.PIC}</span>}
+
+                    {/* Detail baris 1: setup, kapasitas, pax, PIC */}
+                    <div className="text-sm text-slate-500 flex flex-wrap gap-x-3 mt-2">
+                      <span>🎭 {setupLabel(x.Setup)}</span>
+                      {kapSetup > 0 && <span title={`Kapasitas ${x.Setup}: ${kapSetup}`}>🪑 Kap {kapSetup}</span>}
+                      {x.Pax && <span title={`${paxNum}${paxNum > kapSetup ? " melebihi kapasitas!" : ""}`}>👥 {x.Pax} pax</span>}
+                      {x.PIC && <span>👤 {x.PIC}</span>}
                     </div>
-                    {x.Sumber === "Ucup" && <div className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-2"><BadgeUcup x={x} /><span>{x.KodeBooking}</span><span>👤 {x.TamuNama}</span><span>📱 {x.TamuWA}</span><span>✉ {x.TamuEmail}</span></div>}
-                    {x.LeadID && <div className="text-[11px] text-amber-600 mt-1">↳ tertaut Lead</div>}
-                    <div className="flex flex-wrap gap-2 mt-3">
+
+                    {/* Lead connection */}
+                    {x.LeadID && (
+                      <div className="mt-2 flex items-center gap-2 text-[11px] text-amber-600 bg-amber-50 rounded-md px-2 py-1">
+                        ↳ Tertaut Lead <b>{x.LeadID}</b>
+                      </div>
+                    )}
+
+                    {/* Sumber Ucup: kontak tamu + kode booking */}
+                    {x.Sumber === "Ucup" && (
+                      <div className="mt-2 text-xs text-sky-700 bg-sky-50 rounded-md px-2 py-2 space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <BadgeUcup x={x} />
+                          <span><b>{x.KodeBooking || "-"}</b></span>
+                          {x.TamuNama && <span>👤 {x.TamuNama}</span>}
+                        </div>
+                        <div className="flex flex-wrap gap-x-2">
+                          {x.TamuWA && <span>📱 {x.TamuWA}</span>}
+                          {x.TamuEmail && <span>✉ {x.TamuEmail}</span>}
+                          {x.EstimasiHarga && <span>💰 {rp(x.EstimasiHarga)}</span>}
+                        </div>
+                        {x.Preferensi && <div className="italic mt-0.5">🎨 {x.Preferensi}</div>}
+                        {x.RequestKhusus && <div className="italic mt-0.5">📝 {x.RequestKhusus}</div>}
+                        {x.HoldUntil && <div className="text-[11px] font-semibold mt-0.5">⏳ {sisaHold(x.HoldUntil)}</div>}
+                      </div>
+                    )}
+
+                    {/* Audit trail */}
+                    {(x.CreatedAt || x.CreatedBy || x.UpdatedBy) && (
+                      <div className="mt-2 text-[11px] text-slate-400">
+                        {x.CreatedAt && <>Dibuat: {x.CreatedAt}{x.CreatedBy ? ` oleh ${x.CreatedBy}` : ""}</>}
+                        {x.UpdatedBy && <span className="ml-2">· Diperbarui: {x.UpdatedBy}</span>}
+                      </div>
+                    )}
+
+                    {/* Catatan */}
+                    {x.Catatan && <div className="mt-2 text-xs text-slate-500 italic bg-slate-50 rounded px-2 py-1">📋 {x.Catatan}</div>}
+
+                    {/* Actions */}
+                    <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-100">
                       {x.Sumber === "Ucup" && x.Status === "Tentative" && x.Room && !x.LeadID
                         ? <button onClick={() => konfirmasiUcup(x)} disabled={saving} className="text-xs font-semibold bg-emerald-600 text-white rounded-md px-3 py-1.5 disabled:opacity-50">✓ Konfirmasi &amp; Jadikan Lead</button>
                         : x.Status !== "Definite" && <button onClick={() => ubahStatus(x, "Definite")} className="text-xs font-semibold bg-emerald-600 text-white rounded-md px-3 py-1.5">Definite</button>}
@@ -349,7 +398,7 @@ export default function RoomBookingPage() {
                       <button onClick={() => hapus(x)} className="text-xs font-semibold border border-slate-300 text-slate-500 rounded-md px-3 py-1.5 hover:bg-slate-50">Hapus</button>
                     </div>
                   </div>
-                ))}
+                );})}
               </div>
             )}
           </>

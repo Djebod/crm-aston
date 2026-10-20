@@ -35,6 +35,12 @@ const SETUP_MEETING = [
   { key: "round", label: "Round Table" }, { key: "ushape", label: "U Shape" }, { key: "hollow", label: "Hollow Square" },
 ];
 const keMenit = (hhmm) => { const m = String(hhmm || "").match(/^(\d{1,2}):(\d{2})/); return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : null; };
+// Slot waktu meeting: interval 1 jam dari 08:00–21:00 (min 2 jam durasi)
+const SLOT_JAM = (() => { const a = []; for (let h = 8; h <= 21; h++) a.push(String(h).padStart(2, "0") + ":00"); return a; })();
+function generateSlotOptions(startJam) {
+  const s = keMenit(startJam); if (s === null) return [];
+  return SLOT_JAM.filter((opt) => keMenit(opt) > s + 120).map((opt) => opt);
+}
 
 const FORM_KOSONG = {
   id: "",
@@ -378,6 +384,10 @@ export default function Dashboard() {
       if (data.status === "ok") {
         setModalForm(false);
         await ambilLeads();
+        // Setelah save baru, jika pesanMeeting aktif → langsung buka Meeting Room Blocking
+        if (!form.id && form.pesanMeeting) {
+          router.push("/roombooking");
+        }
       } else {
         alert("Gagal menyimpan: " + (data.message || "coba lagi"));
       }
@@ -622,11 +632,19 @@ export default function Dashboard() {
                 {form.id && <p className="text-xs text-slate-400 mt-1">Penjadwalan ruangan dilakukan di menu Meeting Room untuk lead yang sudah ada.</p>}
                 {form.pesanMeeting && !form.id && (
                   <div className="mt-3 space-y-3">
-                    <div className="grid sm:grid-cols-2 gap-3">
-                      <Field label="Ruang Meeting">
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      <Field label="Ruangan">
                         <select className={inp} value={form.meetRoom} onChange={(e) => setForm({ ...form, meetRoom: e.target.value })}>
                           <option value="">— pilih ruangan —</option>
-                          {RUANGAN.map((r) => <option key={r.name} value={r.name}>{r.name}</option>)}
+                          {RUANGAN.filter((r) => {
+                            if (!form.tanggalEvent || !form.meetMulai || !form.meetSelesai) return true;
+                            const b = bookings.find((x) => x.Room === r.name && x.Tanggal === form.tanggalEvent);
+                            if (!b) return true; // belum booked
+                            const rs = keMenit(b.JamMulai), re = keMenit(b.JamSelesai);
+                            const sa = keMenit(form.meetMulai), ea = keMenit(form.meetSelesai);
+                            if (rs === null || re === null || sa === null || ea === null) return true;
+                            return !(sa >= re + 120 || rs >= ea + 120); // tersedia jika no overlap+gap
+                          }).map((r) => <option key={r.name} value={r.name}>{r.name}</option>)}
                         </select>
                       </Field>
                       <Field label="Setup">
@@ -634,8 +652,20 @@ export default function Dashboard() {
                           {SETUP_MEETING.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                         </select>
                       </Field>
-                      <Field label="Jam Mulai"><input type="time" className={inp} value={form.meetMulai} onChange={(e) => setForm({ ...form, meetMulai: e.target.value })} /></Field>
-                      <Field label="Jam Selesai"><input type="time" className={inp} value={form.meetSelesai} onChange={(e) => setForm({ ...form, meetSelesai: e.target.value })} /></Field>
+                      <Field label="Jam Mulai">
+                        <select className={inp} value={form.meetMulai} onChange={(e) => { setForm({ ...form, meetMulai: e.target.value }); setForm((f) => ({ ...f, meetSelesai: "" })); }}>
+                          {SLOT_JAM.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Jam Selesai">
+                        <select className={inp} value={form.meetSelesai} onChange={(e) => setForm({ ...form, meetSelesai: e.target.value })}>
+                          {generateSlotOptions(form.meetMulai).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                          {(() => {
+                            // Tambahkan juga manual jika user perlu klik time picker
+                            return null;
+                          })()}
+                        </select>
+                      </Field>
                     </div>
                     {meetCek && (
                       <div className={"text-sm rounded-md px-3 py-2 " + (meetCek.paxLebih || meetCek.bentrok ? "bg-rose-50 border border-rose-300 text-rose-700" : "bg-slate-50 border border-slate-200 text-slate-600")}>
@@ -644,7 +674,17 @@ export default function Dashboard() {
                         {meetCek.bentrok && <div className="font-semibold mt-1">⚠ Bentrok dengan {meetCek.bentrok.JamMulai}–{meetCek.bentrok.JamSelesai} ({meetCek.bentrok.EventTitle || "-"}). Perlu jeda min. 2 jam.</div>}
                       </div>
                     )}
-                    <p className="text-xs text-slate-400">Tanggal & jumlah peserta booking mengikuti data di atas. Booking tidak bisa menimpa jadwal yang sudah ada.</p>
+                    {(() => {
+                      if (!form.meetRoom) return null;
+                      const available = RUANGAN.filter((r) => r.name !== form.meetRoom).length;
+                      const totalBentrok = bookings.filter((x) => x.Tanggal === form.tanggalEvent && x.Status !== "Cancel" && x.Status !== "Expired").length;
+                      return (
+                        <p className="text-xs text-slate-500">
+                          Tanggal {form.tanggalEvent}: {totalBentrok} slot terpakai. Ruangan tersedia untuk jam ini: {available} dari {RUANGAN.length - 1}.
+                        </p>
+                      );
+                    })()}
+                    <p className="text-xs text-slate-400">Booking tidak bisa menimpa jadwal yang sudah ada. Minimal jeda 2 jam antar-booking.</p>
                   </div>
                 )}
               </div>
