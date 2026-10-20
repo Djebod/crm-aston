@@ -44,6 +44,10 @@ function rebuildNo(g) {
   return `${g.nomor}/${dd}/${mm}/${yy}/SM/ACHCC/${String(g.kodeSales || "").toUpperCase()}`;
 }
 
+// Urutan blok di daftar GEO: draft & dikembalikan paling atas (perlu tindakan sales),
+// lalu per penyetuju yang sedang ditunggu, dan yang sudah disetujui paling bawah.
+const BLOK_GEO = ["draft", "ditolak", "menunggu_leader", "menunggu_fom", "menunggu_fc", "menunggu_gm", "disetujui"];
+
 const DEFAULT_NOTES = {
   fo: "Group arrival by partial/group, check in time: 14.00 WIB.\nPlease prepare room as per requested.\nPlease prepare room keys before guest arrival.\nPlease be ready to assist guests luggage.",
   hk: "Please prepare the room based on room blocking.\nPlease make sure that all guest rooms are cleaned & tidy.",
@@ -526,6 +530,7 @@ export default function GeoPage() {
   const [fStatus, setFStatus] = useState("");
   const [dari, setDari] = useState("");
   const [sampai, setSampai] = useState("");
+  const [blokTerbuka, setBlokTerbuka] = useState({}); // blok status yang sedang dibuka di daftar
 
   useEffect(() => {
     const raw = typeof window !== "undefined" ? localStorage.getItem("crm_user") : null;
@@ -823,9 +828,53 @@ export default function GeoPage() {
   const adaFilter = !!(cari || fSales || fStatus || dari || sampai);
   const jumlahGiliran = useMemo(() => list.filter((row) => bolehBertindak(user, parseGeoRow(row))).length, [list, user]);
 
+  // Pengelompokan daftar per blok status (urutan BLOK_GEO: draft paling atas,
+  // disetujui paling bawah). Blok tertutup secara default; bila ada filter
+  // aktif, blok yang punya isi otomatis terbuka.
+  const kelompok = useMemo(() => {
+    const m = {};
+    BLOK_GEO.forEach((k) => { m[k] = []; });
+    listTampil.forEach((row) => { const st = infoRow(row).info.status; (m[st] || m.draft).push(row); });
+    return m;
+  }, [listTampil, infoRow]);
+
   const rowApv = modalApvId ? list.find((r) => r.ID === modalApvId) : null;
 
   if (!user) return null;
+
+  // Satu kartu GEO di dalam blok
+  function kartuGeo(row) {
+    const i = infoRow(row);
+    const info = i.info;
+    const next = tahapBerikut(info);
+    const giliran = bolehBertindak(user, info);
+    return (
+      <div key={row.ID} className={"bg-white rounded-xl border p-4 " + (giliran ? "border-amber-300 shadow-sm" : "border-slate-200")}>
+        <div className="flex items-start justify-between gap-2">
+          <div className="font-bold text-[#12263a] break-all">{row.GeoNo || "(tanpa nomor)"}</div>
+          <BadgeStatus status={info.status} />
+        </div>
+        <div className="text-sm text-slate-600">{row.EventTitle || "-"}</div>
+        <div className="text-xs text-slate-400">{row.Company || ""} · dibuat {row.CreatedAt}</div>
+        <div className="text-xs text-slate-500 mt-1">
+          {i.sales && <span className="inline-block bg-slate-100 rounded px-1.5 py-0.5 mr-1">👤 {i.sales}</span>}
+          {i.tgl && <span className="inline-block bg-slate-100 rounded px-1.5 py-0.5">📅 {i.tgl}</span>}
+        </div>
+        <div className="mt-2"><Stepper info={info} /></div>
+        <div className="flex flex-wrap gap-2 mt-3">
+          {giliran && (
+            <button onClick={() => { setApvCatatan(""); setModalApvId(row.ID); }} className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md px-3 py-1.5">
+              {next === 0 ? "📤 Ajukan" : "✔ " + TAHAP_GEO[next].aksi}
+            </button>
+          )}
+          <button onClick={() => unduhPDFRow(row)} disabled={pdfBusy === row.ID} className="text-xs font-semibold bg-[#c8962c] text-white rounded-md px-3 py-1.5 disabled:opacity-60">{pdfBusy === row.ID ? "Membuat…" : "⬇ PDF"}</button>
+          <button onClick={() => { setApvCatatan(""); setModalApvId(row.ID); }} className="text-xs font-semibold border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">Riwayat</button>
+          {bolehEdit(user, info) && <button onClick={() => bukaEdit(row)} className="text-xs font-semibold border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">Edit</button>}
+          {bolehHapus(user, info) && <button onClick={() => hapus(row)} className="text-xs font-semibold border border-rose-300 text-rose-700 rounded-md px-3 py-1.5 hover:bg-rose-50">Hapus</button>}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen md:pl-60">
@@ -879,36 +928,22 @@ export default function GeoPage() {
         ) : listTampil.length === 0 ? (
           <div className="text-center text-slate-500 py-16 border-2 border-dashed border-slate-200 rounded-2xl">Tidak ada GEO yang cocok dengan filter.</div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {listTampil.map((row) => {
-              const i = infoRow(row);
-              const info = i.info;
-              const next = tahapBerikut(info);
-              const giliran = bolehBertindak(user, info);
+          <div className="space-y-3">
+            {BLOK_GEO.map((k) => {
+              const rows = kelompok[k];
+              const n = rows.length;
+              const buka = n > 0 && (blokTerbuka[k] ?? adaFilter);
+              const giliranN = rows.filter((r) => bolehBertindak(user, infoRow(r).info)).length;
               return (
-                <div key={row.ID} className={"bg-white rounded-xl border p-4 " + (giliran ? "border-amber-300 shadow-sm" : "border-slate-200")}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="font-bold text-[#12263a] break-all">{row.GeoNo || "(tanpa nomor)"}</div>
-                    <BadgeStatus status={info.status} />
-                  </div>
-                  <div className="text-sm text-slate-600">{row.EventTitle || "-"}</div>
-                  <div className="text-xs text-slate-400">{row.Company || ""} · dibuat {row.CreatedAt}</div>
-                  <div className="text-xs text-slate-500 mt-1">
-                    {i.sales && <span className="inline-block bg-slate-100 rounded px-1.5 py-0.5 mr-1">👤 {i.sales}</span>}
-                    {i.tgl && <span className="inline-block bg-slate-100 rounded px-1.5 py-0.5">📅 {i.tgl}</span>}
-                  </div>
-                  <div className="mt-2"><Stepper info={info} /></div>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {giliran && (
-                      <button onClick={() => { setApvCatatan(""); setModalApvId(row.ID); }} className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md px-3 py-1.5">
-                        {next === 0 ? "📤 Ajukan" : "✔ " + TAHAP_GEO[next].aksi}
-                      </button>
-                    )}
-                    <button onClick={() => unduhPDFRow(row)} disabled={pdfBusy === row.ID} className="text-xs font-semibold bg-[#c8962c] text-white rounded-md px-3 py-1.5 disabled:opacity-60">{pdfBusy === row.ID ? "Membuat…" : "⬇ PDF"}</button>
-                    <button onClick={() => { setApvCatatan(""); setModalApvId(row.ID); }} className="text-xs font-semibold border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">Riwayat</button>
-                    {bolehEdit(user, info) && <button onClick={() => bukaEdit(row)} className="text-xs font-semibold border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">Edit</button>}
-                    {bolehHapus(user, info) && <button onClick={() => hapus(row)} className="text-xs font-semibold border border-rose-300 text-rose-700 rounded-md px-3 py-1.5 hover:bg-rose-50">Hapus</button>}
-                  </div>
+                <div key={k} className={"bg-white rounded-xl border " + (n === 0 ? "border-slate-100 opacity-60" : giliranN ? "border-amber-300 shadow-sm" : "border-slate-200")}>
+                  <button type="button" disabled={n === 0} onClick={() => setBlokTerbuka((s) => ({ ...s, [k]: !buka }))} className="w-full flex items-center gap-3 px-4 py-3 text-left disabled:cursor-default">
+                    <span className="text-slate-400 text-xs w-3 shrink-0">{buka ? "▾" : "▸"}</span>
+                    <span className={"inline-block min-w-[2.25rem] text-center text-sm font-bold rounded-full px-2 py-0.5 " + (WARNA_STATUS[k] || WARNA_STATUS.draft)}>{n}</span>
+                    <span className="font-semibold text-[#12263a] flex-1">{labelStatus(k)}</span>
+                    {giliranN > 0 && <span className="text-[11px] font-semibold bg-amber-100 text-amber-800 rounded-full px-2 py-0.5 whitespace-nowrap">⏳ {giliranN} giliran Anda</span>}
+                    {n > 0 && !buka && <span className="text-xs text-slate-400 whitespace-nowrap hidden sm:inline">klik untuk melihat</span>}
+                  </button>
+                  {buka && <div className="grid gap-3 sm:grid-cols-2 px-4 pb-4">{rows.map(kartuGeo)}</div>}
                 </div>
               );
             })}
