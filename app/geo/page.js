@@ -359,6 +359,152 @@ function Stepper({ info }) {
   );
 }
 
+/** Data GEO tersimpan -> bentuk lengkap & ternormalisasi (dipakai PDF dan rincian di modal). */
+function dataDariInfo(info) {
+  return normalisasiGeo({ ...GEO_KOSONG(), ...info.data, notes: { ...DEFAULT_NOTES, ...(info.data.notes || {}) } });
+}
+
+function BarisInfo({ l, v, bold }) {
+  return (
+    <div className="flex gap-2 py-1 border-t border-slate-100 first:border-t-0">
+      <span className="w-32 shrink-0 text-slate-500">{l}</span>
+      <span className={"min-w-0 break-words whitespace-pre-wrap " + (bold ? "font-semibold text-slate-800" : "text-slate-700")}>{v || "-"}</span>
+    </div>
+  );
+}
+
+/**
+ * Rincian isi GEO yang ditampilkan langsung di modal persetujuan,
+ * supaya penyetuju bisa memeriksa dokumen tanpa harus mengunduh PDF.
+ * buatHtml() mengembalikan HTML dokumen (sama persis dengan PDF) untuk pratinjau.
+ */
+function RincianGeo({ data: g, buatHtml }) {
+  const [lihatDok, setLihatDok] = useState(false);
+  const html = useMemo(() => (lihatDok && buatHtml ? buatHtml() : ""), [lihatDok, buatHtml]);
+  const gt = grandTotal(g);
+  const balance = gt - angka(g.dpAmount);
+  const komp = (g.komponen || []).filter((k) => String(k.nama || "").trim());
+  const kamarBd = (g.rooms || []).filter((r) => r.type && angka(r.price) > 0);
+  const notes = g.notes || {};
+  const catatan = [
+    ["Front Office", notes.fo], ["Housekeeping", notes.hk], ["Engineering", notes.eng],
+    ["Finance", notes.fin], ["Security & Concierge", notes.sec], ["Sign Board", notes.sign],
+  ];
+  const TD = "px-2 py-1 whitespace-nowrap";
+  return (
+    <div className="border border-slate-200 rounded-lg overflow-hidden">
+      <div className="bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">RINCIAN GEO</div>
+
+      <div className="px-3 py-2 grid sm:grid-cols-2 gap-x-6 text-xs">
+        <div>
+          <BarisInfo l="Issued Date" v={g.issuedDate} />
+          <BarisInfo l="Event Title" v={g.eventTitle} bold />
+          <BarisInfo l="Company/Organizer" v={g.company} bold />
+          <BarisInfo l="Contact Person" v={g.contactPerson} />
+          <BarisInfo l="Address" v={g.address} />
+          <BarisInfo l="Phone" v={g.phone} />
+          <BarisInfo l="Email" v={g.email} />
+        </div>
+        <div>
+          <BarisInfo l="Sales Person" v={g.salesPerson} />
+          <BarisInfo l="Check In" v={g.checkIn} />
+          <BarisInfo l="Check Out" v={g.checkOut} />
+          <BarisInfo l="No. of Room" v={g.noRoom} />
+          <BarisInfo l="Guarantee Check In" v={g.guarantee} />
+        </div>
+      </div>
+
+      <div className="border-t border-slate-100 px-3 py-2">
+        <div className="text-xs font-semibold text-slate-500 mb-1">ROOM ARRANGEMENT</div>
+        <div className="overflow-x-auto -mx-3 px-3">
+          <table className="w-full text-xs min-w-[520px]">
+            <thead>
+              <tr className="bg-slate-50 text-slate-500">
+                <th className={TD + " text-left"}>Room Type</th><th className={TD}>Check In</th><th className={TD}>Check Out</th>
+                <th className={TD}>Room</th><th className={TD}>Night</th><th className={TD + " text-right"}>Price</th><th className={TD + " text-right"}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(g.rooms || []).map((r, i) => {
+                const malam = hitungMalam(r.checkIn, r.checkOut);
+                const tot = angka(r.totalRoom) * malam * angka(r.price);
+                return (
+                  <tr key={i} className="border-t border-slate-100">
+                    <td className={TD}>{r.type || "-"}</td><td className={TD + " text-center"}>{r.checkIn || "-"}</td><td className={TD + " text-center"}>{r.checkOut || "-"}</td>
+                    <td className={TD + " text-center"}>{fmt(r.totalRoom)}</td><td className={TD + " text-center"}>{malam}</td>
+                    <td className={TD + " text-right"}>{fmt(r.price)}</td><td className={TD + " text-right font-medium"}>{tot.toLocaleString("id-ID")}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-slate-200 font-bold text-slate-800"><td colSpan={6} className={TD + " text-right"}>GRAND TOTAL (Rp)</td><td className={TD + " text-right bg-amber-50"}>{gt.toLocaleString("id-ID")}</td></tr>
+              <tr className="text-slate-600"><td colSpan={6} className={TD + " text-right"}>DP {g.dpDate ? g.dpDate + " " : ""}(Rp)</td><td className={TD + " text-right"}>{fmt(g.dpAmount)}</td></tr>
+              <tr className="font-bold text-slate-800"><td colSpan={6} className={TD + " text-right"}>BALANCE (Rp)</td><td className={TD + " text-right"}>{balance.toLocaleString("id-ID")}</td></tr>
+            </tfoot>
+          </table>
+        </div>
+        <div className="text-xs mt-2"><span className="font-semibold text-slate-500">REMARK:</span> <span className="whitespace-pre-wrap text-slate-700">{g.remark || "-"}</span></div>
+      </div>
+
+      {kamarBd.length > 0 && (
+        <div className="border-t border-slate-100 px-3 py-2">
+          <div className="text-xs font-semibold text-slate-500 mb-1">BREAKDOWN HARGA KAMAR</div>
+          <div className="overflow-x-auto -mx-3 px-3">
+            <table className="w-full text-xs min-w-[360px]">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500">
+                  <th className={TD + " text-left"}>Room Type</th><th className={TD + " text-right"}>Lodging</th>
+                  {komp.map((k) => <th key={k.id} className={TD + " text-right"}>{k.nama}</th>)}
+                  <th className={TD + " text-right"}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {kamarBd.map((r, i) => {
+                  const price = angka(r.price);
+                  const totalKomp = komp.reduce((t, k) => t + angka((r.bd || {})[k.id]), 0);
+                  return (
+                    <tr key={i} className="border-t border-slate-100">
+                      <td className={TD}>{r.type}</td><td className={TD + " text-right"}>{(price - totalKomp).toLocaleString("id-ID")}</td>
+                      {komp.map((k) => <td key={k.id} className={TD + " text-right"}>{angka((r.bd || {})[k.id]).toLocaleString("id-ID")}</td>)}
+                      <td className={TD + " text-right font-medium"}>{price.toLocaleString("id-ID")}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div className="border-t border-slate-100 px-3 py-2">
+        <div className="text-xs font-semibold text-slate-500 mb-1">CATATAN DEPARTEMEN</div>
+        <div className="grid sm:grid-cols-2 gap-2 text-xs">
+          {catatan.map(([judul, isi]) => (
+            <div key={judul} className="bg-slate-50 rounded-md px-2 py-1.5">
+              <div className="font-semibold text-slate-600">{judul}</div>
+              <div className="whitespace-pre-wrap text-slate-700">{isi || "-"}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {buatHtml && (
+        <div className="border-t border-slate-100">
+          <button type="button" onClick={() => setLihatDok((v) => !v)} className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+            {lihatDok ? "▾" : "▸"} Tampilan dokumen (sama seperti PDF, dengan tanda tangan yang sudah tercatat)
+          </button>
+          {lihatDok && (
+            <div className="overflow-x-auto bg-slate-100 p-2">
+              <div className="bg-white p-2 min-w-[640px]" dangerouslySetInnerHTML={{ __html: html }} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function GeoPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -635,9 +781,14 @@ export default function GeoPage() {
 
   function unduhPDFRow(row) {
     const info = parseGeoRow(row);
-    const data = normalisasiGeo({ ...GEO_KOSONG(), ...info.data, notes: { ...DEFAULT_NOTES, ...(info.data.notes || {}) } });
-    unduhPDF(data, row.ID, { id: row.ID, approvals: info.approvals, audit: info.audit, status: info.status, info });
+    unduhPDF(dataDariInfo(info), row.ID, { id: row.ID, approvals: info.approvals, audit: info.audit, status: info.status, info });
   }
+
+  // HTML dokumen GEO (tanpa halaman audit) untuk pratinjau di modal persetujuan
+  const htmlPratinjau = useCallback((info) => {
+    const data = dataDariInfo(info);
+    return buildHTML(data, window.location.origin, { approvals: info.approvals, audit: info.audit, status: info.status, info, karyawan });
+  }, [karyawan]);
 
   const gt = useMemo(() => grandTotal(g), [g]);
 
@@ -771,12 +922,15 @@ export default function GeoPage() {
         const next = tahapBerikut(info);
         const giliran = bolehBertindak(user, info);
         return (
-          <Modal title={"Persetujuan GEO " + (rowApv.GeoNo || "")} onClose={() => setModalApvId(null)}>
+          <Modal title={"Persetujuan GEO " + (rowApv.GeoNo || "")} onClose={() => setModalApvId(null)} wide>
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <BadgeStatus status={info.status} />
                 <span className="text-slate-600">{rowApv.EventTitle || "-"} · {rowApv.Company || "-"}</span>
               </div>
+
+              {/* Isi GEO ditampilkan langsung supaya penyetuju tidak perlu mengunduh PDF */}
+              <RincianGeo data={dataDariInfo(info)} buatHtml={() => htmlPratinjau(info)} />
 
               <div className="border border-slate-200 rounded-lg overflow-hidden">
                 <div className="bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">JENJANG PERSETUJUAN</div>
