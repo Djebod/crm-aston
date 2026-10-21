@@ -185,7 +185,7 @@ export default function Dashboard() {
     let bentrok = null;
     if (s !== null && e !== null && e > s && form.tanggalEvent) {
       bentrok = bookings.find((x) => {
-        if (x.Room !== form.meetRoom || x.Tanggal !== form.tanggalEvent || (x.Status === "Cancel" || x.Status === "Expired")) return false;
+        if (x.Room !== form.meetRoom || x.Tanggal !== form.tanggalEvent || x.Status !== "Definite") return false; // antrian: hanya Definite yang memblok
         const rs = keMenit(x.JamMulai), re = keMenit(x.JamSelesai);
         if (rs === null || re === null) return false;
         return !(s >= re + 120 || rs >= e + 120);
@@ -354,12 +354,12 @@ export default function Dashboard() {
       if (kap && pax > kap) { alert(`Kapasitas ${form.meetRoom} (${SETUP_MEETING.find((s) => s.key === form.meetSetup)?.label}) hanya ${kap} orang, peserta ${pax}. Pilih ruangan lebih besar / ubah setup.`); return; }
       const s = keMenit(form.meetMulai), e = keMenit(form.meetSelesai);
       const bentrok = bookings.find((x) => {
-        if (x.Room !== form.meetRoom || x.Tanggal !== form.tanggalEvent || (x.Status === "Cancel" || x.Status === "Expired")) return false;
+        if (x.Room !== form.meetRoom || x.Tanggal !== form.tanggalEvent || x.Status !== "Definite") return false; // antrian: hanya Definite yang memblok
         const rs = keMenit(x.JamMulai), re = keMenit(x.JamSelesai);
         if (rs === null || re === null) return false;
         return !(s >= re + 120 || rs >= e + 120);
       });
-      if (bentrok) { alert(`Ruang ${form.meetRoom} pada ${form.tanggalEvent} sudah terisi ${bentrok.JamMulai}-${bentrok.JamSelesai} (${bentrok.EventTitle || "-"}). Perlu jeda minimal 2 jam. Pilih ruangan/jam lain.`); return; }
+      if (bentrok) { alert(`Ruang ${form.meetRoom} pada ${form.tanggalEvent} sudah Definite ${bentrok.JamMulai}-${bentrok.JamSelesai} (${bentrok.EventTitle || "-"}). Perlu jeda minimal 2 jam. Pilih ruangan/jam lain.`); return; }
     }
     setMenyimpan(true);
     try {

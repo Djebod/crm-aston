@@ -108,6 +108,8 @@ export default function RoomBookingPage() {
     return list.find((x) => {
       if (x.ID === f.id) return false;
       if (x.Room !== f.room || x.Tanggal !== f.tanggal || BEBAS.includes(x.Status)) return false;
+      // antrian: Tentative boleh menumpuk; yang memblok hanya Definite, kecuali booking ini sendiri mau jadi Definite
+      if (x.Status !== "Definite" && f.status !== "Definite") return false;
       const rs = menit(x.JamMulai), re = menit(x.JamSelesai);
       if (rs === null || re === null) return false;
       return !(s >= re + 120 || rs >= e + 120);
@@ -129,7 +131,12 @@ export default function RoomBookingPage() {
     if (!f.room) { alert("Silakan pilih ruangan."); return; }
     if (menit(f.jamSelesai) <= menit(f.jamMulai)) { alert("Jam selesai harus setelah jam mulai."); return; }
     if (paxLebih) { alert(`Kapasitas ${f.room} untuk setup ${setupLabel(f.setup)} hanya ${kapasitas} orang, sedangkan peserta ${f.pax}. Pilih ruangan lebih besar atau ubah setup.`); return; }
-    if (bentrok && !BEBAS.includes(f.status)) { alert(`Bentrok dengan booking ${bentrok.JamMulai}-${bentrok.JamSelesai} (${bentrok.EventTitle || "-"}) di ${f.room}. Minimal jeda 2 jam.`); return; }
+    if (bentrok && !BEBAS.includes(f.status)) {
+      alert(f.status === "Definite"
+        ? `Masih ada booking ${bentrok.Status} ${bentrok.JamMulai}-${bentrok.JamSelesai} (${bentrok.EventTitle || "-"}) di ${f.room}. Cancel booking itu dulu sebelum menjadikan Definite.`
+        : `Slot sudah Definite: ${bentrok.JamMulai}-${bentrok.JamSelesai} (${bentrok.EventTitle || "-"}) di ${f.room}. Pilih jam atau ruangan lain.`);
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/roombooking", {

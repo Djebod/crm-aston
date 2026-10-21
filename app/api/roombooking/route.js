@@ -23,11 +23,16 @@ function menit(hhmm) {
   return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
 }
 
-// Cek bentrok: ruangan sama, tanggal sama, dan jeda < 120 menit (atau overlap)
-async function adaBentrok(b) {
+// Cek bentrok: ruangan sama, tanggal sama, dan jeda < 120 menit (atau overlap).
+// Aturan antrian: booking Tentative boleh menumpuk di jam yang sama (antri). Yang memblok slot hanya booking Definite.
+// Saat sebuah booking mau dijadikan Definite, semua booking lain di jam itu harus sudah di-Cancel dulu (hanyaDefinite = false).
+async function adaBentrok(b, hanyaDefinite = true) {
   if (!b.room) return null;
-  const rows = await sql`SELECT id, jam_mulai, jam_selesai FROM room_booking
-    WHERE room = ${b.room} AND tanggal = ${b.tanggal} AND status <> 'Cancel' AND status <> 'Expired' AND id <> ${b.id || ""}`;
+  const rows = hanyaDefinite
+    ? await sql`SELECT id, jam_mulai, jam_selesai, status, event_title, company FROM room_booking
+        WHERE room = ${b.room} AND tanggal = ${b.tanggal} AND status = 'Definite' AND id <> ${b.id || ""}`
+    : await sql`SELECT id, jam_mulai, jam_selesai, status, event_title, company FROM room_booking
+        WHERE room = ${b.room} AND tanggal = ${b.tanggal} AND status <> 'Cancel' AND status <> 'Expired' AND id <> ${b.id || ""}`;
   const s = menit(b.jamMulai), e = menit(b.jamSelesai);
   if (s === null || e === null) return null;
   for (const r of rows) {
@@ -39,6 +44,9 @@ async function adaBentrok(b) {
   }
   return null;
 }
+
+const pesanAntrian = (x) => `Masih ada booking ${x.status} ${x.jam_mulai}-${x.jam_selesai} (${x.event_title || x.company || "-"}) di ruangan yang sama. Cancel booking itu dulu sebelum menjadikan Definite.`;
+const pesanDefinite = (x) => `Slot sudah Definite: ${x.jam_mulai}-${x.jam_selesai} (${x.event_title || x.company || "-"}). Pilih jam atau ruangan lain.`;
 
 const tglID = (s) => { const d = new Date(s); return isNaN(d) ? s : d.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }); };
 async function emailTamu(rb, subject, isi) {
@@ -60,6 +68,14 @@ export async function POST(req) {
     const b = await req.json();
 
     if (b.action === "setStatus") {
+      if (String(b.status) === "Definite") {
+        const cur = await sql`SELECT id, room, tanggal, jam_mulai, jam_selesai FROM room_booking WHERE id = ${b.id}`;
+        if (cur.length) {
+          const c = cur[0];
+          const lain = await adaBentrok({ id: c.id, room: c.room, tanggal: c.tanggal, jamMulai: c.jam_mulai, jamSelesai: c.jam_selesai }, false);
+          if (lain) return NextResponse.json({ status: "error", message: pesanAntrian(lain) });
+        }
+      }
       await sql`UPDATE room_booking SET status = ${b.status || ""} WHERE id = ${b.id}`;
       return NextResponse.json({ status: "ok" });
     }
@@ -74,8 +90,8 @@ export async function POST(req) {
       if (!rows.length) return NextResponse.json({ status: "error", message: "Booking tidak ditemukan." });
       const rb = rows[0];
       if (rb.lead_id) return NextResponse.json({ status: "error", message: "Booking ini sudah tertaut Lead." });
-      const bentrok = await adaBentrok({ id: rb.id, room: rb.room, tanggal: rb.tanggal, jamMulai: rb.jam_mulai, jamSelesai: rb.jam_selesai });
-      if (bentrok) return NextResponse.json({ status: "error", message: `Bentrok dengan booking ${bentrok.jam_mulai}-${bentrok.jam_selesai} di ruangan yang sama.` });
+      const bentrok = await adaBentrok({ id: rb.id, room: rb.room, tanggal: rb.tanggal, jamMulai: rb.jam_mulai, jamSelesai: rb.jam_selesai }, false);
+      if (bentrok) return NextResponse.json({ status: "error", message: pesanAntrian(bentrok) });
 
       const now = waktuJakarta();
       const leadId = "L" + Date.now();
@@ -117,8 +133,9 @@ export async function POST(req) {
       if (!b.room || !b.tanggal || !b.jamMulai || !b.jamSelesai) return NextResponse.json({ status: "error", message: "Ruangan, tanggal, dan jam wajib diisi." });
       if (menit(b.jamSelesai) <= menit(b.jamMulai)) return NextResponse.json({ status: "error", message: "Jam selesai harus setelah jam mulai." });
       if (!BEBAS.includes(String(b.status))) {
-        const bentrok = await adaBentrok(b);
-        if (bentrok) return NextResponse.json({ status: "error", message: `Bentrok dengan booking ${bentrok.jam_mulai}-${bentrok.jam_selesai} di ruangan yang sama. Minimal jeda 2 jam.` });
+        const jadiDefinite = String(b.status) === "Definite";
+        const bentrok = await adaBentrok(b, !jadiDefinite);
+        if (bentrok) return NextResponse.json({ status: "error", message: jadiDefinite ? pesanAntrian(bentrok) : pesanDefinite(bentrok) });
       }
       if (b.action === "addBooking") {
         const id = "RB" + Date.now();

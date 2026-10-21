@@ -4,11 +4,12 @@ import { sql, raw, exec, waktuJakarta } from "@/lib/db";
 const keMenit = (hhmm) => { const m = String(hhmm || "").match(/^(\d{1,2}):(\d{2})/); return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : null; };
 
 // cek bentrok ruangan (jeda < 120 menit atau overlap). true = bentrok.
+// Aturan antrian: booking Tentative boleh menumpuk di jam yang sama; yang memblok hanya booking Definite.
 async function adaBentrokRuang(room, tanggal, mulai, selesai) {
   if (!room || !tanggal) return false;
   const s = keMenit(mulai), e = keMenit(selesai);
   if (s === null || e === null || e <= s) return true;
-  const rows = await sql`SELECT jam_mulai, jam_selesai FROM room_booking WHERE room = ${room} AND tanggal = ${tanggal} AND status <> 'Cancel' AND status <> 'Expired'`;
+  const rows = await sql`SELECT jam_mulai, jam_selesai FROM room_booking WHERE room = ${room} AND tanggal = ${tanggal} AND status = 'Definite'`;
   for (const r of rows) {
     const rs = keMenit(r.jam_mulai), re = keMenit(r.jam_selesai);
     if (rs === null || re === null) continue;
@@ -71,7 +72,7 @@ export async function POST(req) {
           if (b.pesanMeeting && b.meetRoom) {
             const bebas = !(await adaBentrokRuang(b.meetRoom, b.tanggalEvent, b.meetMulai, b.meetSelesai));
             if (bebas) { room = b.meetRoom; jamMulai = b.meetMulai || "08:00"; jamSelesai = b.meetSelesai || "17:00"; setup = b.meetSetup || ""; catatan = "Dibuat dari Lead"; }
-            else { catatan = "Otomatis dari Lead — ruangan pilihan bentrok, jadwalkan ulang"; }
+            else { catatan = "Otomatis dari Lead — ruangan pilihan sudah Definite untuk booking lain, jadwalkan ulang"; }
           }
           await sql`INSERT INTO room_booking (id, room, tanggal, jam_mulai, jam_selesai, event_title, company, pax, setup, pic, status, catatan, created_at, created_by, lead_id)
             VALUES (${rbId}, ${room}, ${b.tanggalEvent || ""}, ${jamMulai}, ${jamSelesai}, ${b.jenisEvent || ""}, ${b.instansi || ""}, ${String(b.jumlahPax ?? "")}, ${setup}, ${b.pic || ""}, ${status}, ${catatan}, ${now}, ${b.oleh || ""}, ${id})`;
@@ -84,6 +85,24 @@ export async function POST(req) {
       const cur = await sql`SELECT status AS "Status", nama AS "Nama" FROM leads WHERE id = ${b.id}`;
       if (!cur.length) return NextResponse.json({ status: "error", message: "ID tidak ditemukan" });
       const old = cur[0];
+
+      // Lead mau jadi Definite: booking ruangannya tidak boleh masih antri dengan booking lain (Tentative/Definite) di jam yang sama.
+      if (String(b.status) === "Definite" && String(old.Status) !== "Definite") {
+        const milik = await sql`SELECT id, room, tanggal, jam_mulai, jam_selesai FROM room_booking WHERE lead_id = ${b.id} AND room <> '' AND status <> 'Cancel' AND status <> 'Expired'`;
+        for (const m of milik) {
+          const s = keMenit(m.jam_mulai), e = keMenit(m.jam_selesai);
+          if (s === null || e === null) continue;
+          const lain = await sql`SELECT jam_mulai, jam_selesai, status, event_title, company FROM room_booking
+            WHERE room = ${m.room} AND tanggal = ${m.tanggal} AND status <> 'Cancel' AND status <> 'Expired' AND id <> ${m.id}`;
+          for (const x of lain) {
+            const rs = keMenit(x.jam_mulai), re = keMenit(x.jam_selesai);
+            if (rs === null || re === null) continue;
+            if (!(s >= re + 120 || rs >= e + 120)) {
+              return NextResponse.json({ status: "error", message: `Belum bisa Definite: masih ada booking ${x.status} ${x.jam_mulai}-${x.jam_selesai} (${x.event_title || x.company || "-"}) di ${m.room} pada tanggal yang sama. Cancel booking itu dulu di menu Room Booking.` });
+            }
+          }
+        }
+      }
 
       const map = { nama: "nama", instansi: "instansi", nohp: "nohp", email: "email", jenisEvent: "jenis_event",
         tanggalEvent: "tanggal_event", jumlahPax: "jumlah_pax", estimasiNilai: "estimasi_nilai", sumber: "sumber",

@@ -90,18 +90,21 @@ async function emailPIC(nama) {
   } catch (e) { return ""; }
 }
 
-// cek bentrok ruangan (jeda < 120 menit atau overlap). true = bentrok. Sama dengan /api/leads.
-async function adaBentrokRuang(room, tanggal, mulai, selesai) {
-  if (!room || !tanggal) return false;
+// cek slot ruangan (jeda < 120 menit atau overlap). Sama dengan /api/leads.
+// Aturan antrian: booking Tentative boleh menumpuk (antri); yang memblok hanya booking Definite.
+// Hasil: "definite" (slot sudah pasti milik orang lain), "antri" (ada Tentative lain di jam itu), atau "" (kosong).
+async function cekSlotRuang(room, tanggal, mulai, selesai) {
+  if (!room || !tanggal) return "";
   const s = keMenit(mulai), e = keMenit(selesai);
-  if (s === null || e === null || e <= s) return true;
-  const rows = await sql`SELECT jam_mulai, jam_selesai FROM room_booking WHERE room = ${room} AND tanggal = ${tanggal} AND status <> 'Cancel' AND status <> 'Expired'`;
+  if (s === null || e === null || e <= s) return "definite";
+  const rows = await sql`SELECT jam_mulai, jam_selesai, status FROM room_booking WHERE room = ${room} AND tanggal = ${tanggal} AND status <> 'Cancel' AND status <> 'Expired'`;
+  let antri = "";
   for (const r of rows) {
     const rs = keMenit(r.jam_mulai), re = keMenit(r.jam_selesai);
     if (rs === null || re === null) continue;
-    if (!(s >= re + 120 || rs >= e + 120)) return true;
+    if (!(s >= re + 120 || rs >= e + 120)) { if (r.status === "Definite") return "definite"; antri = "antri"; }
   }
-  return false;
+  return antri;
 }
 
 export async function POST(req) {
@@ -177,9 +180,9 @@ export async function POST(req) {
     try {
       let room = "";
       if (ruangan) {
-        const bentrok = await adaBentrokRuang(ruangan, tanggal, jamMulai, jamSelesai);
-        if (bentrok) bookingCatatan = `Ruangan pilihan tamu (${ruangan}) bentrok — jadwalkan ulang`;
-        else { room = ruangan; bookingCatatan = "Dari situs MICE " + ref + (hari > 1 ? ` — acara ${hari} hari, hari berikutnya belum diblok` : ""); }
+        const slot = await cekSlotRuang(ruangan, tanggal, jamMulai, jamSelesai);
+        if (slot === "definite") bookingCatatan = `Ruangan pilihan tamu (${ruangan}) sudah Definite untuk booking lain — jadwalkan ulang`;
+        else { room = ruangan; bookingCatatan = "Dari situs MICE " + ref + (slot === "antri" ? " — ANTRI: ada booking Tentative lain di jam yang sama" : "") + (hari > 1 ? ` — acara ${hari} hari, hari berikutnya belum diblok` : ""); }
       } else bookingCatatan = "Dari situs MICE " + ref + " — tentukan ruangan";
       await sql`INSERT INTO room_booking (id, room, tanggal, jam_mulai, jam_selesai, event_title, company, pax, setup, pic, status, catatan, created_at, created_by, lead_id,
           sumber, tamu_nama, tamu_wa, tamu_email, estimasi_harga, kode_booking)

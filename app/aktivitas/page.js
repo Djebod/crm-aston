@@ -126,7 +126,7 @@ export default function AktivitasPage() {
     let bentrok = null;
     if (s !== null && e !== null && e > s && lead.tanggalEvent) {
       bentrok = bookings.find((x) => {
-        if (x.Room !== lead.meetRoom || x.Tanggal !== lead.tanggalEvent || (x.Status === "Cancel" || x.Status === "Expired")) return false;
+        if (x.Room !== lead.meetRoom || x.Tanggal !== lead.tanggalEvent || x.Status !== "Definite") return false; // antrian: hanya Definite yang memblok
         const rs = keMenit(x.JamMulai), re = keMenit(x.JamSelesai);
         if (rs === null || re === null) return false;
         return !(s >= re + 120 || rs >= e + 120);
@@ -250,12 +250,12 @@ export default function AktivitasPage() {
       if (kap && pax > kap) { alert(`Kapasitas ${lead.meetRoom} (${SETUP_MEETING.find((s) => s.key === lead.meetSetup)?.label}) hanya ${kap} orang, peserta ${pax}.`); return; }
       const s = keMenit(lead.meetMulai), e = keMenit(lead.meetSelesai);
       const bentrok = bookings.find((x) => {
-        if (x.Room !== lead.meetRoom || x.Tanggal !== lead.tanggalEvent || (x.Status === "Cancel" || x.Status === "Expired")) return false;
+        if (x.Room !== lead.meetRoom || x.Tanggal !== lead.tanggalEvent || x.Status !== "Definite") return false; // antrian: hanya Definite yang memblok
         const rs = keMenit(x.JamMulai), re = keMenit(x.JamSelesai);
         if (rs === null || re === null) return false;
         return !(s >= re + 120 || rs >= e + 120);
       });
-      if (bentrok) { alert(`Ruang ${lead.meetRoom} pada ${lead.tanggalEvent} sudah terisi ${bentrok.JamMulai}-${bentrok.JamSelesai}. Perlu jeda minimal 2 jam.`); return; }
+      if (bentrok) { alert(`Ruang ${lead.meetRoom} pada ${lead.tanggalEvent} sudah Definite ${bentrok.JamMulai}-${bentrok.JamSelesai}. Perlu jeda minimal 2 jam.`); return; }
     }
     setMenyimpan(true);
     try {
