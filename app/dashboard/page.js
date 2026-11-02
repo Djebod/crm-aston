@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import PasswordInput from "@/components/PasswordInput";
 import { Donut, BarList, ChartCard, hitungPer, beriWarna, topN } from "@/components/Charts";
 import { unduhCSV, namaFileTanggal } from "@/components/exportUtil";
 import Pager from "@/components/Pager";
@@ -924,7 +923,6 @@ function KelolaTim({ user, onClose }) {
   const [daftar, setDaftar] = useState([]);
   const [nama, setNama] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [role, setRole] = useState("marketing");
   const [kode, setKode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -945,8 +943,8 @@ function KelolaTim({ user, onClose }) {
 
   async function tambah() {
     setPesan("");
-    if (!nama || !email || !password) {
-      setPesan("Nama, email, dan password wajib diisi.");
+    if (!nama || !email) {
+      setPesan("Nama dan email wajib diisi.");
       return;
     }
     setLoading(true);
@@ -954,12 +952,12 @@ function KelolaTim({ user, onClose }) {
       const res = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "addUser", requesterEmail: user.email, nama, email, password, role, kode }),
+        body: JSON.stringify({ action: "addUser", requesterEmail: user.email, nama, email, role, kode }),
       });
       const data = await res.json();
       if (data.status === "ok") {
         setPesan("✓ User berhasil ditambahkan.");
-        setNama(""); setEmail(""); setPassword(""); setRole("marketing"); setKode("");
+        setNama(""); setEmail(""); setRole("marketing"); setKode("");
         await muat();
       } else {
         setPesan("Gagal: " + (data.message || "coba lagi"));
@@ -977,10 +975,7 @@ function KelolaTim({ user, onClose }) {
       <h3 className="font-semibold text-sm text-slate-700 mb-2">Tambah anggota</h3>
       <div className="grid sm:grid-cols-2 gap-3">
         <Field label="Nama"><input className={inp} value={nama} onChange={(e) => setNama(e.target.value)} /></Field>
-        <Field label="Email"><input className={inp} value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-        <Field label="Password awal">
-          <PasswordInput className={inp} value={password} onChange={(e) => setPassword(e.target.value)} />
-        </Field>
+        <Field label="Email Google (sama dgn Portal Staff)"><input className={inp} value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
         <Field label="Role">
           <select className={inp} value={role} onChange={(e) => setRole(e.target.value)}>
             <option value="marketing">marketing (sales)</option>
@@ -1030,7 +1025,6 @@ function BarisUser({ u, requester, expanded, onToggle, onSaved }) {
   const [kode, setKode] = useState(u.Kode || "");
   const [aktif, setAktif] = useState(String(u.Aktif).toLowerCase() !== "false");
   const [ttd, setTtd] = useState(u.Ttd || "");
-  const [pwBaru, setPwBaru] = useState("");
   const [busy, setBusy] = useState(false);
   const [pesan, setPesan] = useState("");
 
@@ -1046,7 +1040,6 @@ function BarisUser({ u, requester, expanded, onToggle, onSaved }) {
       const data = await res.json();
       if (data.status === "ok") {
         setPesan(pesanSukses);
-        setPwBaru("");
         await onSaved();
       } else {
         setPesan("Gagal: " + (data.message || "coba lagi"));
@@ -1111,29 +1104,6 @@ function BarisUser({ u, requester, expanded, onToggle, onSaved }) {
           >
             {busy ? "Menyimpan..." : "Simpan perubahan"}
           </button>
-
-          <div className="mt-4 pt-3 border-t border-slate-200">
-            <div className="text-sm font-medium text-slate-700 mb-1">Reset password</div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <PasswordInput
-                className={inp}
-                value={pwBaru}
-                onChange={(e) => setPwBaru(e.target.value)}
-                placeholder="Password baru (min. 6 karakter)"
-              />
-              <button
-                onClick={() => {
-                  if (pwBaru.length < 6) { setPesan("Password minimal 6 karakter."); return; }
-                  kirim({ password: pwBaru }, "✓ Password direset.");
-                }}
-                disabled={busy}
-                className="bg-[#c8962c] hover:brightness-95 text-[#12263a] text-sm font-semibold rounded-lg py-2 px-4 whitespace-nowrap disabled:opacity-60"
-              >
-                Reset
-              </button>
-            </div>
-            <p className="text-xs text-slate-400 mt-1">Beritahu password baru ini ke anggota, atau minta mereka pakai fitur "Lupa password".</p>
-          </div>
 
           {pesan && <p className="text-sm mt-3">{pesan}</p>}
         </div>

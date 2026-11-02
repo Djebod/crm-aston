@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import PasswordInput from "@/components/PasswordInput";
+import { signInWithPopup, signOut } from "firebase/auth";
+import { ambilAuth, ambilGoogleProvider } from "@/lib/firebaseClient";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -19,18 +18,19 @@ export default function LoginPage() {
 
   async function masuk() {
     setError("");
-    if (!email || !password) {
-      setError("Isi email dan password dulu ya.");
-      return;
-    }
     setLoading(true);
+    const auth = ambilAuth();
     try {
+      const cred = await signInWithPopup(auth, ambilGoogleProvider());
+      const idToken = await cred.user.getIdToken();
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ idToken }),
       });
       const data = await res.json();
+      // Sesi CRM disimpan sendiri; sesi Firebase cukup untuk sekali verifikasi.
+      await signOut(auth).catch(() => {});
       if (data.ok) {
         localStorage.setItem("crm_user", JSON.stringify(data.user));
         router.replace("/dashboard");
@@ -38,7 +38,11 @@ export default function LoginPage() {
         setError(data.message || "Login gagal.");
       }
     } catch (e) {
-      setError("Tidak bisa terhubung ke server. Coba lagi.");
+      const c = String(e?.code || "");
+      if (c.includes("popup-closed") || c.includes("cancelled")) { /* dibatalkan user */ }
+      else if (c.includes("popup-blocked")) setError("Popup diblokir browser. Izinkan popup lalu coba lagi.");
+      else if (c.includes("unauthorized-domain")) setError("Domain ini belum diizinkan di Firebase (Authorized domains).");
+      else setError("Login gagal: " + (e?.message || "coba lagi."));
     } finally {
       setLoading(false);
     }
@@ -56,34 +60,7 @@ export default function LoginPage() {
           </div>
 
           <h1 className="text-lg font-bold mb-1">Masuk</h1>
-          <p className="text-slate-500 text-sm mb-5">Leads Event &amp; Booking &middot; Cirebon</p>
-
-          <label className="block text-sm font-medium mb-1">Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && masuk()}
-            placeholder="nama@email.com"
-            className="w-full border border-slate-300 rounded-lg px-3 py-2.5 mb-4 outline-none focus:ring-2 focus:ring-[#c8962c]"
-          />
-
-          <label className="block text-sm font-medium mb-1">Password</label>
-          <div className="mb-2">
-            <PasswordInput
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && masuk()}
-              placeholder="********"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#c8962c]"
-            />
-          </div>
-
-          <div className="text-right mb-4">
-            <a href="/lupa-password" className="text-sm text-[#12263a] hover:text-[#c8962c] font-medium">
-              Lupa password?
-            </a>
-          </div>
+          <p className="text-slate-500 text-sm mb-5">Masuk memakai akun Google kantor yang terdaftar di Portal Staff.</p>
 
           {error && (
             <div className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 mb-4">
@@ -94,9 +71,15 @@ export default function LoginPage() {
           <button
             onClick={masuk}
             disabled={loading}
-            className="w-full bg-[#12263a] hover:bg-[#0e1f33] text-white font-semibold rounded-lg py-2.5 transition disabled:opacity-60"
+            className="w-full flex items-center justify-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-semibold rounded-lg py-2.5 transition disabled:opacity-60"
           >
-            {loading ? "Memeriksa..." : "Masuk"}
+            <svg viewBox="0 0 48 48" className="h-5 w-5" aria-hidden="true">
+              <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.6 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.3l7.8 6C12.3 13.6 17.7 9.5 24 9.5z" />
+              <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z" />
+              <path fill="#FBBC05" d="M10.4 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l7.8-6z" />
+              <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.7-4.1-13.6-9.8l-7.8 6C6.5 42.6 14.6 48 24 48z" />
+            </svg>
+            {loading ? "Memeriksa..." : "Login dengan Google"}
           </button>
         </div>
 

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { sql, pastikanKolomTtd } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -34,16 +33,6 @@ export async function POST(req) {
       await pastikanKolomTtd();
       const r = await sql`SELECT ttd AS "Ttd" FROM users WHERE email = ${em}`;
       return NextResponse.json({ status: "ok", ttd: r[0]?.Ttd || "" });
-    }
-
-    if (body.action === "changePassword") {
-      if (!rows.length) return NextResponse.json({ status: "error", message: CATATAN });
-      if (!bcrypt.compareSync(String(body.currentPassword || ""), rows[0].PasswordHash || "")) {
-        return NextResponse.json({ status: "error", message: "Password lama salah." });
-      }
-      if (String(body.newPassword || "").length < 6) return NextResponse.json({ status: "error", message: "Password baru minimal 6 karakter." });
-      await sql`UPDATE users SET password_hash = ${bcrypt.hashSync(String(body.newPassword), 10)} WHERE email = ${em}`;
-      return NextResponse.json({ status: "ok" });
     }
 
     return NextResponse.json({ status: "error", message: "Aksi tidak dikenal." });

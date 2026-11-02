@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { sql, pastikanKolomTtd } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -41,7 +40,6 @@ export async function POST(req) {
       if (body.role !== undefined) await sql`UPDATE users SET role = ${body.role} WHERE email = ${em}`;
       if (body.kode !== undefined) await sql`UPDATE users SET kode = ${String(body.kode || "").toUpperCase()} WHERE email = ${em}`;
       if (body.aktif !== undefined) await sql`UPDATE users SET aktif = ${!!body.aktif} WHERE email = ${em}`;
-      if (body.password) await sql`UPDATE users SET password_hash = ${bcrypt.hashSync(String(body.password), 10)} WHERE email = ${em}`;
       if (body.ttd !== undefined) {
         await pastikanKolomTtd();
         const ttd = String(body.ttd || "");
@@ -52,12 +50,12 @@ export async function POST(req) {
       return NextResponse.json({ status: "ok" });
     }
 
-    if (!body.email || !body.password) return NextResponse.json({ status: "error", message: "Email & password wajib diisi." });
+    if (!body.email) return NextResponse.json({ status: "error", message: "Email wajib diisi." });
     const em = String(body.email).toLowerCase().trim();
     const ada = await sql`SELECT 1 FROM users WHERE email = ${em}`;
     if (ada.length) return NextResponse.json({ status: "error", message: "Email sudah terdaftar." });
     await sql`INSERT INTO users (email, nama, password_hash, role, aktif, reset_token, reset_expiry, kode)
-      VALUES (${em}, ${body.nama || ""}, ${bcrypt.hashSync(String(body.password), 10)}, ${body.role || "marketing"}, true, ${""}, ${0}, ${String(body.kode || "").toUpperCase()})`;
+      VALUES (${em}, ${body.nama || ""}, ${""}, ${body.role || "marketing"}, true, ${""}, ${0}, ${String(body.kode || "").toUpperCase()})`;
     return NextResponse.json({ status: "ok" });
   } catch (e) { return NextResponse.json({ status: "error", message: e?.message || String(e) }); }
 }
