@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { Modal, Field, inp } from "@/components/Modal";
 import { unduhPDFdariHTML } from "@/lib/pdf";
-import { RATE_CATEGORIES, ROOM_TYPES, rateDefault } from "@/lib/rates";
+import { RATE_CATEGORIES, rateDefault } from "@/lib/rates";
 import { JABATAN_ROLE, blokTtd, statusTtd } from "@/lib/ttd";
+import { MEETING_PACKAGES, hariDariBaris } from "@/lib/meetingPackages";
 
 const HOTEL = {
   nama: "Aston Cirebon Hotel & Convention Center",
@@ -17,17 +18,8 @@ const HOTEL = {
 
 
 
-// Paket & harga (bisa diubah). Coffee break 150k, Lunch/Dinner 250k.
-const PAKET = [
-  { nama: "Coffee Break Package", harga: 150000 },
-  { nama: "Lunch Package", harga: 250000 },
-  { nama: "Dinner Package", harga: 250000 },
-  { nama: "Half Day Meeting", harga: 300000 },
-  { nama: "Full Day Meeting", harga: 450000 },
-  { nama: "Fullboard Meeting", harga: 600000 },
-  { nama: "Residential Twin", harga: 1500000 },
-  { nama: "Residential Single", harga: 1800000 },
-];
+// Paket & harga mengikuti daftar Meeting Package (lib/meetingPackages.js).
+const PAKET = MEETING_PACKAGES;
 
 const BENEFIT_DEFAULT = [
   "Sarapan untuk 2 orang",
@@ -278,7 +270,7 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
     namaAcara: lead.Instansi || lead.JenisEvent || "",
     jumlahPeserta: lead.JumlahPax || "",
     rangkaian: [{ hari: lead.TanggalEvent || "", waktu: "", acara: "", tempat: "", setup: "", jumlah: lead.JumlahPax || "" }],
-    estimasi: [{ checkIn: "", checkOut: "", deskripsi: "Residential Twin", jumlah: "", harga: "1500000" }],
+    estimasi: [{ checkIn: "", checkOut: "", deskripsi: PAKET[0].nama, jumlah: "", harga: String(PAKET[0].harga) }],
     dpDate: "", pelunasanDate: "", jatuhTempoDate: "",
     prepBy: user?.nama || "", prepTitle: "Sales Person", prepImg: "",
     leaderNama: "", leaderTitle: "Sales Leader", leaderImg: "",
@@ -323,31 +315,17 @@ export default function ConfirmationLetter({ lead, user, onClose }) {
   const addRow = (arr, kosong) => setG((s) => ({ ...s, [arr]: [...s[arr], kosong] }));
   const delRow = (arr, i) => setG((s) => ({ ...s, [arr]: s[arr].filter((_, j) => j !== i) }));
   const setRate = (i, kol, v) => setG((s) => ({ ...s, rates: { ...s.rates, [s.rateCat]: s.rates[s.rateCat].map((r, j) => (j === i ? [r[0], kol === "wd" ? v : r[1], kol === "we" ? v : r[2]] : r)) } }));
-  const tambahPaket = (nama) => { const p = PAKET.find((x) => x.nama === nama); if (p) setG((s) => ({ ...s, estimasi: [...s.estimasi, { deskripsi: p.nama, jumlah: "", harga: String(p.harga) }] })); };
-  const hariDariTanggal = (checkIn, checkOut) => {
-    if (!checkIn || !checkOut) return 0;
-    const mulai = new Date(checkIn + "T00:00:00");
-    const selesai = new Date(checkOut + "T00:00:00");
-    return Number.isNaN(mulai.getTime()) || Number.isNaN(selesai.getTime())
-      ? 0
-      : Math.max(0, Math.round((selesai - mulai) / 86400000));
+  const tambahPaket = (nama) => {
+    const p = PAKET.find((x) => x.nama === nama);
+    if (!p) return;
+    setG((s) => {
+      const akhir = s.estimasi[s.estimasi.length - 1] || {};
+      return { ...s, estimasi: [...s.estimasi, { checkIn: akhir.checkIn || "", checkOut: akhir.checkOut || "", deskripsi: p.nama, jumlah: "", harga: String(p.harga) }] };
+    });
   };
-  // Aturan hitung hari paket (berlaku Meeting, Wedding, Graduation):
-  // - Residential & tipe kamar (Superior, Deluxe, Suite, dst.) dihitung per malam dari
-  //   check-in ke check-out: beda 1 hari = 1 malam.
-  // - Paket lain dihitung per hari kalender: hari yang sama = 1 hari, hari berikutnya = 2 hari.
-  const perMalam = (r) => {
-    const d = (r.deskripsi || "").toLowerCase();
-    return /residen|kamar|room|suite|twin|single/.test(d) || ROOM_TYPES.some((t) => d.includes(t.toLowerCase()));
-  };
-  const lamaBaris = (r) => {
-    if (r.checkIn || r.checkOut) {
-      if (!r.checkIn || !r.checkOut) return 1;
-      const selisih = hariDariTanggal(r.checkIn, r.checkOut);
-      return perMalam(r) ? Math.max(1, selisih) : selisih + 1;
-    }
-    return g.jenisCL === "Graduation" ? angka(r.hari) || 1 : 1;
-  };
+  // Jumlah hari otomatis dari check in / check out (lib/meetingPackages.js):
+  // Residential & tipe kamar per malam, paket lain per hari kalender.
+  const lamaBaris = (r) => hariDariBaris(r) ?? (g.jenisCL === "Graduation" ? angka(r.hari) || 1 : 1);
   const totalBaris = (r) => angka(r.jumlah) * angka(r.harga) * lamaBaris(r);
   const grandTotal = g.estimasi.reduce((t, r) => t + totalBaris(r), 0);
   const clNo = buildNoDok("CL", g.nomor, g.tglSurat, g.kodeSales);

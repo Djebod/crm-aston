@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Modal, Field, inp } from "@/components/Modal";
 import { unduhPDFdariHTML } from "@/lib/pdf";
 import { RATE_CATEGORIES, rateDefault } from "@/lib/rates";
+import { MEETING_PACKAGES, hariDariBaris } from "@/lib/meetingPackages";
 import { JABATAN_ROLE, blokTtd, statusTtd } from "@/lib/ttd";
 
 // ====== Jenis Offering Letter ======
@@ -44,32 +45,7 @@ const INCLUSIONS = [
   "Free Shuttle menuju Mall dan stasiun kereta",
 ];
 
-const RES_INCLUDES = [
-  "Superior Room",
-  "Penggunaan ruang Meeting selama 12 jam",
-  "LCD Projector (2000 lumens) dan Layar (2 m x 1,5 m)",
-  "Audio Sound System",
-  "2 Microphone",
-  "Meeting Stationary: 1 Flip Chart dengan 3 warna Spidol, Notepad dan Pensil",
-  "Air Putih dan permen",
-  "2 kali sarapan",
-  "1 kali makan siang",
-  "1 kali makan malam di ballroom",
-  "1 kali Coffee Break",
-  "1 kali Amazing Race",
-];
-
-const RES_BENEFIT = "Superior Room\nPenggunaan ruang Meeting selama 12 jam\nLCD Projector (2000 lumens) dan Layar (2 m x 1,5 m)\nAudio Sound System\n2 Microphone\nMeeting Stationary: 1 Flip Chart 3 warna Spidol, Notepad dan Pensil\nAir Putih dan permen\n2 kali sarapan\n1 kali makan siang\n1 kali makan malam di ballroom\n1 kali Coffee Break\n1 kali Amazing Race";
-
-const PACKAGES = [
-  { nama: "Coffee Break Package", harga: 150000, benefit: "1x Coffee Break (snack + minuman)\nRuang meeting\nStandard sound system" },
-  { nama: "Meals Package", harga: 250000, benefit: "1x Makan (Lunch/Dinner) prasmanan\nRuang meeting\nAir mineral" },
-  { nama: "Half Day Meeting", harga: 300000, benefit: "Ruang meeting (4 jam)\n1x Coffee Break\n1x Makan\nLCD Projector & layar\nSound system & 2 microphone\nMeeting stationary\nAir mineral & permen" },
-  { nama: "Full Day Meeting", harga: 450000, benefit: "Ruang meeting (8 jam)\n2x Coffee Break\n1x Makan\nLCD Projector & layar\nSound system & 2 microphone\nMeeting stationary\nAir mineral & permen" },
-  { nama: "Fullboard Meeting", harga: 600000, benefit: "Menginap 1 malam (twin share) + sarapan\nRuang meeting\n2x Coffee Break\n3x Makan\nLCD Projector & layar\nSound system & 2 microphone\nMeeting stationary" },
-  { nama: "Residential Twin Package", harga: 1500000, benefit: "Special Price 3 Hari 2 Malam (Twin/Triple Share)\n" + RES_BENEFIT },
-  { nama: "Residential Single Package", harga: 2300000, benefit: "Special Price 3 Hari 2 Malam (Single Share)\n" + RES_BENEFIT },
-];
+const PACKAGES = MEETING_PACKAGES;
 
 // ====== Wedding Package (4 venue × Gold/Platinum) ======
 const W_GOLD = "1 Suite Room 1 malam (honeymoon decoration)\n2 Superior Room 1 malam\nBuffet 13 pilihan menu\nFood Testing 6 orang\nRomantic Dinner\nAkad Nikah 30 pax include Food\nGiant Welcome Banner\nFree Meeting Room 1x Meeting Coordination\nFree Parkir (10 kendaraan)";
@@ -144,18 +120,18 @@ export default function OfferingLetter({ lead, user, onClose }) {
     namaAcara: lead.Instansi || lead.JenisEvent || "",
     jumlahPeserta: lead.JumlahPax || "",
     rangkaian: [{ hari: lead.TanggalEvent || "", waktu: "", acara: "", tempat: "", setup: "", jumlah: lead.JumlahPax || "" }],
-    resTwin: "1500000",
-    resSingle: "2300000",
+    resTwin: "1120000",
+    resSingle: "1650000",
     addCoffee: "120000",
     addLunch: "150000",
     addDinner: "285000",
     addBand: "9500000",
-    estimasi: [{ deskripsi: "Residential Twin Package", jumlah: "", harga: "1500000" }],
+    estimasi: [{ checkIn: "", checkOut: "", deskripsi: MEETING_PACKAGES[0].nama, jumlah: "", harga: String(MEETING_PACKAGES[0].harga) }],
     konfirmasiTgl: "",
     ttdNama: user?.nama || "",
     ttdImg: "",
     ttdJabatan: "Sales Person",
-    pakets: [{ nama: PACKAGES[5].nama, harga: String(PACKAGES[5].harga), benefit: PACKAGES[5].benefit }],
+    pakets: [{ nama: PACKAGES[0].nama, harga: String(PACKAGES[0].harga), benefit: PACKAGES[0].benefit }],
     weddings: [{ key: wLabel(WEDDING_PACKAGES[6]), harga: String(WEDDING_PACKAGES[6].harga), persons: String(WEDDING_PACKAGES[6].persons), add: String(WEDDING_PACKAGES[6].add), benefit: WEDDING_PACKAGES[6].benefit }],
     ttdHP: "",
   });
@@ -284,7 +260,19 @@ export default function OfferingLetter({ lead, user, onClose }) {
       .catch(() => {});
   }, [kodeDok]); // eslint-disable-line
 
-  const grandTotal = o.estimasi.reduce((t, r) => t + angka(r.jumlah) * angka(r.harga), 0);
+  // Jumlah hari otomatis dari check in / check out (sama seperti Confirmation Letter).
+  // Baris lama tanpa tanggal tetap dihitung 1 hari.
+  const lamaBaris = (r) => hariDariBaris(r) ?? 1;
+  const totalBaris = (r) => angka(r.jumlah) * angka(r.harga) * lamaBaris(r);
+  const tambahPaketEst = (nama) => {
+    const p = PACKAGES.find((x) => x.nama === nama);
+    if (!p) return;
+    setO((s) => {
+      const akhir = s.estimasi[s.estimasi.length - 1] || {};
+      return { ...s, estimasi: [...s.estimasi, { checkIn: akhir.checkIn || "", checkOut: akhir.checkOut || "", deskripsi: p.nama, jumlah: "", harga: String(p.harga) }] };
+    });
+  };
+  const grandTotal = o.estimasi.reduce((t, r) => t + totalBaris(r), 0);
   const noOL = buildNoDok(kodeDok, o.nomor, o.tglSurat, o.kodeSales);
 
   function cetak() {
@@ -296,11 +284,10 @@ export default function OfferingLetter({ lead, user, onClose }) {
       `<tr>${td(r[0], "c")}${td(rp(r[1]), "c")}${td(rp(r[2]), "c")}</tr>`).join("");
 
     const inclList = INCLUSIONS.map((x) => `<li>${esc(x)}</li>`).join("");
-    const resList = RES_INCLUDES.map((x) => `<li>${esc(x)}</li>`).join("");
     const addonList = ADDON.map((x) => `<li>${esc(x)}</li>`).join("");
     const paketBlok = (o.pakets || []).map((p) => {
       const li = String(p.benefit || "").split("\n").filter((x) => x.trim()).map((x) => `<li>${esc(x)}</li>`).join("");
-      return `<div style="margin-top:6px"><b>${esc(p.nama)}</b> &nbsp;—&nbsp; <b>${rp(p.harga)} Nett/Orang</b></div><ul>${li}</ul>`;
+      return `<div style="margin-top:6px"><b>${esc(p.nama)}</b> &nbsp;—&nbsp; <b>${rp(p.harga)} Nett/Orang/Hari</b></div><ul>${li}</ul>`;
     }).join("");
     const weddingBlok = (o.weddings || []).map((w) => {
       const li = String(w.benefit || "").split("\n").filter((x) => x.trim()).map((x) => `<li>${esc(x)}</li>`).join("");
@@ -338,8 +325,8 @@ export default function OfferingLetter({ lead, user, onClose }) {
   ${galeri("fungames-1.jpg", "fungames-2.jpg", "fungames-3.jpg")}`;
 
     const estRows = o.estimasi.map((r, i) => {
-      const tot = angka(r.jumlah) * angka(r.harga);
-      return `<tr>${td(i + 1, "c")}${td(esc(r.deskripsi))}${td(angka(r.jumlah).toLocaleString("id-ID"), "r")}${td(angka(r.harga).toLocaleString("id-ID"), "r")}${td(tot.toLocaleString("id-ID"), "r")}</tr>`;
+      const rentang = r.checkIn || r.checkOut ? `${esc(tglID(r.checkIn))} - ${esc(tglID(r.checkOut))}` : "-";
+      return `<tr>${td(i + 1, "c")}${td(rentang, "c")}${td(esc(r.deskripsi))}${td(lamaBaris(r), "r")}${td(angka(r.jumlah).toLocaleString("id-ID"), "r")}${td(angka(r.harga).toLocaleString("id-ID"), "r")}${td(totalBaris(r).toLocaleString("id-ID"), "r")}</tr>`;
     }).join("");
 
 
@@ -447,9 +434,9 @@ export default function OfferingLetter({ lead, user, onClose }) {
 
   <div class="sec pb">ESTIMASI BIAYA</div>
   <table>
-    <tr>${th("No")}${th("Deskripsi")}${th("Jumlah")}${th("Harga")}${th("Total")}</tr>
+    <tr>${th("No")}${th("Check In - Check Out")}${th("Deskripsi")}${th("Hari")}${th("Jumlah")}${th("Harga")}${th("Total")}</tr>
     ${estRows}
-    <tr class="total"><td colspan="4" class="r">Grand Total</td>${td(grandTotal.toLocaleString("id-ID"), "r")}</tr>
+    <tr class="total"><td colspan="6" class="r">Grand Total</td>${td(grandTotal.toLocaleString("id-ID"), "r")}</tr>
   </table>
   <p>Estimasi biaya yang kami sampaikan bersifat sementara dan dapat berubah menyesuaikan kebutuhan serta spesifikasi yang akan disepakati lebih lanjut.</p>
   <p>Saat ini kami sudah melakukan reservasi sebanyak <b>${angka(o.jumlahKamar) || "-"} kamar</b>, namun masih berstatus tentative. Apabila ${esc(o.sapaan)} ingin melakukan perubahan silakan melakukan konfirmasi sebelum <b>${o.konfirmasiTgl ? tglID(o.konfirmasiTgl) : "________"}</b>. Harga yang disebutkan dalam proposal ini berlaku hingga hari tersebut, dan apabila konfirmasi melewati hari tersebut maka hotel berhak melakukan perubahan harga.</p>
@@ -626,16 +613,25 @@ export default function OfferingLetter({ lead, user, onClose }) {
         <div className="border border-slate-200 rounded-lg p-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-slate-500">ESTIMASI BIAYA</span>
-            <button onClick={() => addRow("estimasi", { deskripsi: "", jumlah: "", harga: "" })} className="text-xs bg-[#12263a] text-white rounded px-2 py-1">+ Baris</button>
+            <div className="flex gap-1">
+              <select className="border border-slate-300 rounded px-2 py-1 text-xs bg-white" value="" onChange={(e) => { if (e.target.value) tambahPaketEst(e.target.value); e.target.value = ""; }}>
+                <option value="">+ Tambah paket…</option>
+                {PACKAGES.map((p) => <option key={p.nama} value={p.nama}>{p.nama} — {angka(p.harga).toLocaleString("id-ID")}</option>)}
+              </select>
+              <button onClick={() => addRow("estimasi", { checkIn: "", checkOut: "", deskripsi: "", jumlah: "", harga: "" })} className="text-xs bg-[#12263a] text-white rounded px-2 py-1">+ Baris</button>
+            </div>
           </div>
           <div className="space-y-2">
             {o.estimasi.map((r, i) => (
               <div key={i} className="grid grid-cols-12 gap-1 items-center">
-                <input className={inp + " !py-1.5 text-xs col-span-5"} placeholder="Deskripsi" value={r.deskripsi} onChange={(e) => setRow("estimasi", i, "deskripsi", e.target.value)} />
-                <input className={inp + " !py-1.5 text-xs col-span-2"} placeholder="Jml" inputMode="numeric" value={r.jumlah} onChange={(e) => setRow("estimasi", i, "jumlah", e.target.value.replace(/[^\d]/g, ""))} />
+                <input type="date" aria-label="Check in" title="Check in" className={inp + " !py-1.5 text-xs col-span-2"} value={r.checkIn || ""} onChange={(e) => setRow("estimasi", i, "checkIn", e.target.value)} />
+                <input type="date" aria-label="Check out" title="Check out" className={inp + " !py-1.5 text-xs col-span-2"} value={r.checkOut || ""} min={r.checkIn || undefined} onChange={(e) => setRow("estimasi", i, "checkOut", e.target.value)} />
+                <input className={inp + " !py-1.5 text-xs col-span-3"} placeholder="Deskripsi" value={r.deskripsi} onChange={(e) => setRow("estimasi", i, "deskripsi", e.target.value)} />
+                <input className={inp + " !py-1.5 text-xs col-span-1"} placeholder="Jml" inputMode="numeric" value={r.jumlah} onChange={(e) => setRow("estimasi", i, "jumlah", e.target.value.replace(/[^\d]/g, ""))} />
                 <input className={inp + " !py-1.5 text-xs col-span-3"} placeholder="Harga" inputMode="numeric" value={r.harga ? angka(r.harga).toLocaleString("id-ID") : ""} onChange={(e) => setRow("estimasi", i, "harga", e.target.value.replace(/[^\d]/g, ""))} />
-                <div className="col-span-2 text-right text-xs text-slate-500">
-                  {(angka(r.jumlah) * angka(r.harga)).toLocaleString("id-ID")}
+                <div className="col-span-1 text-right text-xs text-slate-500">{lamaBaris(r)} hari</div>
+                <div className="col-span-12 text-right text-xs text-slate-500">
+                  Subtotal: {totalBaris(r).toLocaleString("id-ID")}
                   {o.estimasi.length > 1 && <button onClick={() => delRow("estimasi", i)} className="text-rose-600 ml-1">✕</button>}
                 </div>
               </div>
