@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { sql, raw, waktuJakarta, pastikanKolomGeo } from "@/lib/db";
 import { TAHAP_GEO, parseGeoRow, tahapBerikut, bolehBertindak, bolehEdit, bolehHapus, bolehKirimAlert, statusDari } from "@/lib/geoApproval";
 import { kirimAlertGeo } from "@/lib/geoAlert";
-import { isAdmin } from "@/lib/akses";
+import { isAdmin, isManajemen } from "@/lib/akses";
+import { KODE_MEMO, MEMO_TERAKHIR_AWAL, nomorMemo } from "@/lib/geoMemo";
 
 export const runtime = "nodejs";
 // Jangan di-cache saat build: data harus selalu diambil segar dari database.
@@ -107,7 +108,17 @@ export async function POST(req) {
       if (!row) return gagal("GEO tidak ditemukan.");
       const info = parseGeoRow(row);
       if (!bolehEdit(user, info)) return gagal("Anda tidak berhak mengubah GEO ini.", 403);
-      await sql`UPDATE geo SET geo_no = ${b.geoNo || ""}, event_title = ${b.eventTitle || ""}, company = ${b.company || ""}, data = ${data} WHERE id = ${b.id}`;
+      // Nomor memo yang sudah terbit tidak boleh hilang karena form lama disimpan ulang.
+      let dataSimpan = data;
+      try {
+        const lama = info.data?.sp || {};
+        const baru = JSON.parse(data);
+        if (lama.memoNo && baru && typeof baru === "object" && !(baru.sp || {}).memoNo) {
+          baru.sp = { ...(baru.sp || {}), memoNo: lama.memoNo, memoTgl: lama.memoTgl || "" };
+          dataSimpan = JSON.stringify(baru);
+        }
+      } catch (e) {}
+      await sql`UPDATE geo SET geo_no = ${b.geoNo || ""}, event_title = ${b.eventTitle || ""}, company = ${b.company || ""}, data = ${dataSimpan} WHERE id = ${b.id}`;
       // Isi berubah -> persetujuan yang sudah ada tidak berlaku lagi (harus diajukan ulang dari awal).
       const direset = info.approvals.length > 0;
       const audit = [...info.audit, entriAudit("Diubah", user, direset ? "Isi GEO diubah; seluruh persetujuan sebelumnya direset, harus diajukan ulang." : "")];
@@ -152,6 +163,27 @@ export async function POST(req) {
       const alert = await kirimAlertGeo(row, user, true);
       if (alert.hasil !== "terkirim") return gagal(alert.pesan || "Alert gagal dikirim.");
       return ok({ alert });
+    }
+
+    // Nomor Interoffice Memo (Special Inquiry): SM-xxx/20/<bulan romawi>/<tahun>.
+    // Dialokasikan sekali per GEO (atomik di database), pemanggilan berikutnya memakai nomor yang sama.
+    if (b.action === "nomorMemo") {
+      if (!b.id) return gagal("ID tidak ada.");
+      const row = await ambilRow(b.id);
+      if (!row) return gagal("GEO tidak ditemukan.");
+      const info = parseGeoRow(row);
+      if (!(bolehEdit(user, info) || isManajemen(user))) return gagal("Anda tidak berhak membuat memo untuk GEO ini.", 403);
+      const sp = info.data?.sp || {};
+      if (!sp.aktif) return gagal("GEO ini bukan Special Inquiry.");
+      if (sp.memoNo) return ok({ memoNo: sp.memoNo, memoTgl: sp.memoTgl || "" });
+      const r = await sql`INSERT INTO doc_counter (kode, tahun, last) VALUES (${KODE_MEMO}, ${0}, ${MEMO_TERAKHIR_AWAL + 1})
+        ON CONFLICT (kode, tahun) DO UPDATE SET last = doc_counter.last + 1 RETURNING last`;
+      const memoTgl = waktuJakarta().slice(0, 10);
+      const memoNo = nomorMemo(Number(r[0].last), memoTgl);
+      const data2 = { ...info.data, sp: { ...sp, memoNo, memoTgl } };
+      const audit = [...info.audit, entriAudit("Memo Special Inquiry dibuat", user, memoNo)];
+      await sql`UPDATE geo SET data = ${JSON.stringify(data2)}, audit = ${JSON.stringify(audit)} WHERE id = ${b.id}`;
+      return ok({ memoNo, memoTgl });
     }
 
     if (b.action === "logUnduhGeo") {

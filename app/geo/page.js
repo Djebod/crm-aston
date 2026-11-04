@@ -7,6 +7,8 @@ import Header from "@/components/Header";
 import { Modal, Field, inp } from "@/components/Modal";
 import DateRange, { dalamRentang } from "@/components/DateRange";
 import { statusTtd, cariKaryawan } from "@/lib/ttd";
+import { SP_KOSONG, normalisasiSp, komponenSpBaru, hitungSp, breakdownSpHtml, rp as rpEn } from "@/lib/geoMemo";
+import { buatMemo } from "@/lib/geoMemoPdf";
 import {
   TAHAP_GEO, STATUS_GEO, WARNA_STATUS, labelStatus, parseGeoRow, tahapBerikut,
   bolehBertindak, bolehEdit, bolehHapus, bolehKirimAlert,
@@ -68,6 +70,10 @@ const KOMPONEN_DEFAULT = () => [
   { id: "others", nama: "Others" },
 ];
 
+// Departemen yang di-assign pada GEO (menjadi daftar Distribution di PDF).
+// Default: semua departemen terpilih, sama seperti daftar distribusi GEO sebelumnya.
+const DEPARTEMEN = ["GM", "EAM", "DOSM", "FC", "Chief Engineer", "EHK", "RBM", "Chief Sec", "HRM", "AFOM", "Reservation", "Sales Admin", "Ext. Chef", "Outlet Rest."];
+
 // Kolom tanda tangan selalu 5, urutannya mengikuti jenjang persetujuan (TAHAP_GEO)
 const TTD_DEFAULT = () => TAHAP_GEO.map((t) => ({ nama: "", jabatan: t.jabatan }));
 
@@ -78,6 +84,8 @@ const TTD_DEFAULT = () => TAHAP_GEO.map((t) => ({ nama: "", jabatan: t.jabatan }
 function normalisasiGeo(d) {
   const n = { ...d };
   if (!Array.isArray(n.komponen) || !n.komponen.length) n.komponen = KOMPONEN_DEFAULT();
+  if (!Array.isArray(n.departemen)) n.departemen = [...DEPARTEMEN];
+  n.sp = normalisasiSp(n.sp);
   n.rooms = (n.rooms || []).map((r) => {
     if (r.bd && typeof r.bd === "object") return r;
     return { ...r, bd: { bfast: r.bfast || "", dinner: r.dinner || "", others: r.others || "" } };
@@ -94,6 +102,7 @@ const GEO_KOSONG = () => ({
   eventTitle: "", company: "", contactPerson: "", address: "", phone: "", email: "",
   salesPerson: "", checkIn: "", checkOut: "", noRoom: "", guarantee: "YES",
   komponen: KOMPONEN_DEFAULT(),
+  departemen: [...DEPARTEMEN], sp: SP_KOSONG(),
   rooms: [{ type: "Superior", checkIn: "", checkOut: "", totalRoom: "", day: "", price: "", bd: {} }],
   dpAmount: "", dpDate: "", remark: "",
   notes: { ...DEFAULT_NOTES },
@@ -226,6 +235,7 @@ function buildHTML(g, origin, ctx) {
           </table>
           <div style="border-top:1px solid #111;padding:3px;"><b>REMARK :</b> ${esc(g.remark)}</div>
           <div style="border-top:1px solid #111;padding:3px;"><b>Breakdown :</b><br>${breakdownRows || "-"}</div>
+          ${breakdownSpHtml(g) ? `<div style="border-top:1px solid #111;padding:3px;"><b>Discount Allowance (Special Inquiry) :</b><br>${breakdownSpHtml(g)}</div>` : ""}
         </td>
         <td style="width:40%;vertical-align:top;padding:0;">
           ${notaBox("FRONT OFFICE", g.notes.fo)}
@@ -247,7 +257,7 @@ function buildHTML(g, origin, ctx) {
         ${ttd.map((t) => `<td style="${TDB}">${esc(t.nama) || "&nbsp;"}<div style="font-weight:normal">${esc(t.jabatan)}</div>${t.waktu ? `<div style="font-weight:normal;font-size:6.5px;color:#555">Digitally signed · ${esc(t.waktu)}</div>` : ""}</td>`).join("")}
       </tr>
     </table>
-    <div style="font-style:italic;font-weight:bold;font-size:8px;padding:3px;border-top:1px solid #111;">Distribution: GM, EAM, DOSM, FC, Chief Engineer, EHK, RBM, Chief Sec, HRM, AFOM, Reservation, Sales Admin, Ext. Chef, Outlet Rest.</div>
+    <div style="font-style:italic;font-weight:bold;font-size:8px;padding:3px;border-top:1px solid #111;">Distribution: ${esc((g.departemen || []).join(", ")) || "-"}</div>
   </div>
   <div style="text-align:center;font-size:8px;color:#666;margin-top:4px;">${HOTEL.alamat}</div>
 </div>`;
@@ -389,6 +399,7 @@ function RincianGeo({ data: g, buatHtml }) {
   const balance = gt - angka(g.dpAmount);
   const komp = (g.komponen || []).filter((k) => String(k.nama || "").trim());
   const kamarBd = (g.rooms || []).filter((r) => r.type && angka(r.price) > 0);
+  const spH = hitungSp(g);
   const notes = g.notes || {};
   const catatan = [
     ["Front Office", notes.fo], ["Housekeeping", notes.hk], ["Engineering", notes.eng],
@@ -480,6 +491,38 @@ function RincianGeo({ data: g, buatHtml }) {
           </div>
         </div>
       )}
+
+      {spH.sp.aktif && spH.baris.length > 0 && (
+        <div className="border-t border-slate-100 px-3 py-2">
+          <div className="text-xs font-semibold text-amber-700 mb-1">DISCOUNT ALLOWANCE (SPECIAL INQUIRY)</div>
+          <div className="overflow-x-auto -mx-3 px-3">
+            <table className="w-full text-xs min-w-[420px]">
+              <thead>
+                <tr className="bg-amber-50 text-slate-500">
+                  <th className={TD + " text-left"}>Room Type</th><th className={TD + " text-right"}>Room Rate</th><th className={TD + " text-right"}>Lodging</th>
+                  {spH.komp.map((k) => <th key={k.id} className={TD + " text-right"}>{k.nama}</th>)}
+                  <th className={TD + " text-right"}>Disc.Allowance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {spH.baris.map((b) => (
+                  <tr key={b.idx} className="border-t border-slate-100">
+                    <td className={TD}>{b.type}{b.pax > 1 ? " (" + b.pax + " Pax)" : ""}</td><td className={TD + " text-right"}>{rpEn(b.rate)}</td><td className={TD + " text-right"}>{rpEn(b.lodging)}</td>
+                    {spH.komp.map((k) => <td key={k.id} className={TD + " text-right"}>{rpEn(angka((b.bd || {})[k.id]))}</td>)}
+                    <td className={TD + " text-right font-medium"}>{rpEn(b.da)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="text-xs mt-1 text-slate-600">Nett DA: <b>Rp {rpEn(spH.nett)}</b> ({spH.persen.toFixed(2)}%){g.sp?.memoNo ? " · Memo " + g.sp.memoNo : ""}</div>
+        </div>
+      )}
+
+      <div className="border-t border-slate-100 px-3 py-2">
+        <div className="text-xs font-semibold text-slate-500 mb-1">DEPARTEMEN YANG DI-ASSIGN</div>
+        <div className="text-xs text-slate-700">{(g.departemen || []).join(", ") || "-"}</div>
+      </div>
 
       <div className="border-t border-slate-100 px-3 py-2">
         <div className="text-xs font-semibold text-slate-500 mb-1">CATATAN DEPARTEMEN</div>
@@ -669,7 +712,41 @@ export default function GeoPage() {
       rooms: s.rooms.map((r) => { const bd = { ...(r.bd || {}) }; delete bd[k.id]; return { ...r, bd }; }),
     };
   });
-  const delRoom = (i) => setG((s) => ({ ...s, rooms: s.rooms.filter((_, j) => j !== i) }));
+  // Hapus baris kamar: indeks data Special Inquiry ikut digeser
+  const delRoom = (i) => setG((s) => {
+    const sp = normalisasiSp(s.sp);
+    const rooms = {};
+    Object.entries(sp.rooms).forEach(([ri, x]) => { const n = Number(ri); if (n < i) rooms[n] = x; else if (n > i) rooms[n - 1] = x; });
+    return { ...s, rooms: s.rooms.filter((_, j) => j !== i), sp: { ...sp, rooms } };
+  });
+  const toggleDept = (d) => setG((s) => {
+    const a = s.departemen || [];
+    return { ...s, departemen: a.includes(d) ? a.filter((x) => x !== d) : [...a, d] };
+  });
+  const tambahDept = () => {
+    const d = (prompt("Nama departemen yang akan di-assign:") || "").trim();
+    if (d) setG((s) => ((s.departemen || []).includes(d) ? s : { ...s, departemen: [...(s.departemen || []), d] }));
+  };
+  const setSp = (patch) => setG((s) => ({ ...s, sp: { ...normalisasiSp(s.sp), ...patch } }));
+  const setSpRoom = (i, k, v) => setG((s) => {
+    const sp = normalisasiSp(s.sp);
+    return { ...s, sp: { ...sp, rooms: { ...sp.rooms, [i]: { ...(sp.rooms[i] || {}), [k]: v } } } };
+  });
+  const setSpBd = (i, kid, v) => setG((s) => {
+    const sp = normalisasiSp(s.sp);
+    const x = sp.rooms[i] || {};
+    return { ...s, sp: { ...sp, rooms: { ...sp.rooms, [i]: { ...x, bd: { ...(x.bd || {}), [kid]: v } } } } };
+  });
+  const setSpKomp = (i, nama) => setG((s) => { const sp = normalisasiSp(s.sp); return { ...s, sp: { ...sp, komponen: sp.komponen.map((k, j) => (j === i ? { ...k, nama } : k)) } }; });
+  const addSpKomp = () => setG((s) => { const sp = normalisasiSp(s.sp); return { ...s, sp: { ...sp, komponen: [...sp.komponen, komponenSpBaru()] } }; });
+  const delSpKomp = (i) => setG((s) => {
+    const sp = normalisasiSp(s.sp);
+    const k = sp.komponen[i];
+    if (!k) return s;
+    const rooms = {};
+    Object.entries(sp.rooms).forEach(([ri, x]) => { const bd = { ...(x.bd || {}) }; delete bd[k.id]; rooms[ri] = { ...x, bd }; });
+    return { ...s, sp: { ...sp, komponen: sp.komponen.filter((_, j) => j !== i), rooms } };
+  });
 
   // Gambar tanda tangan TIDAK ikut disimpan ke database (ukurannya besar).
   // Saat GEO dibuka lagi, gambarnya diambil ulang dari data karyawan berdasarkan nama.
@@ -784,6 +861,16 @@ export default function GeoPage() {
     } finally { setPdfBusy(""); }
   }
 
+  const [memoBusy, setMemoBusy] = useState("");
+  async function unduhMemoRow(row) {
+    const info = parseGeoRow(row);
+    setMemoBusy(row.ID);
+    try {
+      await buatMemo({ geoId: row.ID, g: dataDariInfo(info), approvals: info.approvals, karyawan, email: user?.email || "" });
+      await ambil(true);
+    } catch (e) { alert(e?.message || "Gagal membuat memo."); } finally { setMemoBusy(""); }
+  }
+
   function unduhPDFRow(row) {
     const info = parseGeoRow(row);
     unduhPDF(dataDariInfo(info), row.ID, { id: row.ID, approvals: info.approvals, audit: info.audit, status: info.status, info });
@@ -858,7 +945,8 @@ export default function GeoPage() {
         <div className="text-xs text-slate-400">{row.Company || ""} · dibuat {row.CreatedAt}</div>
         <div className="text-xs text-slate-500 mt-1">
           {i.sales && <span className="inline-block bg-slate-100 rounded px-1.5 py-0.5 mr-1">👤 {i.sales}</span>}
-          {i.tgl && <span className="inline-block bg-slate-100 rounded px-1.5 py-0.5">📅 {i.tgl}</span>}
+          {i.tgl && <span className="inline-block bg-slate-100 rounded px-1.5 py-0.5 mr-1">📅 {i.tgl}</span>}
+          {info.data?.sp?.aktif && <span className="inline-block bg-amber-100 text-amber-800 rounded px-1.5 py-0.5 font-semibold">Special Inquiry{info.data.sp.memoNo ? " · " + info.data.sp.memoNo : ""}</span>}
         </div>
         <div className="mt-2"><Stepper info={info} /></div>
         <div className="flex flex-wrap gap-2 mt-3">
@@ -868,6 +956,7 @@ export default function GeoPage() {
             </button>
           )}
           <button onClick={() => unduhPDFRow(row)} disabled={pdfBusy === row.ID} className="text-xs font-semibold bg-[#c8962c] text-white rounded-md px-3 py-1.5 disabled:opacity-60">{pdfBusy === row.ID ? "Membuat…" : "⬇ PDF"}</button>
+          {info.data?.sp?.aktif && <button onClick={() => unduhMemoRow(row)} disabled={memoBusy === row.ID} title="Interoffice Memo Discount Allowance" className="text-xs font-semibold border border-amber-400 text-amber-700 rounded-md px-3 py-1.5 hover:bg-amber-50 disabled:opacity-60">{memoBusy === row.ID ? "Membuat…" : "📄 Memo"}</button>}
           <button onClick={() => { setApvCatatan(""); setModalApvId(row.ID); }} className="text-xs font-semibold border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">Riwayat</button>
           {bolehEdit(user, info) && <button onClick={() => bukaEdit(row)} className="text-xs font-semibold border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50">Edit</button>}
           {bolehHapus(user, info) && <button onClick={() => hapus(row)} className="text-xs font-semibold border border-rose-300 text-rose-700 rounded-md px-3 py-1.5 hover:bg-rose-50">Hapus</button>}
@@ -1056,6 +1145,9 @@ export default function GeoPage() {
                 )}
               </div>
 
+              {info.data?.sp?.aktif && (
+                <button onClick={() => unduhMemoRow(rowApv)} disabled={memoBusy === rowApv.ID} className="w-full border border-amber-400 text-amber-700 font-semibold rounded-lg py-2.5 text-sm disabled:opacity-60">{memoBusy === rowApv.ID ? "Membuat memo…" : "📄 Unduh Memo Special Inquiry" + (info.data.sp.memoNo ? " (" + info.data.sp.memoNo + ")" : "")}</button>
+              )}
               <button onClick={() => unduhPDFRow(rowApv)} disabled={pdfBusy === rowApv.ID} className="w-full border border-[#c8962c] text-[#a9781f] font-semibold rounded-lg py-2.5 text-sm disabled:opacity-60">{pdfBusy === rowApv.ID ? "Membuat…" : "⬇ Unduh PDF (dengan halaman audit trail)"}</button>
             </div>
           </Modal>
@@ -1171,6 +1263,77 @@ export default function GeoPage() {
                 {g.rooms.filter((r) => r.type).length === 0 && (
                   <p className="text-xs text-slate-400">Isi Room Type di bagian Room Arrangement dulu.</p>
                 )}
+              </div>
+            </div>
+            <div className="border border-amber-200 bg-amber-50/40 rounded-lg p-3">
+              <label className="flex items-center gap-2 text-sm font-semibold text-[#12263a] cursor-pointer">
+                <input type="checkbox" className="w-4 h-4" checked={!!g.sp?.aktif} onChange={(e) => setSp({ aktif: e.target.checked })} />
+                Special Inquiry
+              </label>
+              <p className="text-xs text-slate-500 mt-1">Bila dipilih, muncul breakdown Discount Allowance (tampil juga di GEO) dan GEO ini bisa dibuatkan Memo.</p>
+              {g.sp?.aktif && (() => {
+                const h = hitungSp(g);
+                return (
+                  <div className="mt-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-amber-700">BREAKDOWN DISCOUNT ALLOWANCE</span>
+                      <button onClick={addSpKomp} className="text-xs bg-[#12263a] text-white rounded px-2 py-1">+ Tambah komponen</button>
+                    </div>
+                    <p className="text-xs text-slate-500">Tarif SENTEC = tarif resmi di sistem; harga GEO di Room Arrangement dianggap tarif ACTUAL. Disc.Allowance = (SENTEC − ACTUAL) × pax dan Lodging dihitung otomatis.</p>
+                    <div className="space-y-1">
+                      {h.sp.komponen.map((k, i) => (
+                        <div key={k.id} className="flex gap-1 items-center">
+                          <input className={inp + " !py-1.5 text-xs"} placeholder={"Nama komponen " + (i + 1)} value={k.nama} onChange={(e) => setSpKomp(i, e.target.value)} />
+                          <button onClick={() => delSpKomp(i)} title="Hapus komponen ini" className="text-rose-600 text-xs px-2 shrink-0">✕</button>
+                        </div>
+                      ))}
+                    </div>
+                    {g.rooms.map((r, idx) => {
+                      if (!r.type) return null;
+                      const x = (h.sp.rooms || {})[idx] || {};
+                      const b = h.baris.find((y) => y.idx === idx);
+                      return (
+                        <div key={idx} className="text-xs border-t border-amber-200 pt-2">
+                          <div className="font-semibold text-[#12263a]">{r.type} — harga GEO (ACTUAL) Rp {angka(r.price).toLocaleString("id-ID")}</div>
+                          <div className="grid grid-cols-2 gap-1 mt-1">
+                            <input className={inp + " !py-1.5 text-xs"} placeholder="Tarif SENTEC / pax" inputMode="numeric" value={x.sentec ? fmt(x.sentec) : ""} onChange={(e) => setSpRoom(idx, "sentec", e.target.value.replace(/[^\d]/g, ""))} />
+                            <input className={inp + " !py-1.5 text-xs"} placeholder="Pax per kamar (1/2)" inputMode="numeric" value={x.pax || ""} onChange={(e) => setSpRoom(idx, "pax", e.target.value.replace(/[^\d]/g, ""))} />
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 mt-1">
+                            {h.komp.map((k) => (
+                              <input key={k.id} className={inp + " !py-1.5 text-xs"} placeholder={k.nama} inputMode="numeric" value={(x.bd || {})[k.id] ? fmt((x.bd || {})[k.id]) : ""} onChange={(e) => setSpBd(idx, k.id, e.target.value.replace(/[^\d]/g, ""))} />
+                            ))}
+                          </div>
+                          {b && (
+                            <div className={"mt-1 " + (b.lodging < 0 ? "text-rose-600 font-semibold" : "text-slate-600")}>
+                              Room Rate Rp {rpEn(b.rate)} · Disc.Allowance <b>Rp {rpEn(b.da)}</b> · Lodging (otomatis) <b>Rp {rpEn(b.lodging)}</b>
+                              {b.lodging < 0 && " — komponen melebihi room rate"}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <div className="text-sm text-slate-700 border-t border-amber-200 pt-2">
+                      SENTEC <b>Rp {rpEn(h.sentecTotal)}</b> · ACTUAL <b>Rp {rpEn(h.actualTotal)}</b> · Nett DA <b className="text-amber-700">Rp {rpEn(h.nett)}</b> ({h.persen.toFixed(2)}%)
+                    </div>
+                    <p className="text-xs text-slate-500">{g.sp.memoNo ? "Nomor memo: " + g.sp.memoNo + ". " : "Nomor memo (SM-xxx/20/bulan/tahun) diberikan otomatis saat memo pertama kali dibuat. "}Tombol 📄 Memo ada di kartu GEO setelah disimpan.</p>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="border border-slate-200 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-slate-500">DEPARTEMEN YANG DI-ASSIGN</span>
+                <button onClick={tambahDept} className="text-xs bg-[#12263a] text-white rounded px-2 py-1">+ Departemen</button>
+              </div>
+              <p className="text-xs text-slate-400 mb-2">Departemen yang dicentang menjadi daftar Distribution pada PDF GEO.</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                {Array.from(new Set([...DEPARTEMEN, ...(g.departemen || [])])).map((d) => (
+                  <label key={d} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                    <input type="checkbox" checked={(g.departemen || []).includes(d)} onChange={() => toggleDept(d)} /> {d}
+                  </label>
+                ))}
               </div>
             </div>
             <Field label="Remark"><input className={inp} value={g.remark} onChange={(e) => set("remark", e.target.value)} /></Field>
