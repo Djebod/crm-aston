@@ -61,46 +61,131 @@ const hariIni = () => new Date().toISOString().slice(0, 10);
 const tglID = (s) => { if (!s) return "________"; const d = new Date(s); return isNaN(d) ? s : d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }); };
 const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
 
+// ====== Tema Confirmation Letter (Meeting) — mengikuti template baru ======
+const NAVY = "#10236e";
+const CSS_CL = `
+  .doc { font-family:"Inter","Segoe UI",Arial,Helvetica,sans-serif; font-size:11px; color:#1e293b; line-height:1.55; }
+  .doc table { width:100%; border-collapse:collapse; margin:0; }
+  .doc td, .doc th { border:0; padding:0; vertical-align:top; }
+  .doc p { margin:7px 0; }
+  .doc b { color:#0f172a; }
+  .doc b.nv, .doc .nv { color:${NAVY}; font-weight:700; }
+  .doc .mut { color:#94a3b8; font-weight:400; }
+  .doc .top td { vertical-align:top; }
+  .doc .top img { height:54px; display:block; }
+  .doc .noCl { text-align:right; color:#94a3b8; font-size:11px; line-height:1.7; }
+  .doc h1.jd { font-size:31px; font-weight:300; color:${NAVY}; margin:16px 0 12px; letter-spacing:-0.5px; }
+  .doc .hr { border-top:1px solid #d9dde5; margin:9px 0 11px; }
+  .doc .lb { font-size:9.5px; color:#64748b; margin-bottom:2px; }
+  .doc .v { font-size:12.5px; color:#1e293b; line-height:1.65; }
+  .doc .v2 { font-size:11.5px; color:#0f172a; line-height:1.65; }
+  .doc .kpd td { padding-right:14px; }
+  .doc .s { margin:16px 0 4px; page-break-inside:avoid; }
+  .doc .sh td { vertical-align:baseline; }
+  .doc .sh .n { width:28px; font-size:11px; color:#94a3b8; }
+  .doc .sh .t { font-size:12px; font-weight:700; color:${NAVY}; letter-spacing:.2px; }
+  .doc .sbd { margin-left:28px; margin-top:5px; }
+  .doc .sbd p { text-align:left; }
+  .doc .sub { font-weight:700; color:#0f172a; margin:12px 0 3px; }
+  .doc .kv td { width:50%; padding:0 10px 4px 0; }
+  .doc .cap { font-size:10px; color:#64748b; margin:12px 0 4px; text-transform:uppercase; }
+  .doc .tb th { font-size:9.5px; font-weight:400; color:#64748b; text-align:center; padding:5px 4px 6px; border-bottom:1.5px solid ${NAVY}; }
+  .doc .tb th.l { text-align:left; } .doc .tb th.r { text-align:right; }
+  .doc .tb td { padding:8px 4px; border-bottom:1px solid #e2e5ea; font-size:11.5px; }
+  .doc .tb td.nv { font-weight:700; color:${NAVY}; }
+  .doc .tb td.c { text-align:center; } .doc .tb td.r { text-align:right; }
+  .doc .tb.sm td { font-size:10px; padding:7px 4px; }
+  .doc .tb.sm th { font-size:9px; }
+  .doc .bt td { padding:1px 0; font-size:11.5px; vertical-align:top; }
+  .doc .bt td.dot { width:16px; color:${NAVY}; font-size:6px; padding-top:5px; }
+  .doc .bt2 td.h { width:50%; padding-right:12px; }
+  .doc .gt { margin-top:10px; }
+  .doc .gt td { text-align:right; }
+  .doc .gt .gl { color:#64748b; font-size:11px; padding-top:9px; }
+  .doc .gt .gv { width:26%; color:${NAVY}; font-size:19px; font-weight:300; }
+  .doc .cat { color:#64748b; font-size:10px; margin-top:8px; }
+  .doc .bank { margin:8px 0; border-top:1px solid #d9dde5; border-bottom:1px solid #d9dde5; }
+  .doc .bank td { padding:7px 6px 7px 0; }
+  .doc .bank .bv { font-weight:700; color:${NAVY}; font-size:11.5px; }
+  .doc .ttd { page-break-inside:avoid; margin-top:22px; }
+  .doc .utk { font-size:11.5px; margin:8px 0 10px; }
+  .doc .sg td { width:33.33%; padding-right:16px; }
+  .doc .sg .gb { height:50px; }
+  .doc .sg .gb img { max-height:48px; max-width:150px; display:block; }
+  .doc .sg .gn { border-top:1.5px solid #1e293b; padding-top:5px; font-weight:700; color:${NAVY}; }
+  .doc .sg .gj { color:#64748b; font-size:10.5px; }
+  .doc .cs { width:62%; }
+  .doc .cs td { padding:9px 0 3px; }
+  .doc .cs .ln { border-bottom:1px solid #94a3b8; }
+`;
+
+function bl(items) {
+  return `<table class="bt">${items.map((x) => `<tr><td class="dot">&#9679;</td><td>${x}</td></tr>`).join("")}</table>`;
+}
+function kotakTtd(img, nama, jabatan) {
+  return `<div class="gb">${img ? `<img src="${img}" />` : ""}</div><div class="gn">${esc(nama) || "&nbsp;"}</div><div class="gj">${esc(jabatan) || "&nbsp;"}</div>`;
+}
+
 function pasalList(g) {
+  const p = (t) => `<p>${t}</p>`;
   return [
     ["KEBIJAKAN HOTEL",
-      "<b>Kebijakan Pembatalan</b><br>Dalam hal pembatalan, pemberitahuan tertulis harus telah diterima hotel paling lama 90 hari sebelum pelaksanaan kegiatan. Deposit akan hangus apabila Bapak/Ibu melakukan pembatalan. Apabila pembatalan dilakukan kurang dari 90 hari sebelum pelaksanaan kegiatan maka akan dikenakan 100% biaya pembatalan.<br><br><b>Ketidakhadiran (No-Show)</b><br>Dalam hal ketidakhadiran tamu atau no-show, hotel berhak mengenakan biaya penuh terhadap seluruh kamar dan jumlah malam yang telah direservasi.<br><br><b>Pengurangan Jumlah Kamar</b><br>• Pengurangan jumlah kamar dalam kurun waktu 30 dan 7 hari sebelum tanggal kedatangan, pengurangan sebesar 5% dari total masa menginap dapat diizinkan tanpa dikenakan biaya.<br>• Pengurangan jumlah kamar dalam kurun waktu kurang dari 7 hari sebelum tanggal kedatangan akan dikenakan biaya penalty 100% sesuai dengan jumlah kamar dan masa menginap yang dibatalkan."],
+      `<div class="sub" style="margin-top:0">Kebijakan Pembatalan</div>`
+      + p("Dalam hal pembatalan, pemberitahuan tertulis harus telah diterima hotel paling lama 90 hari sebelum pelaksanaan kegiatan. Deposit akan hangus apabila Bapak/Ibu melakukan pembatalan. Apabila pembatalan dilakukan kurang dari 90 hari sebelum pelaksanaan kegiatan maka akan dikenakan 100% biaya pembatalan.")
+      + `<div class="sub">Ketidakhadiran (No-Show)</div>`
+      + p("Dalam hal ketidakhadiran tamu atau no-show, hotel berhak mengenakan biaya penuh terhadap seluruh kamar dan jumlah malam yang telah direservasi.")
+      + `<div class="sub">Pengurangan Jumlah Kamar</div>`
+      + bl([
+        "Pengurangan jumlah kamar dalam kurun waktu 30 dan 7 hari sebelum tanggal kedatangan, pengurangan sebesar 5% dari total masa menginap dapat diizinkan tanpa dikenakan biaya.",
+        "Pengurangan jumlah kamar dalam kurun waktu kurang dari 7 hari sebelum tanggal kedatangan akan dikenakan biaya penalty 100% sesuai dengan jumlah kamar dan masa menginap yang dibatalkan.",
+      ])],
     ["DAFTAR KAMAR (ROOMING LIST)",
-      "Untuk kelancaran pembagian kamar dimohon mengirimkan daftar kamar atau rooming list paling lambat 2 hari sebelum tanggal kedatangan tamu."],
+      p("Untuk kelancaran pembagian kamar dimohon mengirimkan daftar kamar atau rooming list paling lambat 2 hari sebelum tanggal kedatangan tamu.")],
     ["DEKORASI",
-      "Klien setuju bahwa tidak ada bendera, banner, poster, gambar, tanda tangan, logo perusahaan dan lain-lain yang akan dipasang di area umum tanpa persetujuan hotel. Setiap bahan dekorasi yang disetujui harus mematuhi peraturan perlindungan kebakaran dan hotel berhak meminta sertifikat resmi untuk itu. Hotel berhak membebankan biaya atas segala kerusakan yang diakibatkan oleh dekorasi klien."],
+      p("Klien setuju bahwa tidak ada bendera, banner, poster, gambar, tanda tangan, logo perusahaan dan lain-lain yang akan dipasang di area umum tanpa persetujuan hotel. Setiap bahan dekorasi yang disetujui harus mematuhi peraturan perlindungan kebakaran dan hotel berhak meminta sertifikat resmi untuk itu. Hotel berhak membebankan biaya atas segala kerusakan yang diakibatkan oleh dekorasi klien.")],
     ["BARANG BERBAHAYA",
-      "Open flame (lampu lantern, lilin, obor, dll), sparklers, fireworks, pyrotechnics, bahan kimia berbahaya, glitter, confetti, pasir dan segala zat yang menghasilkan sampah/puing dilarang keras di lokasi hotel. Pelanggaran dapat mengakibatkan pembatalan acara, tindakan hukum, dan biaya pembersihan/kerusakan."],
+      p("Open flame (lampu lantern, lilin, obor, dll), sparklers, fireworks, pyrotechnics, bahan kimia berbahaya, glitter, confetti, pasir dan segala zat yang menghasilkan sampah/puing dilarang keras di lokasi hotel. Pelanggaran dapat mengakibatkan pembatalan acara, tindakan hukum, dan biaya pembersihan/kerusakan.")],
     ["DEPOSIT & PEMBAYARAN",
-      "• Biaya kamar akan secara otomatis ditagihkan ke dalam Group Master Account. Biaya tambahan yang dikonsumsi tamu akan dibebankan sebelum meninggalkan hotel.<br>• Hotel berhak meminta tambahan deposit apabila terdapat penambahan jumlah peserta.<br>• Pembayaran DP 50% paling lambat tanggal <b>" + tglID(g.dpDate) + "</b>.<br>• Pelunasan pembayaran paling lambat <b>" + tglID(g.pelunasanDate) + "</b> sebelum kegiatan.<br><br>Pembayaran menggunakan cash atau bank transfer ke:<br>Account Number : <b>" + BANK.no + "</b><br>Account Name : <b>" + BANK.nama + "</b><br>Bank : <b>" + BANK.bank + "</b><br><br>Setelah transfer, mohon kirimkan salinan bukti transfer kepada pihak hotel melalui email. Pembayaran ke rekening lain tidak akan diterima sebagai bukti pembayaran."],
+      bl([
+        "Biaya kamar akan secara otomatis ditagihkan ke dalam Group Master Account. Biaya tambahan yang dikonsumsi tamu akan dibebankan sebelum meninggalkan hotel.",
+        "Hotel berhak meminta tambahan deposit apabila terdapat penambahan jumlah peserta.",
+        "Pembayaran DP 50% paling lambat tanggal <b>" + tglID(g.dpDate) + "</b>.",
+        "Pelunasan pembayaran paling lambat <b>" + tglID(g.pelunasanDate) + "</b> sebelum kegiatan.",
+      ])
+      + p("Pembayaran menggunakan cash atau bank transfer ke:")
+      + `<table class="bank"><tr>
+          <td width="30%"><div class="lb">Account Number</div><div class="bv">${BANK.no}</div></td>
+          <td width="34%"><div class="lb">Account Name</div><div class="bv">${BANK.nama}</div></td>
+          <td><div class="lb">Bank</div><div class="bv">${BANK.bank}</div></td></tr></table>`
+      + p("Setelah transfer, mohon kirimkan salinan bukti transfer kepada pihak hotel melalui email. Pembayaran ke rekening lain tidak akan diterima sebagai bukti pembayaran.")],
     ["FASILITAS KREDIT",
-      "Fasilitas kredit dapat diberikan kepada perusahaan yang memenuhi syarat setelah sukses melakukan aplikasi. Pihak hotel membutuhkan setidaknya 14 hari kerja untuk memproses aplikasi. Fasilitas kredit tidak berlaku untuk tamu individual."],
+      p("Fasilitas kredit dapat diberikan kepada perusahaan yang memenuhi syarat setelah sukses melakukan aplikasi. Pihak hotel membutuhkan setidaknya 14 hari kerja untuk memproses aplikasi. Fasilitas kredit tidak berlaku untuk tamu individual.")],
     ["JATUH TEMPO",
-      "Apabila Bapak/Ibu ingin melakukan reservasi, silakan melakukan konfirmasi dengan menandatangani kontrak ini sebelum <b>" + tglID(g.jatuhTempoDate) + "</b>. Harga yang tercantum berlaku hingga tanggal jatuh tempo tersebut, dan apabila melewati tanggal tersebut hotel berhak melakukan revisi harga."],
+      p("Apabila Bapak/Ibu ingin melakukan reservasi, silakan melakukan konfirmasi dengan menandatangani kontrak ini sebelum <b>" + tglID(g.jatuhTempoDate) + "</b>. Harga yang tercantum berlaku hingga tanggal jatuh tempo tersebut, dan apabila melewati tanggal tersebut hotel berhak melakukan revisi harga.")],
     ["KONDISI DARURAT",
-      "Kontrak ini akan berakhir tanpa menimbulkan kewajiban kepada masing-masing pihak apabila terdapat keadaan di luar kekuasaan kedua belah pihak, termasuk namun tidak terbatas pada tindakan Tuhan, peraturan pemerintah, kebakaran, banjir, ledakan, perang, bencana, kekacauan sipil, pembatasan transportasi, peringatan kesehatan/epidemi, dan sebab lain yang wajar di luar kendali."],
+      p("Kontrak ini akan berakhir tanpa menimbulkan kewajiban kepada masing-masing pihak apabila terdapat keadaan di luar kekuasaan kedua belah pihak, termasuk namun tidak terbatas pada tindakan Tuhan, peraturan pemerintah, kebakaran, banjir, ledakan, perang, bencana, kekacauan sipil, pembatasan transportasi, peringatan kesehatan/epidemi, dan sebab lain yang wajar di luar kendali.")],
     ["KEAMANAN",
-      "Penyelenggara Acara bertanggung jawab penuh atas keamanan peralatan, perlengkapan, maupun barang berharga selama berada di hotel. Setiap barang yang dikirim ke hotel harus ditandai dan ditujukan kepada \"Sales Marketing\" dengan menyatakan nama acara. Penyelenggara harus mengatur asuransi dan/atau keamanan sendiri."],
+      p("Penyelenggara Acara bertanggung jawab penuh atas keamanan peralatan, perlengkapan, maupun barang berharga selama berada di hotel. Setiap barang yang dikirim ke hotel harus ditandai dan ditujukan kepada \"Sales Marketing\" dengan menyatakan nama acara. Penyelenggara harus mengatur asuransi dan/atau keamanan sendiri.")],
     ["KERUGIAN & KERUSAKAN",
-      "Penyelenggara Acara beserta seluruh kontraktor, pemasok, dan karyawannya harus menjaga dan tidak melakukan tindakan yang menyebabkan kerusakan pada ruang acara atau properti hotel, dan wajib membayar setiap kerusakan yang terjadi akibat kelalaian."],
+      p("Penyelenggara Acara beserta seluruh kontraktor, pemasok, dan karyawannya harus menjaga dan tidak melakukan tindakan yang menyebabkan kerusakan pada ruang acara atau properti hotel, dan wajib membayar setiap kerusakan yang terjadi akibat kelalaian.")],
     ["HUKUM & REGULASI",
-      "Penyelenggara tidak mengizinkan kegiatan ilegal atau yang melanggar hukum. Minuman keras yang dibawa ke hotel dikenakan biaya corkage sesuai kebijakan hotel. Merokok dilarang di seluruh outlet, ruang rapat, maupun ruang publik hotel."],
+      p("Penyelenggara tidak mengizinkan kegiatan ilegal atau yang melanggar hukum. Minuman keras yang dibawa ke hotel dikenakan biaya corkage sesuai kebijakan hotel. Merokok dilarang di seluruh outlet, ruang rapat, maupun ruang publik hotel.")],
     ["LISENSI",
-      "Klien sepenuhnya bertanggung jawab untuk mendapatkan lisensi/izin yang diperlukan untuk menampilkan karya hak cipta (musik, audio, video, karya seni, dll) yang digunakan Grup di hotel."],
+      p("Klien sepenuhnya bertanggung jawab untuk mendapatkan lisensi/izin yang diperlukan untuk menampilkan karya hak cipta (musik, audio, video, karya seni, dll) yang digunakan Grup di hotel.")],
     ["KERAHASIAAN",
-      "Semua rincian pada perjanjian bersifat rahasia dan tidak boleh ditunjukkan kepada pihak ketiga atau dipublikasikan tanpa persetujuan khusus dari pihak hotel."],
+      p("Semua rincian pada perjanjian bersifat rahasia dan tidak boleh ditunjukkan kepada pihak ketiga atau dipublikasikan tanpa persetujuan khusus dari pihak hotel.")],
     ["GANTI RUGI",
-      "Klien setuju untuk mengganti rugi hotel dan penyedianya dari segala kewajiban, kerugian, klaim, tuntutan, kerusakan, dan biaya (termasuk biaya legal) yang disebabkan oleh pelanggaran terhadap ketentuan dalam perjanjian ini."],
+      p("Klien setuju untuk mengganti rugi hotel dan penyedianya dari segala kewajiban, kerugian, klaim, tuntutan, kerusakan, dan biaya (termasuk biaya legal) yang disebabkan oleh pelanggaran terhadap ketentuan dalam perjanjian ini.")],
     ["KETIDAKBERDAYAAN KINERJA",
-      "Perjanjian ini akan berakhir tanpa kewajiban apabila kinerja substansial salah satu pihak tertunda/terhambat oleh sebab di luar kendali yang wajar. Pengakhiran dilakukan melalui pemberitahuan tertulis dan tidak lebih dari sepuluh (10) hari setelah mempelajari dasar tersebut."],
+      p("Perjanjian ini akan berakhir tanpa kewajiban apabila kinerja substansial salah satu pihak tertunda/terhambat oleh sebab di luar kendali yang wajar. Pengakhiran dilakukan melalui pemberitahuan tertulis dan tidak lebih dari sepuluh (10) hari setelah mempelajari dasar tersebut.")],
     ["EKSEKUSI YANG TEPAT",
-      "Perjanjian ini menggantikan semua perjanjian, proposal, dan komunikasi sebelumnya, dan hanya dapat diubah secara tertulis melalui persetujuan bersama. Perjanjian ini tidak berlaku sampai dieksekusi oleh individu yang berwenang dari klien dan hotel."],
+      p("Perjanjian ini menggantikan semua perjanjian, proposal, dan komunikasi sebelumnya, dan hanya dapat diubah secara tertulis melalui persetujuan bersama. Perjanjian ini tidak berlaku sampai dieksekusi oleh individu yang berwenang dari klien dan hotel.")],
     ["FLUKTUASI PAJAK",
-      "Apabila di kemudian hari terjadi perubahan nilai pajak dan/atau retribusi, hotel berhak mengumpulkan pajak/retribusi tersebut dari Penyelenggara Acara atas nama kewenangan Pemerintah dengan pemberitahuan terlebih dahulu."],
+      p("Apabila di kemudian hari terjadi perubahan nilai pajak dan/atau retribusi, hotel berhak mengumpulkan pajak/retribusi tersebut dari Penyelenggara Acara atas nama kewenangan Pemerintah dengan pemberitahuan terlebih dahulu.")],
     ["KELALAIAN",
-      "Apabila Penyelenggara Acara gagal melakukan pembayaran atau tidak mematuhi persyaratan, maka Hotel dapat mengakhiri kontrak ini."],
+      p("Apabila Penyelenggara Acara gagal melakukan pembayaran atau tidak mematuhi persyaratan, maka Hotel dapat mengakhiri kontrak ini.")],
     ["TANDA TANGAN",
-      "Silakan tandatangani semua lembar kontrak ini apabila telah disetujui dan dikirim kembali kepada " + HOTEL.nama + ". Setelah kontrak ditandatangani maka kesepakatan yang mengikat dianggap telah dikonfirmasi dan pasti."],
+      p("Silakan tandatangani semua lembar kontrak ini apabila telah disetujui dan dikirim kembali kepada " + HOTEL.nama + ". Setelah kontrak ditandatangani maka kesepakatan yang mengikat dianggap telah dikonfirmasi dan pasti.")],
   ];
 }
 
@@ -191,22 +276,22 @@ function pasalAcara(g, wed) {
 }
 
 const CSS_ACARA = `
-  .doc { font-family: Arial, Helvetica, sans-serif; font-size:11px; color:#111; line-height:1.5; }
-  .doc .logo { text-align:center; margin-bottom:10px; }
-  .doc .logo img { height:46px; display:block; margin:0 auto; }
-  .doc b { color:#000; }
-  .doc .sec { font-weight:bold; margin:12px 0 4px; }
+  .doc { font-family: "Inter","Segoe UI",Arial,Helvetica,sans-serif; font-size:11px; color:#1e293b; line-height:1.55; }
+  .doc .logo { text-align:left; margin-bottom:10px; }
+  .doc .logo img { height:52px; display:block; margin:0; }
+  .doc b { color:#0f172a; }
+  .doc .sec { font-weight:bold; margin:14px 0 4px; color:#10236e; }
   .doc .italb { font-weight:bold; font-style:italic; }
   .doc ul { margin:4px 0 4px 18px; padding:0; }
   .doc p { margin:6px 0; }
   .doc table { width:100%; border-collapse:collapse; margin:8px 0; page-break-inside:avoid; }
-  .doc th, .doc td { border:1px solid #111; padding:5px 7px; text-align:left; vertical-align:top; font-size:10px; }
-  .doc th { text-align:center; }
+  .doc th, .doc td { border:0; border-bottom:1px solid #e2e5ea; padding:7px 6px; text-align:left; vertical-align:top; font-size:10px; }
+  .doc th { text-align:center; font-weight:400; color:#64748b; border-bottom:1.5px solid #10236e; }
   .doc td.c { text-align:center; } .doc td.r { text-align:right; }
   .doc .total td { font-weight:bold; }
   .doc .pasal { margin:10px 0; }
-  .doc .ptitle { font-weight:bold; }
-  .doc .pbody { text-align:justify; }
+  .doc .ptitle { font-weight:bold; color:#10236e; }
+  .doc .pbody { text-align:left; }
   .doc .polos td { border:0; padding:1px 6px 1px 0; font-size:11px; }
   .doc .sign { page-break-inside:avoid; }
   .doc .sign td { border:0; padding:2px 6px; vertical-align:bottom; font-size:11px; }
@@ -486,111 +571,95 @@ ${pasalRows}
   function build() {
     if (g.jenisCL !== "Meeting") return buildAcara();
     const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const perusahaan = esc(g.instansi || g.namaAcara);
     const rateRows = (g.rates[g.rateCat] || []).map((r) =>
-      `<tr><td>${r[0]}</td><td class="c">${rp(r[1])}</td><td class="c">${rp(r[2])}</td></tr>`).join("");
-    const inclList = String(g.benefit || "").split("\n").filter((x) => x.trim()).map((x) => `<li>${esc(x)}</li>`).join("");
+      `<tr><td class="nv">${r[0]}</td><td class="c">${rp(r[1])}</td><td class="c">${rp(r[2])}</td></tr>`).join("");
+    const manfaat = String(g.benefit || "").split("\n").filter((x) => x.trim()).map((x) => esc(x));
+    const separuh = Math.ceil(manfaat.length / 2);
+    const inclList = `<table class="bt2"><tr><td class="h">${bl(manfaat.slice(0, separuh))}</td><td class="h">${bl(manfaat.slice(separuh))}</td></tr></table>`;
     const rangkaianRows = g.rangkaian.map((r) =>
       `<tr><td>${esc(tglID(r.hari))}</td><td>${esc(r.waktu)}</td><td>${esc(r.acara)}</td><td>${esc(r.tempat)}</td><td>${esc(r.setup)}</td><td class="c">${esc(r.jumlah)}</td></tr>`).join("");
     const estRows = g.estimasi.map((r, i) => {
       const durasi = lamaBaris(r);
-      const rentang = r.checkIn || r.checkOut
-        ? `${esc(tglID(r.checkIn))} - ${esc(tglID(r.checkOut))}`
-        : "-";
-      return `<tr><td class="c">${i + 1}</td><td class="c">${rentang}</td><td>${esc(r.deskripsi)}</td><td class="r">${durasi}</td><td class="r">${angka(r.jumlah).toLocaleString("id-ID")}</td><td class="r">${angka(r.harga).toLocaleString("id-ID")}</td><td class="r">${totalBaris(r).toLocaleString("id-ID")}</td></tr>`;
+      const rentang = r.checkIn || r.checkOut ? `${esc(tglID(r.checkIn))} - ${esc(tglID(r.checkOut))}` : "-";
+      return `<tr><td class="c">${i + 1}</td><td class="c">${rentang}</td><td>${esc(r.deskripsi)}</td><td class="c">${durasi}</td><td class="c">${angka(r.jumlah).toLocaleString("id-ID")}</td><td class="r">${angka(r.harga).toLocaleString("id-ID")}</td><td class="r">${totalBaris(r).toLocaleString("id-ID")}</td></tr>`;
     }).join("");
-    const pasalRows = pasalList(g).map((p, i) =>
-      `<div class="pasal"><div class="ptitle">${i + 3}. ${p[0]}</div><div class="pbody">${p[1]}</div></div>`).join("");
-
+    const sec = (no, judul, isi) => `<div class="s"><table class="sh"><tr><td class="n">${no}</td><td class="t">${judul}</td></tr></table><div class="sbd">${isi}</div></div>`;
+    const pasalRows = pasalList(g).map((p, i) => sec(i + 3, p[0], p[1])).join("");
 
     return `<div class="doc">
-<style>
-  .doc { font-family: Arial, Helvetica, sans-serif; font-size:11px; color:#111; line-height:1.5; }
-  .doc .logo { text-align:center; margin-bottom:10px; }
-  .doc .logo img { height:46px; display:block; margin:0 auto; }
-  .doc b { color:#000; }
-  .doc .sec { font-weight:bold; margin:12px 0 4px; }
-  .doc .italb { font-weight:bold; font-style:italic; }
-  .doc ul { margin:4px 0 4px 18px; padding:0; }
-  .doc p { margin:6px 0; }
-  .doc table { width:100%; border-collapse:collapse; margin:8px 0; page-break-inside:avoid; }
-  .doc th, .doc td { border:1px solid #94a3b8; padding:5px 7px; text-align:left; vertical-align:top; font-size:10px; }
-  .doc th { background:#f1f5f9; text-align:center; }
-  .doc td.c { text-align:center; } .doc td.r { text-align:right; }
-  .doc .rate-title td { text-align:center; font-weight:bold; background:#eef2f8; }
-  .doc .total td { font-weight:bold; background:#fdf6e9; }
-  .doc .pasal { margin:8px 0; page-break-inside:avoid; }
-  .doc .ptitle { font-weight:bold; }
-  .doc .pb { page-break-before: always; }
-  .doc .sign { page-break-inside:avoid; }
-  .doc .foot { text-align:center; font-size:8px; color:#666; border-top:1px solid #bbb; padding-top:6px; margin-top:28px; }
-  .doc .foot .web { color:#2563eb; }
-  .doc .sign td { border:0; padding:2px 6px; vertical-align:bottom; }
-</style>
+<style>${CSS_CL}</style>
 
-<div class="logo"><img src="${origin}/aston-logo.png" onerror="this.style.display='none'"/></div>
-<div><b>Cirebon, ${tglID(g.tglSurat)}</b></div>
-<div><b>${esc(clNo)}</b></div>
-<br>
-<div><b>${esc(g.namaTamu) || "-"}</b></div>
-${g.instansi ? "<div><b>" + esc(g.instansi) + "</b></div>" : ""}
-${g.kota ? "<div><b>" + esc(g.kota) + "</b></div>" : ""}
-${g.noHP ? "<div><b>No HP : " + esc(g.noHP) + "</b></div>" : ""}
-<br>
-<div class="italb">Perihal: Perjanjian/${esc(g.instansi || g.namaAcara)}/${g.tglKamar ? tglID(g.tglKamar) : ""}</div>
+<table class="top"><tr>
+  <td><img src="${origin}/aston-logo.png" onerror="this.style.display='none'"/></td>
+  <td class="noCl">${esc(clNo)}<br>Cirebon, ${tglID(g.tglSurat)}</td>
+</tr></table>
+<h1 class="jd">Confirmation Letter</h1>
+<div class="hr"></div>
+<table class="kpd"><tr>
+  <td width="42%"><div class="lb">Kepada</div>
+    <div class="v">${esc(g.namaTamu) || "-"}</div>
+    ${g.instansi ? `<div class="v">${esc(g.instansi)}</div>` : ""}
+    ${g.kota ? `<div class="v">${esc(g.kota)}</div>` : ""}
+    ${g.noHP ? `<div class="v2">No HP : ${esc(g.noHP)}</div>` : ""}</td>
+  <td><div class="lb">Perihal</div>
+    <div class="v"><b class="nv">Perjanjian/</b>${perusahaan}<b class="nv">/</b>${tglID(g.tglSurat)}</div></td>
+</tr></table>
+<div class="hr"></div>
+
 <p>Dengan hormat,</p>
-<div class="italb">Salam hangat dari ${HOTEL.nama}.</div>
-<p>Terima kasih telah memilih <b>${HOTEL.nama}</b> sebagai tempat akomodasi <b>${esc(g.instansi || g.namaAcara)}</b>. Melanjutkan percakapan mengenai harga kamar dan paket meeting, bersama ini kami sampaikan konfirmasi acara tersebut:</p>
+<p>Salam hangat dari ${HOTEL.nama}.</p>
+<p>Terima kasih telah memilih <b class="nv">${HOTEL.nama}</b> sebagai tempat akomodasi <b>${perusahaan}</b>. Melanjutkan percakapan mengenai harga kamar dan paket meeting, bersama ini kami sampaikan konfirmasi acara tersebut:</p>
 
-<div class="sec">1. KAMAR — ${esc(g.rateCat)}</div>
-<div>Tanggal &nbsp;: ${g.tglKamar ? tglID(g.tglKamar) : "-"}</div>
-<div>Jumlah Kamar &nbsp;: ${angka(g.jumlahKamar) || "-"} Kamar</div>
-<table>
-  <tr class="rate-title"><td colspan="3">${HOTEL.namaCap} — ${esc(g.rateCat)}</td></tr>
-  <tr><th>ROOM TYPE</th><th>WEEKDAYS RATE</th><th>WEEKEND RATE</th></tr>
+${sec(1, `KAMAR <span class="mut">— ${esc(g.rateCat)}</span>`, `
+<table class="kv"><tr>
+  <td><div class="lb">Tanggal</div><div class="v">${g.tglKamar ? tglID(g.tglKamar) : "-"}</div></td>
+  <td><div class="lb">Jumlah Kamar</div><div class="v">${angka(g.jumlahKamar) || "-"} <b>Kamar</b></div></td>
+</tr></table>
+<div class="cap">${HOTEL.namaCap} — ${esc(g.rateCat)}</div>
+<table class="tb">
+  <tr><th class="l">ROOM TYPE</th><th>WEEKDAYS RATE</th><th>WEEKEND RATE</th></tr>
   ${rateRows}
 </table>
-<div class="sec">Harga Kamar Sudah Termasuk:</div>
-<ul>${inclList}</ul>
-<p>Penggunaan Extra Bed dikenakan biaya Rp 400.000 per malam sudah termasuk sarapan. Penambahan sarapan di luar paket kamar dikenakan biaya Rp 180.000 per orang.</p>
+<div class="sub">Harga Kamar Sudah Termasuk:</div>
+${inclList}
+<p>Penggunaan Extra Bed dikenakan biaya Rp 400.000 per malam sudah termasuk sarapan. Penambahan sarapan di luar paket kamar dikenakan biaya Rp 180.000 per orang.</p>`)}
 
-<div class="sec">2. KEBUTUHAN ACARA</div>
-<div>Nama Acara &nbsp;: <b>${esc(g.namaAcara) || "-"}</b></div>
-<div>Jumlah Peserta &nbsp;: ${angka(g.jumlahPeserta) ? angka(g.jumlahPeserta) + " Orang" : "-"}</div>
-<div class="sec">Rangkaian Acara:</div>
-<table>
-  <tr><th>Hari/Tanggal</th><th>Waktu</th><th>Acara</th><th>Tempat</th><th>Set up</th><th>Jumlah Peserta</th></tr>
+${sec(2, "KEBUTUHAN ACARA", `
+<table class="kv"><tr>
+  <td><div class="lb">Nama Acara</div><div class="v">${esc(g.namaAcara) || "-"}</div></td>
+  <td><div class="lb">Jumlah Peserta</div><div class="v">${angka(g.jumlahPeserta) ? angka(g.jumlahPeserta) + " <b>Orang</b>" : "-"}</div></td>
+</tr></table>
+<div class="sub">Rangkaian Acara:</div>
+<table class="tb sm">
+  <tr><th class="l">Hari/Tanggal</th><th>Waktu</th><th>Acara</th><th>Tempat</th><th>Set up</th><th>Jumlah Peserta</th></tr>
   ${rangkaianRows}
 </table>
-
-<div class="sec">ESTIMASI BIAYA</div>
-<table>
-  <tr><th>No</th><th>Check in / Check out</th><th>Description</th><th>Day(s)</th><th>Jumlah</th><th>Harga</th><th>Total</th></tr>
+<div class="sub" style="margin-top:14px">ESTIMASI BIAYA</div>
+<table class="tb sm">
+  <tr><th>No</th><th>Check in / Check out</th><th class="l">Description</th><th>Day(s)</th><th>Jumlah</th><th class="r">Harga</th><th class="r">Total</th></tr>
   ${estRows}
-  <tr class="total"><td colspan="6" class="r">Grand Total</td><td class="r">${grandTotal.toLocaleString("id-ID")}</td></tr>
 </table>
-<p><i><b>Catatan: Harga tersebut di atas sudah termasuk 21% pajak &amp; pelayanan dan hotel tidak memberikan komisi.</b></i></p>
+<table class="gt"><tr><td class="gl">Grand Total</td><td class="gv">${grandTotal.toLocaleString("id-ID")}</td></tr></table>
+<p class="cat">Catatan: Harga tersebut di atas sudah termasuk 21% pajak &amp; pelayanan dan hotel tidak memberikan komisi.</p>`)}
 
 ${pasalRows}
 
-<table class="sign" style="margin-top:20px">
-  <tr><td>Ditandatangani untuk <b>${HOTEL.nama}</b></td></tr>
+<div class="ttd">
+<p class="utk">Ditandatangani untuk <b class="nv">${HOTEL.nama}</b></p>
+<table class="sg"><tr>
+  <td><div class="lb">Prepared by,</div>${kotakTtd(g.prepImg, g.prepBy, g.prepTitle)}</td>
+  <td><div class="lb">Acknowledge by,</div>${kotakTtd(g.leaderImg, g.leaderNama, g.leaderTitle)}</td>
+  <td><div class="lb">Approved by,</div>${kotakTtd(g.gmImg, g.gmNama, g.gmTitle)}</td>
+</tr></table>
+<p class="utk" style="margin-top:22px">Ditandatangani untuk <b class="nv">${perusahaan}</b></p>
+<table class="cs">
+  <tr><td class="lb" width="18%">Nama</td><td class="ln">&nbsp;</td></tr>
+  <tr><td class="lb">Jabatan</td><td class="ln">&nbsp;</td></tr>
+  <tr><td class="lb">Tanggal</td><td class="ln">&nbsp;</td></tr>
+  <tr><td class="lb" style="padding-top:18px">Tanda Tangan</td><td class="ln" style="padding-top:18px">&nbsp;</td></tr>
 </table>
-<table class="sign">
-  <tr><td width="33%">Prepared by,</td><td width="33%">Acknowledge by,</td><td width="34%">Approved by,</td></tr>
-  <tr>
-    <td>${blokTtd(g.prepImg, g.prepBy, g.prepTitle, "", esc, 44)}</td>
-    <td>${blokTtd(g.leaderImg, g.leaderNama, g.leaderTitle, "", esc, 44)}</td>
-    <td>${blokTtd(g.gmImg, g.gmNama, g.gmTitle, "", esc, 44)}</td>
-  </tr>
-</table>
-<br>
-<div>Ditandatangani untuk <b>${esc(g.instansi || g.namaAcara)}</b></div>
-<table class="sign" style="width:60%">
-  <tr><td width="35%">Nama</td><td>: ______________________</td></tr>
-  <tr><td>Jabatan</td><td>: ______________________</td></tr>
-  <tr><td>Tanggal</td><td>: ______________________</td></tr>
-  <tr><td>Tanda Tangan</td><td>: ______________________</td></tr>
-</table>
+</div>
 </div>`;
   }
 
@@ -662,7 +731,7 @@ ${pasalRows}
   const [busy, setBusy] = useState(false);
   async function unduh() {
     setBusy(true);
-    await unduhPDFdariHTML(build(), "CL-" + (clNo || "letter").replace(/[^\w-]/g, "_") + ".pdf", HOTEL.alamat + " · " + HOTEL.telp + " · " + HOTEL.web, { paraf: g.jenisCL !== "Meeting" });
+    await unduhPDFdariHTML(build(), "CL-" + (clNo || "letter").replace(/[^\w-]/g, "_") + ".pdf", HOTEL.alamat + " · " + HOTEL.telp + " · " + HOTEL.web, { paraf: g.jenisCL !== "Meeting", footerKiri: true });
     try {
       const th = new Date(g.tglSurat || hariIni()).getFullYear();
       await fetch("/api/docnum", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kode: "CL", tahun: th, nomor: angka(g.nomor) }) });
