@@ -158,8 +158,6 @@ function pasalList(g) {
           <td width="34%"><div class="lb">Account Name</div><div class="bv">${BANK.nama}</div></td>
           <td><div class="lb">Bank</div><div class="bv">${BANK.bank}</div></td></tr></table>`
       + p("Setelah transfer, mohon kirimkan salinan bukti transfer kepada pihak hotel melalui email. Pembayaran ke rekening lain tidak akan diterima sebagai bukti pembayaran.")],
-    ["FASILITAS KREDIT",
-      p("Fasilitas kredit dapat diberikan kepada perusahaan yang memenuhi syarat setelah sukses melakukan aplikasi. Pihak hotel membutuhkan setidaknya 14 hari kerja untuk memproses aplikasi. Fasilitas kredit tidak berlaku untuk tamu individual.")],
     ["JATUH TEMPO",
       p("Apabila Bapak/Ibu ingin melakukan reservasi, silakan melakukan konfirmasi dengan menandatangani kontrak ini sebelum <b>" + tglID(g.jatuhTempoDate) + "</b>. Harga yang tercantum berlaku hingga tanggal jatuh tempo tersebut, dan apabila melewati tanggal tersebut hotel berhak melakukan revisi harga.")],
     ["KONDISI DARURAT",
@@ -263,8 +261,6 @@ function pasalAcara(g, wed) {
       "Dalam hal pembatalan, pemberitahuan tertulis harus telah diterima hotel paling lama 90 hari sebelum pelaksanaan kegiatan. Deposit akan hangus apabila Bapak/Ibu melakukan pembatalan. Apabila pembatalan dilakukan kurang dari 90 hari sebelum pelaksanaan kegiatan maka akan dikenakan 100% biaya pembatalan."],
     ["KETIDAKHADIRAN <i>(No-Show)</i>", noShow],
     dekorasi, berbahaya, deposit,
-    ["FASILITAS KREDIT",
-      "Fasilitas kredit dapat diberikan kepada perusahaan yang memenuhi syarat setelah sukses melakukan aplikasi. Pihak hotel membutuhkan setidaknya 14 hari kerja untuk memproses aplikasi sebelum tamu datang, agar mengefektifkan proses aplikasi. Hasil persetujuan aplikasi sesuai dengan kebijakan hotel dan tidak menutup kemungkinan akan terjadi sebuah penolakan tanpa penjelasan. Hanya klien yang akan menggunakan hotel lebih dari sekali yang dapat mengajukan, jika tidak aplikasi akan ditolak. Saat disetujui, kredit yang diperpanjang tidak bisa melebihi dari batas yang telah ditentukan. Fasilitas kredit tidak bisa diberlakukan untuk tamu individual."],
     jatuhTempo, darurat, keamanan, kerusakan, hukum,
     ["LISENSI",
       "Klien sepenuhnya bertanggung jawab untuk mendapatkan lisensi atau izin yang diperlukan untuk melakukan, menyiarkan, mengirim, atau menampilkan karya hak cipta apa pun (termasuk, tanpa batasan, musik, audio, atau rekaman video, karya seni, dan lain-lain) yang dapat digunakan Grup atau diminta untuk digunakan di hotel."],
